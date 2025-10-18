@@ -5,6 +5,7 @@
 
 import { TwilioProvider } from '../providers/communication/twilio.provider';
 import { SendSMSOptions, SMSSession } from '../types';
+import { logger } from '../utils/logger';
 
 export class SMSResource {
   constructor(private twilioProvider: TwilioProvider) {}
@@ -18,11 +19,11 @@ export class SMSResource {
    *   to: '+1234567890',
    *   body: 'Hello from our AI assistant!'
    * });
-   * console.log('SMS sent:', sms.id);
+   * logger.info('SMS sent:', sms.id);
    * ```
    */
   async send(options: SendSMSOptions): Promise<SMSSession> {
-    console.log(`[SMSResource] Sending SMS to ${options.to}`);
+    logger.info(`[SMSResource] Sending SMS to ${options.to}`);
 
     const messageSid = await this.twilioProvider.sendSMS(options.to, options.body);
 

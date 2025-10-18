@@ -9,6 +9,7 @@ import { ToolExecutionService } from './services/tool-execution.service';
 import { ToolRegistry } from './tools/registry';
 import { InMemoryConversationStore } from './storage/in-memory-conversation.store';
 import { setupStandardTools } from './tools/standard';
+import { logger } from './utils/logger';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider } from './providers/communication/twilio.provider';
@@ -89,7 +90,7 @@ export class AIReceptionist {
     }
 
     if (config.debug) {
-      console.log('[AIReceptionist] Created instance for agent:', config.agent.name);
+      logger.info('[AIReceptionist] Created instance for agent:', config.agent.name);
     }
   }
 
@@ -99,11 +100,11 @@ export class AIReceptionist {
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
-      console.warn('[AIReceptionist] Already initialized');
+      logger.warn('[AIReceptionist] Already initialized');
       return;
     }
 
-    console.log(`[AIReceptionist] Initializing agent: ${this.config.agent.name}`);
+    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.name}`);
 
     // 1. Initialize conversation store
     this.conversationService = new ConversationService(
@@ -192,9 +193,9 @@ export class AIReceptionist {
 
     this.initialized = true;
 
-    console.log(`[AIReceptionist] Initialized successfully`);
-    console.log(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);
-    console.log(`[AIReceptionist] - Available channels: ${[
+    logger.info(`[AIReceptionist] Initialized successfully`);
+    logger.info(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);
+    logger.info(`[AIReceptionist] - Available channels: ${[
       this.calls ? 'calls' : null,
       this.sms ? 'sms' : null,
       this.email ? 'email' : null
@@ -225,7 +226,7 @@ export class AIReceptionist {
    * ```
    */
   clone(overrides: Partial<AIReceptionistConfig>): AIReceptionist {
-    console.log(`[AIReceptionist] Cloning instance with overrides`);
+    logger.info(`[AIReceptionist] Cloning instance with overrides`);
 
     const clonedConfig: AIReceptionistConfig = {
       // Merge agent config
@@ -278,7 +279,7 @@ export class AIReceptionist {
    * Dispose of all resources
    */
   async dispose(): Promise<void> {
-    console.log('[AIReceptionist] Disposing');
+    logger.info('[AIReceptionist] Disposing');
 
     if (this.twilioProvider) {
       await this.twilioProvider.dispose();

@@ -7,6 +7,7 @@ import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { BaseProvider } from '../base.provider';
 import { AIModelConfig, AgentConfig, ChatOptions, AIResponse, ITool } from '../../types';
+import { logger } from '../../utils/logger';
 
 /**
  * OpenAI Provider - Leverages the official OpenAI SDK
@@ -33,7 +34,7 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   async initialize(): Promise<void> {
-    console.log('[OpenAIProvider] Initializing with model:', this.config.model);
+    logger.info('[OpenAIProvider] Initializing with model:', this.config.model);
 
     this.client = new OpenAI({
       apiKey: this.config.apiKey,
@@ -51,9 +52,9 @@ export class OpenAIProvider extends BaseProvider {
       throw new Error('OpenAI client not initialized');
     }
 
-    console.log(`[OpenAIProvider] Chat request for conversation: ${options.conversationId}`);
-    console.log(`[OpenAIProvider] User message: ${options.userMessage}`);
-    console.log(`[OpenAIProvider] Available tools: ${options.availableTools?.length || 0}`);
+    logger.info(`[OpenAIProvider] Chat request for conversation: ${options.conversationId}`);
+    logger.info(`[OpenAIProvider] User message: ${options.userMessage}`);
+    logger.info(`[OpenAIProvider] Available tools: ${options.availableTools?.length || 0}`);
 
     const messages = this.buildMessages(options);
     const tools = options.availableTools ? this.buildToolDefinitions(options.availableTools) : undefined;
@@ -70,7 +71,7 @@ export class OpenAIProvider extends BaseProvider {
 
       return this.parseResponse(response);
     } catch (error) {
-      console.error('[OpenAIProvider] Chat error:', error);
+      logger.error('[OpenAIProvider] Chat error:', error);
       throw error;
     }
   }
@@ -178,13 +179,13 @@ export class OpenAIProvider extends BaseProvider {
       await this.client.models.list();
       return true;
     } catch (error) {
-      console.error('[OpenAIProvider] Health check failed:', error);
+      logger.error('[OpenAIProvider] Health check failed:', error);
       return false;
     }
   }
 
   async dispose(): Promise<void> {
-    console.log('[OpenAIProvider] Disposing');
+    logger.info('[OpenAIProvider] Disposing');
     this.client = null;
     this.initialized = false;
   }

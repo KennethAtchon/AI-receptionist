@@ -18,6 +18,7 @@ import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { BaseProvider } from '../base.provider';
 import { AIModelConfig, AgentConfig, ChatOptions, AIResponse, ITool } from '../../types';
+import { logger } from '../../utils/logger';
 
 /**
  * OpenRouter Provider - Multi-model AI access through unified API
@@ -81,7 +82,7 @@ export class OpenRouterProvider extends BaseProvider {
   }
 
   async initialize(): Promise<void> {
-    console.log('[OpenRouterProvider] Initializing with model:', this.config.model);
+    logger.info('[OpenRouterProvider] Initializing with model:', this.config.model);
 
     // OpenRouter uses OpenAI-compatible API with custom base URL
     this.client = new OpenAI({
@@ -96,7 +97,7 @@ export class OpenRouterProvider extends BaseProvider {
     });
 
     this.initialized = true;
-    console.log('[OpenRouterProvider] Initialized successfully');
+    logger.info('[OpenRouterProvider] Initialized successfully');
   }
 
   /**
@@ -115,7 +116,7 @@ export class OpenRouterProvider extends BaseProvider {
       );
     }
 
-    console.log(`[OpenRouterProvider] Switching model from ${this.currentModel} to ${model}`);
+    logger.info(`[OpenRouterProvider] Switching model from ${this.currentModel} to ${model}`);
     this.currentModel = model;
   }
 
@@ -129,7 +130,7 @@ export class OpenRouterProvider extends BaseProvider {
       const availableModels = await this.listAvailableModels();
       return availableModels.some(m => m.id === model);
     } catch (error) {
-      console.error('[OpenRouterProvider] Model validation failed:', error);
+      logger.error('[OpenRouterProvider] Model validation failed:', error);
       return false;
     }
   }
@@ -160,7 +161,7 @@ export class OpenRouterProvider extends BaseProvider {
         provider: model.id.split('/')[0] || 'unknown',
       }));
     } catch (error) {
-      console.error('[OpenRouterProvider] Failed to list models:', error);
+      logger.error('[OpenRouterProvider] Failed to list models:', error);
       throw error;
     }
   }
@@ -172,10 +173,10 @@ export class OpenRouterProvider extends BaseProvider {
       throw new Error('OpenRouter client not initialized');
     }
 
-    console.log(`[OpenRouterProvider] Chat request for conversation: ${options.conversationId}`);
-    console.log(`[OpenRouterProvider] Model: ${this.currentModel}`);
-    console.log(`[OpenRouterProvider] User message: ${options.userMessage}`);
-    console.log(`[OpenRouterProvider] Available tools: ${options.availableTools?.length || 0}`);
+    logger.info(`[OpenRouterProvider] Chat request for conversation: ${options.conversationId}`);
+    logger.info(`[OpenRouterProvider] Model: ${this.currentModel}`);
+    logger.info(`[OpenRouterProvider] User message: ${options.userMessage}`);
+    logger.info(`[OpenRouterProvider] Available tools: ${options.availableTools?.length || 0}`);
 
     const messages = this.buildMessages(options);
     const tools = options.availableTools ? this.buildToolDefinitions(options.availableTools) : undefined;
@@ -192,7 +193,7 @@ export class OpenRouterProvider extends BaseProvider {
 
       return this.parseResponse(response);
     } catch (error) {
-      console.error('[OpenRouterProvider] Chat error:', error);
+      logger.error('[OpenRouterProvider] Chat error:', error);
       throw error;
     }
   }
@@ -300,13 +301,13 @@ export class OpenRouterProvider extends BaseProvider {
       await this.client.models.list();
       return true;
     } catch (error) {
-      console.error('[OpenRouterProvider] Health check failed:', error);
+      logger.error('[OpenRouterProvider] Health check failed:', error);
       return false;
     }
   }
 
   async dispose(): Promise<void> {
-    console.log('[OpenRouterProvider] Disposing');
+    logger.info('[OpenRouterProvider] Disposing');
     this.client = null;
     this.initialized = false;
   }

@@ -5,6 +5,7 @@
 
 import { BaseProvider } from '../base.provider';
 import { GoogleCalendarConfig, CalendarEvent } from '../../types';
+import { logger } from '../../utils/logger';
 
 export class GoogleCalendarProvider extends BaseProvider {
   readonly name = 'google-calendar';
@@ -17,7 +18,7 @@ export class GoogleCalendarProvider extends BaseProvider {
   }
 
   async initialize(): Promise<void> {
-    console.log('[GoogleCalendarProvider] Initializing');
+    logger.info('[GoogleCalendarProvider] Initializing');
 
     // TODO: Initialize Google Calendar client
     // const { google } = require('googleapis');
@@ -29,7 +30,7 @@ export class GoogleCalendarProvider extends BaseProvider {
   async getAvailableSlots(date: Date, duration: number = 60): Promise<Date[]> {
     this.ensureInitialized();
 
-    console.log(`[GoogleCalendarProvider] Getting available slots for ${date}, duration: ${duration}min`);
+    logger.info(`[GoogleCalendarProvider] Getting available slots for ${date}, duration: ${duration}min`);
 
     // TODO: Actual Google Calendar API call
     // const response = await this.client.freebusy.query({
@@ -52,7 +53,7 @@ export class GoogleCalendarProvider extends BaseProvider {
   async createEvent(event: CalendarEvent): Promise<string> {
     this.ensureInitialized();
 
-    console.log(`[GoogleCalendarProvider] Creating event: ${event.title}`);
+    logger.info(`[GoogleCalendarProvider] Creating event: ${event.title}`);
 
     // TODO: Actual Google Calendar event creation
     // const response = await this.client.events.insert({
@@ -78,13 +79,13 @@ export class GoogleCalendarProvider extends BaseProvider {
       // TODO: Actual health check
       return true;
     } catch (error) {
-      console.error('[GoogleCalendarProvider] Health check failed:', error);
+      logger.error('[GoogleCalendarProvider] Health check failed:', error);
       return false;
     }
   }
 
   async dispose(): Promise<void> {
-    console.log('[GoogleCalendarProvider] Disposing');
+    logger.info('[GoogleCalendarProvider] Disposing');
     this.client = null;
     this.initialized = false;
   }

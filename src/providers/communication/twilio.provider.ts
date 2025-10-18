@@ -5,6 +5,7 @@
 
 import { BaseProvider } from '../base.provider';
 import { TwilioConfig, CallOptions, SMSOptions } from '../../types';
+import { logger } from '../../utils/logger';
 
 export class TwilioProvider extends BaseProvider {
   readonly name = 'twilio';
@@ -18,7 +19,7 @@ export class TwilioProvider extends BaseProvider {
 
   async initialize(): Promise<void> {
     // TODO: Initialize Twilio client
-    console.log('[TwilioProvider] Initializing with account:', this.config.accountSid);
+    logger.info('[TwilioProvider] Initializing with account:', this.config.accountSid);
 
     // Placeholder: const twilio = require('twilio');
     // this.client = twilio(this.config.accountSid, this.config.authToken);
@@ -29,8 +30,8 @@ export class TwilioProvider extends BaseProvider {
   async makeCall(to: string, options: CallOptions): Promise<string> {
     this.ensureInitialized();
 
-    console.log(`[TwilioProvider] Making call to ${to}`);
-    console.log(`[TwilioProvider] Webhook URL: ${options.webhookUrl}`);
+    logger.info(`[TwilioProvider] Making call to ${to}`);
+    logger.info(`[TwilioProvider] Webhook URL: ${options.webhookUrl}`);
 
     // TODO: Actual Twilio call creation
     // const call = await this.client.calls.create({
@@ -49,7 +50,7 @@ export class TwilioProvider extends BaseProvider {
   async sendSMS(to: string, body: string, options?: SMSOptions): Promise<string> {
     this.ensureInitialized();
 
-    console.log(`[TwilioProvider] Sending SMS to ${to}: ${body}`);
+    logger.info(`[TwilioProvider] Sending SMS to ${to}: ${body}`);
 
     // TODO: Actual Twilio SMS
     // const message = await this.client.messages.create({
@@ -72,13 +73,13 @@ export class TwilioProvider extends BaseProvider {
       // await this.client.api.accounts(this.config.accountSid).fetch();
       return true;
     } catch (error) {
-      console.error('[TwilioProvider] Health check failed:', error);
+      logger.error('[TwilioProvider] Health check failed:', error);
       return false;
     }
   }
 
   async dispose(): Promise<void> {
-    console.log('[TwilioProvider] Disposing');
+    logger.info('[TwilioProvider] Disposing');
     this.client = null;
     this.initialized = false;
   }

@@ -7,6 +7,7 @@ import { TwilioProvider } from '../providers/communication/twilio.provider';
 import { ConversationService } from './conversation.service';
 import { ToolExecutionService } from './tool-execution.service';
 import { MakeCallOptions, CallSession, AgentConfig, IAIProvider } from '../types';
+import { logger } from '../utils/logger';
 
 export class CallService {
   constructor(
@@ -22,7 +23,7 @@ export class CallService {
    * Initiate an outbound call
    */
   async initiateCall(options: MakeCallOptions): Promise<CallSession> {
-    console.log(`[CallService] Initiating call to ${options.to}`);
+    logger.info(`[CallService] Initiating call to ${options.to}`);
 
     // 1. Create conversation context
     const conversation = await this.conversationService.create({
@@ -33,7 +34,7 @@ export class CallService {
 
     // 2. Get available tools for this channel
     const availableTools = this.toolExecutor.getToolsForChannel('call');
-    console.log(`[CallService] Available tools: ${availableTools.map(t => t.name).join(', ')}`);
+    logger.info(`[CallService] Available tools: ${availableTools.map(t => t.name).join(', ')}`);
 
     // 3. Make the call via Twilio provider
     const webhookUrl = `${this.webhookBaseUrl}/webhooks/calls/${conversation.id}`;
@@ -55,7 +56,7 @@ export class CallService {
     await this.conversationService.get(conversation.id);
     // TODO: Update conversation with callSid via store
 
-    console.log(`[CallService] Call initiated: ${callSid}`);
+    logger.info(`[CallService] Call initiated: ${callSid}`);
 
     return {
       id: callSid,
@@ -70,7 +71,7 @@ export class CallService {
    * Handle incoming voice from user during call
    */
   async handleUserSpeech(callSid: string, userSpeech: string): Promise<string> {
-    console.log(`[CallService] Handling speech for call ${callSid}: "${userSpeech}"`);
+    logger.info(`[CallService] Handling speech for call ${callSid}: "${userSpeech}"`);
 
     // 1. Get conversation
     const conversation = await this.conversationService.getByCallId(callSid);
@@ -94,7 +95,7 @@ export class CallService {
 
     // 4. If AI wants to use tools, execute them
     if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0) {
-      console.log(`[CallService] AI requested ${aiResponse.toolCalls.length} tool calls`);
+      logger.info(`[CallService] AI requested ${aiResponse.toolCalls.length} tool calls`);
 
       for (const toolCall of aiResponse.toolCalls) {
         const toolResult = await this.toolExecutor.execute(
@@ -145,7 +146,7 @@ export class CallService {
    * End a call
    */
   async endCall(callSid: string): Promise<void> {
-    console.log(`[CallService] Ending call ${callSid}`);
+    logger.info(`[CallService] Ending call ${callSid}`);
 
     const conversation = await this.conversationService.getByCallId(callSid);
     if (conversation) {

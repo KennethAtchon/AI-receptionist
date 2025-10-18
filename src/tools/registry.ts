@@ -4,6 +4,7 @@
  */
 
 import { ITool, ExecutionContext, ToolResult } from '../types';
+import { logger } from '../utils/logger';
 
 export class ToolRegistry {
   private tools = new Map<string, ITool>();
@@ -13,10 +14,10 @@ export class ToolRegistry {
    */
   register(tool: ITool): void {
     if (this.tools.has(tool.name)) {
-      console.warn(`[ToolRegistry] Tool '${tool.name}' already registered, overwriting`);
+      logger.warn(`[ToolRegistry] Tool '${tool.name}' already registered, overwriting`);
     }
     this.tools.set(tool.name, tool);
-    console.log(`[ToolRegistry] Registered tool: ${tool.name}`);
+    logger.info(`[ToolRegistry] Registered tool: ${tool.name}`);
   }
 
   /**
@@ -25,7 +26,7 @@ export class ToolRegistry {
   unregister(toolName: string): void {
     const removed = this.tools.delete(toolName);
     if (removed) {
-      console.log(`[ToolRegistry] Unregistered tool: ${toolName}`);
+      logger.info(`[ToolRegistry] Unregistered tool: ${toolName}`);
     }
   }
 
@@ -71,13 +72,13 @@ export class ToolRegistry {
     const handlerKey = `on${this.capitalizeFirst(context.channel)}` as keyof typeof tool.handlers;
     const handler = tool.handlers[handlerKey] || tool.handlers.default;
 
-    console.log(`[ToolRegistry] Executing tool '${toolName}' on channel '${context.channel}'`);
+    logger.info(`[ToolRegistry] Executing tool '${toolName}' on channel '${context.channel}'`);
 
     try {
       const result = await handler(parameters, context);
       return result;
     } catch (error) {
-      console.error(`[ToolRegistry] Tool execution failed:`, error);
+      logger.error(`[ToolRegistry] Tool execution failed:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -99,7 +100,7 @@ export class ToolRegistry {
    * Clear all tools
    */
   clear(): void {
-    console.log(`[ToolRegistry] Clearing ${this.tools.size} tools`);
+    logger.info(`[ToolRegistry] Clearing ${this.tools.size} tools`);
     this.tools.clear();
   }
 

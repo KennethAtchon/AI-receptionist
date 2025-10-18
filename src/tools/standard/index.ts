@@ -6,6 +6,7 @@
 import { ToolRegistry } from '../registry';
 import { ToolBuilder } from '../builder';
 import { ToolConfig, ProviderConfig } from '../../types';
+import { logger } from '../../utils/logger';
 
 /**
  * Setup standard tools based on configuration
@@ -24,7 +25,7 @@ export async function setupStandardTools(
           const calendarTool = createCalendarTool(toolConfig.calendar, providerConfig);
           registry.register(calendarTool);
         } else {
-          console.warn('[StandardTools] Calendar tool requested but no calendar provider configured');
+          logger.warn('[StandardTools] Calendar tool requested but no calendar provider configured');
         }
         break;
 
@@ -33,7 +34,7 @@ export async function setupStandardTools(
           const bookingTool = createBookingTool(toolConfig.booking);
           registry.register(bookingTool);
         } else {
-          console.warn('[StandardTools] Booking tool requested but no booking config provided');
+          logger.warn('[StandardTools] Booking tool requested but no booking config provided');
         }
         break;
 
@@ -42,12 +43,12 @@ export async function setupStandardTools(
           const crmTool = createCRMTool(toolConfig.crm);
           registry.register(crmTool);
         } else {
-          console.warn('[StandardTools] CRM tool requested but no CRM config provided');
+          logger.warn('[StandardTools] CRM tool requested but no CRM config provided');
         }
         break;
 
       default:
-        console.warn(`[StandardTools] Unknown standard tool: ${toolName}`);
+        logger.warn(`[StandardTools] Unknown standard tool: ${toolName}`);
     }
   }
 }
@@ -91,7 +92,7 @@ function createCalendarTool(calendarConfig: any, providerConfig: ProviderConfig)
     })
     .onCall(async (params, ctx) => {
       // Voice call: Conversational response
-      console.log(`[CalendarTool] Call: ${params.action} for ${params.date}`);
+      logger.info(`[CalendarTool] Call: ${params.action} for ${params.date}`);
 
       // TODO: Actual calendar API integration
       const availableSlots = ['9:00 AM', '2:00 PM', '4:00 PM'];
@@ -124,7 +125,7 @@ function createCalendarTool(calendarConfig: any, providerConfig: ProviderConfig)
     })
     .onSMS(async (params, ctx) => {
       // SMS: Brief, structured response
-      console.log(`[CalendarTool] SMS: ${params.action} for ${params.date}`);
+      logger.info(`[CalendarTool] SMS: ${params.action} for ${params.date}`);
 
       const availableSlots = ['9:00 AM', '2:00 PM', '4:00 PM'];
 
@@ -156,7 +157,7 @@ function createCalendarTool(calendarConfig: any, providerConfig: ProviderConfig)
     })
     .onEmail(async (params, ctx) => {
       // Email: Formal with calendar invite
-      console.log(`[CalendarTool] Email: ${params.action} for ${params.date}`);
+      logger.info(`[CalendarTool] Email: ${params.action} for ${params.date}`);
 
       const availableSlots = ['9:00 AM', '2:00 PM', '4:00 PM'];
 
@@ -205,7 +206,7 @@ function createCalendarTool(calendarConfig: any, providerConfig: ProviderConfig)
     })
     .default(async (params, ctx) => {
       // Fallback handler
-      console.log(`[CalendarTool] Default: ${params.action} for ${params.date}`);
+      logger.info(`[CalendarTool] Default: ${params.action} for ${params.date}`);
 
       return {
         success: true,
@@ -236,7 +237,7 @@ function createBookingTool(bookingConfig: any) {
       required: ['action']
     })
     .default(async (params, ctx) => {
-      console.log('[BookingTool] Processing booking action:', params.action);
+      logger.info('[BookingTool] Processing booking action:', params.action);
 
       // TODO: Integrate with actual booking API
       return {
@@ -266,7 +267,7 @@ function createCRMTool(crmConfig: any) {
       required: ['action']
     })
     .default(async (params, ctx) => {
-      console.log('[CRMTool] Processing CRM action:', params.action);
+      logger.info('[CRMTool] Processing CRM action:', params.action);
 
       // TODO: Integrate with actual CRM API
       return {

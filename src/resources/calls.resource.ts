@@ -5,6 +5,7 @@
 
 import { CallService } from '../services/call.service';
 import { MakeCallOptions, CallSession } from '../types';
+import { logger } from '../utils/logger';
 
 export class CallsResource {
   constructor(private callService: CallService) {}
@@ -18,7 +19,7 @@ export class CallsResource {
    *   to: '+1234567890',
    *   metadata: { leadId: '123', source: 'website' }
    * });
-   * console.log('Call initiated:', call.id);
+   * logger.info('Call initiated:', call.id);
    * ```
    */
   async make(options: MakeCallOptions): Promise<CallSession> {

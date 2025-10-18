@@ -52,6 +52,13 @@ export { CallService } from './services/call.service';
 export { InMemoryConversationStore } from './storage/in-memory-conversation.store';
 
 // ============================================================================
+// Utilities
+// ============================================================================
+
+export { logger, configureLogger, createLogger, getLogger, LogLevel } from './utils/logger';
+export type { ILogger, LoggerConfig, LogContext } from './utils/logger';
+
+// ============================================================================
 // Types (All type exports)
 // ============================================================================
 

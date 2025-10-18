@@ -4,6 +4,7 @@
  */
 
 import { IConversationStore, Conversation, ConversationFilters } from '../types';
+import { logger } from '../utils/logger';
 
 export class InMemoryConversationStore implements IConversationStore {
   private conversations = new Map<string, Conversation>();
@@ -21,7 +22,7 @@ export class InMemoryConversationStore implements IConversationStore {
       this.messageIdIndex.set(conversation.messageSid, conversation.id);
     }
 
-    console.log(`[InMemoryStore] Saved conversation: ${conversation.id}`);
+    logger.info(`[InMemoryStore] Saved conversation: ${conversation.id}`);
   }
 
   async get(conversationId: string): Promise<Conversation | null> {
@@ -63,7 +64,7 @@ export class InMemoryConversationStore implements IConversationStore {
     }
 
     this.conversations.delete(conversationId);
-    console.log(`[InMemoryStore] Deleted conversation: ${conversationId}`);
+    logger.info(`[InMemoryStore] Deleted conversation: ${conversationId}`);
   }
 
   async list(filters?: ConversationFilters): Promise<Conversation[]> {
@@ -112,6 +113,6 @@ export class InMemoryConversationStore implements IConversationStore {
     this.conversations.clear();
     this.callIdIndex.clear();
     this.messageIdIndex.clear();
-    console.log('[InMemoryStore] Cleared all conversations');
+    logger.info('[InMemoryStore] Cleared all conversations');
   }
 }

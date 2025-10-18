@@ -5,6 +5,7 @@
 
 import { ToolRegistry } from '../tools/registry';
 import { ExecutionContext, ToolResult, ToolExecutionEvent, ToolErrorEvent } from '../types';
+import { logger } from '../utils/logger';
 
 export class ToolExecutionService {
   constructor(
@@ -31,7 +32,7 @@ export class ToolExecutionService {
     const startTime = Date.now();
 
     try {
-      console.log(`[ToolExecutionService] Executing '${toolName}' on ${context.channel}`);
+      logger.info(`[ToolExecutionService] Executing '${toolName}' on ${context.channel}`);
 
       const result = await this.registry.execute(toolName, parameters, context);
 
@@ -48,7 +49,7 @@ export class ToolExecutionService {
         });
       }
 
-      console.log(`[ToolExecutionService] Tool '${toolName}' executed in ${duration}ms`);
+      logger.info(`[ToolExecutionService] Tool '${toolName}' executed in ${duration}ms`);
 
       return result;
     } catch (error) {
@@ -64,7 +65,7 @@ export class ToolExecutionService {
         });
       }
 
-      console.error(`[ToolExecutionService] Tool '${toolName}' failed:`, errorObj);
+      logger.error(`[ToolExecutionService] Tool '${toolName}' failed:`, errorObj);
 
       return {
         success: false,

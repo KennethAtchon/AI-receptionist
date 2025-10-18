@@ -4,6 +4,7 @@
  */
 
 import { SendEmailOptions, EmailSession } from '../types';
+import { logger } from '../utils/logger';
 
 export class EmailResource {
   constructor() {}
@@ -19,11 +20,11 @@ export class EmailResource {
    *   body: 'Thanks for reaching out...',
    *   html: '<h1>Welcome!</h1><p>Thanks for reaching out...</p>'
    * });
-   * console.log('Email sent:', email.id);
+   * logger.info('Email sent:', email.id);
    * ```
    */
   async send(options: SendEmailOptions): Promise<EmailSession> {
-    console.log(`[EmailResource] Sending email to ${options.to}`);
+    logger.info(`[EmailResource] Sending email to ${options.to}`);
 
     // TODO: Implement email sending via provider
 

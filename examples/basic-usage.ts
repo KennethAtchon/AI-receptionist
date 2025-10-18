@@ -3,7 +3,7 @@
  * Demonstrates the agent-centric architecture with tools and multiple channels
  */
 
-import { AIReceptionist, Tools, ToolBuilder } from '../src';
+import { AIReceptionist, Tools, ToolBuilder, logger } from '../src';
 
 async function main() {
   // =========================================================================
@@ -61,7 +61,7 @@ async function main() {
             required: ['productId']
           },
           handler: async (params, ctx) => {
-            console.log(`Checking inventory for product: ${params.productId}`);
+            logger.info(`Checking inventory for product: ${params.productId}`);
 
             // Simulated inventory check
             const inventory = {
@@ -161,11 +161,11 @@ async function main() {
 
     // Event callbacks for monitoring
     onToolExecute: (event) => {
-      console.log(`✓ Tool executed: ${event.toolName} in ${event.duration}ms`);
+      logger.info(`✓ Tool executed: ${event.toolName} in ${event.duration}ms`);
     },
 
     onToolError: (event) => {
-      console.error(`✗ Tool failed: ${event.toolName}`, event.error.message);
+      logger.error(`✗ Tool failed: ${event.toolName}`, event.error);
     },
 
     debug: true
@@ -174,7 +174,7 @@ async function main() {
   // Initialize the agent
   await sarah.initialize();
 
-  console.log('\n=== Sarah (Sales Agent) Initialized ===\n');
+  logger.info('\n=== Sarah (Sales Agent) Initialized ===\n');
 
   // Use the agent across different channels
   if (sarah.calls) {
@@ -182,7 +182,7 @@ async function main() {
       to: '+1234567890',
       metadata: { leadId: 'LEAD-123', source: 'website' }
     });
-    console.log('Call initiated:', call.id);
+    logger.info('Call initiated:', call.id);
   }
 
   if (sarah.sms) {
@@ -190,14 +190,14 @@ async function main() {
       to: '+1234567890',
       body: 'Hi! This is Sarah from ABC Company. I wanted to follow up on your inquiry.'
     });
-    console.log('SMS sent:', sms.id);
+    logger.info('SMS sent:', sms.id);
   }
 
   // =========================================================================
   // Example 2: Clone Pattern for Multiple Agents
   // =========================================================================
 
-  console.log('\n=== Creating Bob (Support Agent) via Clone ===\n');
+  logger.info('\n=== Creating Bob (Support Agent) via Clone ===\n');
 
   const bob = sarah.clone({
     agent: {
@@ -239,7 +239,7 @@ async function main() {
 
   await bob.initialize();
 
-  console.log('Bob initialized with different tools and personality');
+  logger.info('Bob initialized with different tools and personality');
 
   // Both agents can work independently
   if (sarah.calls && bob.calls) {
@@ -251,7 +251,7 @@ async function main() {
   // Example 3: Runtime Tool Management
   // =========================================================================
 
-  console.log('\n=== Runtime Tool Management ===\n');
+  logger.info('\n=== Runtime Tool Management ===\n');
 
   const sarahToolRegistry = sarah.getToolRegistry();
 
@@ -266,7 +266,7 @@ async function main() {
       }
     },
     handler: async (params, ctx) => {
-      console.log('Escalating to manager:', params.reason);
+      logger.info('Escalating to manager:', params.reason);
       return {
         success: true,
         response: {
@@ -278,11 +278,11 @@ async function main() {
   });
 
   sarahToolRegistry.register(urgentTool);
-  console.log(`Sarah now has ${sarahToolRegistry.count()} tools available`);
+  logger.info(`Sarah now has ${sarahToolRegistry.count()} tools available`);
 
   // List tools for specific channel
   const callTools = sarahToolRegistry.listAvailable('call');
-  console.log(`Tools available for calls:`, callTools.map(t => t.name));
+  logger.info(`Tools available for calls:`, callTools.map(t => t.name));
 
   // =========================================================================
   // Cleanup
@@ -291,7 +291,7 @@ async function main() {
   await sarah.dispose();
   await bob.dispose();
 
-  console.log('\n=== Example Complete ===\n');
+  logger.info('\n=== Example Complete ===\n');
 }
 
 // Run the example

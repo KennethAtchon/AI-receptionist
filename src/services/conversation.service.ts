@@ -5,6 +5,7 @@
 
 import { IConversationStore, Conversation, ConversationMessage, AgentConfig } from '../types';
 import { InMemoryConversationStore } from '../storage/in-memory-conversation.store';
+import { logger } from '../utils/logger';
 
 export interface CreateConversationOptions {
   channel: 'call' | 'sms' | 'email';
@@ -38,7 +39,7 @@ export class ConversationService {
 
     await this.store.save(conversation);
 
-    console.log(`[ConversationService] Created conversation: ${conversation.id} on channel: ${options.channel}`);
+    logger.info(`[ConversationService] Created conversation: ${conversation.id} on channel: ${options.channel}`);
 
     return conversation;
   }
@@ -64,7 +65,7 @@ export class ConversationService {
 
     await this.store.update(conversationId, { messages: conversation.messages });
 
-    console.log(`[ConversationService] Added message to ${conversationId}: ${message.role}`);
+    logger.info(`[ConversationService] Added message to ${conversationId}: ${message.role}`);
   }
 
   /**
@@ -97,7 +98,7 @@ export class ConversationService {
       endedAt: new Date()
     });
 
-    console.log(`[ConversationService] Completed conversation: ${conversationId}`);
+    logger.info(`[ConversationService] Completed conversation: ${conversationId}`);
   }
 
   /**
@@ -109,7 +110,7 @@ export class ConversationService {
       endedAt: new Date()
     });
 
-    console.log(`[ConversationService] Failed conversation: ${conversationId}`);
+    logger.info(`[ConversationService] Failed conversation: ${conversationId}`);
   }
 
   private generateId(): string {
