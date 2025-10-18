@@ -1,0 +1,1 @@
+I want the agent system to be more robust. We create like a class for the Agent, we provide it with everything it needs. A detailed system prompt with hierachy and enhancements. That makes the agent the best it can be, can you write a markdown, braintorming how to improve our current Agent design? 
