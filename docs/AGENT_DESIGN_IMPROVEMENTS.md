@@ -3,6 +3,19 @@
 **Date**: 2025-10-18
 **Purpose**: Comprehensive brainstorming on how to make our Agent system more robust, scalable, and maintainable through a class-based architecture with enhanced system prompts and hierarchical design.
 
+## Core Philosophy: The Six Pillars
+
+This design is built around **six core pillars** that define every agent:
+
+1. **Identity** - Who the agent is (name, role, backstory, authority)
+2. **Personality** - How the agent behaves (traits, communication style, emotional intelligence)
+3. **Knowledge** - What the agent knows (domain expertise, limitations, knowledge base)
+4. **Capabilities** - What the agent can do (skills, tools, actions)
+5. **Memory** - What the agent remembers (short-term, long-term, semantic)
+6. **Goals** - What the agent aims to achieve (primary/secondary goals, constraints, metrics)
+
+**Important**: We deliberately **do not** include explicit Reasoning or Planning engines. Modern AI providers (Claude, GPT-4, etc.) handle reasoning and planning natively through their training. Explicit reasoning frameworks in system prompts are redundant and can actually constrain the model's natural capabilities. We trust the AI to reason intelligently based on the context we provide through the six pillars.
+
 ---
 
 ## Table of Contents
@@ -15,10 +28,9 @@
 6. [Agent Capabilities & Skills](#agent-capabilities--skills)
 7. [Agent Hierarchy & Specialization](#agent-hierarchy--specialization)
 8. [Memory & Context Management](#memory--context-management)
-9. [Agent Communication & Orchestration](#agent-communication--orchestration)
-10. [Error Handling & Resilience](#error-handling--resilience)
-11. [Observability & Debugging](#observability--debugging)
-12. [Implementation Roadmap](#implementation-roadmap)
+9. [Error Handling & Resilience](#error-handling--resilience)
+10. [Observability & Debugging](#observability--debugging)
+11. [Implementation Roadmap](#implementation-roadmap)
 
 ---
 
@@ -149,11 +161,6 @@ const response = await agent.process({
 │  │   Manager      │  │   Management    │  │   System     │ │
 │  └────────────────┘  └─────────────────┘  └──────────────┘ │
 │                                                              │
-│  ┌────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │   Reasoning    │  │    Planning     │  │   Decision   │ │
-│  │    Engine      │  │     Engine      │  │    Engine    │ │
-│  └────────────────┘  └─────────────────┘  └──────────────┘ │
-│                                                              │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │         System Prompt Builder & Optimizer              │ │
 │  └────────────────────────────────────────────────────────┘ │
@@ -208,15 +215,10 @@ src/
 │   │   ├── LongTermMemory.ts        # Persistent memory
 │   │   └── VectorMemory.ts          # Vector storage
 │   │
-│   ├── reasoning/
-│   │   ├── ReasoningEngine.ts       # Decision making
-│   │   ├── ChainOfThought.ts        # CoT reasoning
-│   │   └── ReflectionEngine.ts      # Self-reflection
-│   │
-│   ├── planning/
-│   │   ├── PlanningEngine.ts        # Multi-step planning
+│   ├── goals/
 │   │   ├── GoalSystem.ts            # Goal management
-│   │   └── StrategySelector.ts      # Strategy selection
+│   │   ├── GoalTracker.ts           # Goal tracking & metrics
+│   │   └── Constraints.ts           # Goal constraints
 │   │
 │   ├── prompt/
 │   │   ├── SystemPromptBuilder.ts   # Dynamic prompt building
@@ -227,13 +229,11 @@ src/
 │   ├── hierarchy/
 │   │   ├── AgentHierarchy.ts        # Agent specialization
 │   │   ├── BaseAgent.ts             # Base class
-│   │   ├── SpecializedAgent.ts      # Specialized agents
-│   │   └── AgentTeam.ts             # Multi-agent teams
+│   │   └── SpecializedAgent.ts      # Specialized agents
 │   │
 │   └── observability/
 │       ├── AgentLogger.ts           # Structured logging
-│       ├── ThinkingTracer.ts        # Trace agent thoughts
-│       ├── DecisionExplainer.ts     # Explain decisions
+│       ├── InteractionTracer.ts     # Trace agent interactions
 │       └── PerformanceMonitor.ts    # Performance metrics
 │
 ├── client.ts                        # Updated to use Agent class
@@ -258,18 +258,17 @@ src/
  * - Capabilities: What they can do
  * - Memory: What they remember
  * - Goals: What they aim to achieve
- * - Reasoning: How they think
  */
 export class Agent {
-  // Core components
+  // Core components (The 6 Pillars)
   private readonly identity: Identity;
   private readonly personality: PersonalityEngine;
   private readonly knowledge: KnowledgeBase;
   private readonly capabilities: CapabilityManager;
   private readonly memory: MemoryManager;
   private readonly goals: GoalSystem;
-  private readonly reasoning: ReasoningEngine;
-  private readonly planning: PlanningEngine;
+
+  // Supporting systems
   private readonly promptBuilder: SystemPromptBuilder;
 
   // State
@@ -283,8 +282,7 @@ export class Agent {
 
   // Observability
   private logger: AgentLogger;
-  private tracer: ThinkingTracer;
-  private explainer: DecisionExplainer;
+  private tracer: InteractionTracer;
 
   private constructor(config: AgentConfiguration) {
     // Initialize all components
@@ -323,40 +321,38 @@ export class Agent {
    * Process input and generate response
    */
   async process(request: AgentRequest): Promise<AgentResponse> {
-    this.tracer.startSession(request.id);
+    this.tracer.startInteraction(request.id);
 
     try {
-      // 1. Understand the input
-      const understanding = await this.understand(request.input, request.context);
-      this.tracer.log('understanding', understanding);
-
-      // 2. Retrieve relevant context from memory
-      const memoryContext = await this.memory.retrieve(understanding);
+      // 1. Retrieve relevant context from memory
+      const memoryContext = await this.memory.retrieve(request.input);
       this.tracer.log('memory_retrieval', memoryContext);
 
-      // 3. Determine goals and plan
-      const plan = await this.planning.createPlan(understanding, this.goals.getCurrent());
-      this.tracer.log('plan', plan);
+      // 2. Build context-aware system prompt
+      const systemPrompt = await this.promptBuilder.build({
+        identity: this.identity,
+        personality: this.personality,
+        knowledge: this.knowledge,
+        goals: this.goals.getCurrent(),
+        capabilities: this.capabilities.list(),
+        memoryContext,
+        channel: request.channel
+      });
 
-      // 4. Reason about the best approach
-      const reasoning = await this.reasoning.analyze(understanding, memoryContext, plan);
-      this.tracer.log('reasoning', reasoning);
-
-      // 5. Execute the plan
-      const response = await this.execute(plan, reasoning, request.channel);
+      // 3. Execute with AI provider
+      const response = await this.execute(request, systemPrompt, memoryContext);
       this.tracer.log('response', response);
 
-      // 6. Learn from the interaction
-      await this.learn(request, response);
-
-      // 7. Update memory
+      // 4. Update memory
       await this.memory.store({
         input: request.input,
-        understanding,
-        reasoning,
         response,
+        context: request.context,
         timestamp: new Date()
       });
+
+      // 5. Track goal progress
+      await this.goals.trackProgress(request, response);
 
       return response;
 
@@ -364,54 +360,25 @@ export class Agent {
       this.logger.error('Error processing request', { error, request });
       return this.handleError(error, request);
     } finally {
-      this.tracer.endSession();
+      this.tracer.endInteraction();
     }
   }
 
   /**
-   * Understand the input using AI
-   */
-  private async understand(input: string, context: any): Promise<Understanding> {
-    const prompt = this.promptBuilder.buildUnderstandingPrompt(input, context);
-    const response = await this.aiProvider.chat({
-      conversationId: context.conversationId,
-      userMessage: input,
-      availableTools: []
-    });
-
-    return {
-      intent: this.parseIntent(response.content),
-      entities: this.extractEntities(response.content),
-      sentiment: this.analyzeSentiment(response.content),
-      context: context
-    };
-  }
-
-  /**
-   * Execute the plan and generate response
+   * Execute request with AI provider
    */
   private async execute(
-    plan: ExecutionPlan,
-    reasoning: Reasoning,
-    channel: Channel
+    request: AgentRequest,
+    systemPrompt: string,
+    memoryContext: MemoryContext
   ): Promise<AgentResponse> {
-
-    // Get system prompt optimized for current context
-    const systemPrompt = await this.promptBuilder.build({
-      identity: this.identity,
-      personality: this.personality,
-      knowledge: this.knowledge,
-      goals: this.goals.getCurrent(),
-      reasoning: reasoning,
-      channel: channel
-    });
 
     // Execute with AI provider
     const aiResponse = await this.aiProvider.chat({
-      conversationId: plan.conversationId,
-      userMessage: plan.userInput,
-      conversationHistory: plan.history,
-      availableTools: this.capabilities.getTools(channel),
+      conversationId: request.context.conversationId,
+      userMessage: request.input,
+      conversationHistory: memoryContext.shortTerm,
+      availableTools: this.capabilities.getTools(request.channel),
       systemPrompt: systemPrompt
     });
 
@@ -419,46 +386,20 @@ export class Agent {
     if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0) {
       const toolResults = await this.toolExecutor.executeAll(
         aiResponse.toolCalls,
-        plan.executionContext
+        request.context
       );
 
       // Get final response after tool execution
-      return this.synthesizeResponse(aiResponse, toolResults, channel);
+      return this.synthesizeResponse(aiResponse, toolResults, request.channel);
     }
 
     return {
       content: aiResponse.content,
-      channel: channel,
+      channel: request.channel,
       metadata: {
-        reasoning: reasoning.summary(),
-        confidence: reasoning.confidence
+        confidence: aiResponse.confidence
       }
     };
-  }
-
-  /**
-   * Learn from interactions
-   */
-  private async learn(request: AgentRequest, response: AgentResponse): Promise<void> {
-    // Reflect on the interaction
-    const reflection = await this.reasoning.reflect({
-      request,
-      response,
-      goals: this.goals.getCurrent()
-    });
-
-    // Update knowledge if needed
-    if (reflection.newKnowledge) {
-      await this.knowledge.update(reflection.newKnowledge);
-    }
-
-    // Adjust strategies based on outcome
-    if (reflection.strategyAdjustment) {
-      await this.planning.updateStrategy(reflection.strategyAdjustment);
-    }
-
-    // Log learning
-    this.logger.info('Agent learned from interaction', { reflection });
   }
 
   /**
@@ -622,11 +563,11 @@ Current approach (simple concatenation):
 
 **Issues:**
 - No structure or hierarchy
-- No reasoning guidance
 - No error handling instructions
 - No context awareness
 - No goal alignment
 - Not optimized per-channel
+- Doesn't leverage agent's six core pillars
 
 ### Advanced System Prompt Architecture
 
@@ -641,6 +582,9 @@ export class SystemPromptBuilder {
 
   /**
    * Build a complete, optimized system prompt
+   *
+   * The prompt is built from the 6 core agent pillars:
+   * Identity, Personality, Knowledge, Capabilities, Memory, Goals
    */
   async build(context: PromptContext): Promise<string> {
     const sections: PromptSection[] = [];
@@ -660,19 +604,22 @@ export class SystemPromptBuilder {
     // 5. CAPABILITIES & TOOLS
     sections.push(this.buildCapabilitiesSection(context.capabilities));
 
-    // 6. REASONING FRAMEWORK
-    sections.push(this.buildReasoningSection(context.reasoning));
+    // 6. MEMORY CONTEXT (retrieved from MemoryManager)
+    sections.push(this.buildMemoryContextSection(context.memoryContext));
 
-    // 7. COMMUNICATION GUIDELINES
+    // 7. DECISION-MAKING PRINCIPLES
+    sections.push(this.buildDecisionPrinciplesSection());
+
+    // 8. COMMUNICATION GUIDELINES (channel-specific)
     sections.push(this.buildCommunicationSection(context.channel));
 
-    // 8. CONSTRAINTS & BOUNDARIES
+    // 9. CONSTRAINTS & BOUNDARIES
     sections.push(this.buildConstraintsSection(context));
 
-    // 9. ERROR HANDLING
+    // 10. ERROR HANDLING
     sections.push(this.buildErrorHandlingSection());
 
-    // 10. EXAMPLES (few-shot learning)
+    // 11. EXAMPLES (few-shot learning)
     sections.push(this.buildExamplesSection(context));
 
     // Assemble and optimize
@@ -797,60 +744,52 @@ When conflicts arise, prioritize:
     };
   }
 
-  private buildReasoningSection(reasoning?: Reasoning): PromptSection {
+  private buildMemoryContextSection(memoryContext?: MemoryContext): PromptSection {
+    if (!memoryContext) {
+      return {
+        name: 'MEMORY',
+        priority: 7,
+        content: ''
+      };
+    }
+
     return {
-      name: 'REASONING',
-      priority: 10,
+      name: 'MEMORY',
+      priority: 7,
       content: `
-# REASONING FRAMEWORK
+# RELEVANT CONTEXT FROM MEMORY
 
-## Thinking Process
-You should ALWAYS think step-by-step using this framework:
+## Recent Conversation
+${memoryContext.shortTerm?.slice(-5).map(m =>
+  `- ${m.content}`
+).join('\n') || 'No recent context'}
 
-1. **UNDERSTAND**: What is the user really asking?
-   - Parse the literal request
-   - Identify underlying needs
-   - Detect emotional context
-   - Consider cultural factors
+## Important Facts Recalled
+${memoryContext.longTerm?.map(m =>
+  `- ${m.content}`
+).join('\n') || 'No stored facts'}
 
-2. **ANALYZE**: What context is relevant?
-   - Review conversation history
-   - Retrieve relevant knowledge
-   - Identify applicable policies
-   - Consider edge cases
+## Similar Past Interactions
+${memoryContext.semantic?.map(m =>
+  `- ${m.summary}`
+).join('\n') || 'No similar interactions'}
+      `.trim()
+    };
+  }
 
-3. **PLAN**: What approach should I take?
-   - Identify required capabilities
-   - Sequence actions logically
-   - Anticipate outcomes
-   - Prepare alternatives
+  private buildDecisionPrinciplesSection(): PromptSection {
+    return {
+      name: 'DECISION_PRINCIPLES',
+      priority: 8,
+      content: `
+# DECISION-MAKING PRINCIPLES
 
-4. **EXECUTE**: How should I respond?
-   - Craft appropriate message
-   - Invoke necessary tools
-   - Adapt to channel constraints
-   - Maintain personality consistency
-
-5. **REFLECT**: How did I do?
-   - Assess response quality
-   - Identify improvements
-   - Update mental model
-   - Learn for next time
-
-## Decision-Making Principles
-- Always prioritize user benefit
-- Be transparent about limitations
-- Escalate when uncertain
-- Never make assumptions about sensitive data
+- Always prioritize user benefit and clear communication
+- Be transparent about limitations and uncertainties
+- Escalate to humans when uncertain about high-stakes decisions
+- Never make assumptions about sensitive or personal data
 - Validate before taking irreversible actions
-
-## Chain of Thought
-For complex decisions, show your reasoning:
-"Let me think through this:
-1. [First consideration]
-2. [Second consideration]
-3. [Conclusion]
-Therefore, [action]"
+- Maintain consistency with your personality and goals
       `.trim()
     };
   }
@@ -1025,45 +964,233 @@ Why this is good:
 
 ```typescript
 /**
- * Optimizes prompts for token efficiency and effectiveness
+ * Validates and formats prompts - NO AI-based modification
+ *
+ * Philosophy:
+ * - System prompts are NEVER modified by AI (too risky, unpredictable)
+ * - Only deterministic, rules-based cleanup (whitespace, deduplication)
+ * - If over token budget, THROW ERROR - let user decide what to trim
+ * - AI compression is ONLY for chat history (user/assistant messages)
  */
 export class PromptOptimizer {
 
+  constructor(
+    private tokenizer: ITokenizer,
+    private compressionModel?: IAIProvider // Optional, only for chat history
+  ) {}
+
+  /**
+   * Validate and format system prompt (deterministic only)
+   */
   async optimize(prompt: string, context: PromptContext): Promise<string> {
     let optimized = prompt;
 
-    // 1. Remove redundancy
-    optimized = this.removeRedundantSections(optimized);
+    // 1. Remove duplicate lines (deterministic)
+    optimized = this.deduplicateLines(optimized);
 
-    // 2. Compress verbose sections
-    optimized = this.compressVerbosity(optimized);
+    // 2. Compress whitespace (deterministic)
+    optimized = this.normalizeWhitespace(optimized);
 
-    // 3. Prioritize based on context
-    optimized = this.prioritizeSections(optimized, context);
+    // 3. Validate token budget - THROW if exceeded
+    const tokens = await this.countTokens(optimized);
+    const maxTokens = context.maxTokens || 4000;
 
-    // 4. Fit within token budget
-    optimized = await this.fitTokenBudget(optimized, context.maxTokens || 4000);
+    if (tokens > maxTokens) {
+      throw new PromptTooLargeError(
+        `System prompt exceeds token budget: ${tokens} > ${maxTokens}. ` +
+        `Please reduce prompt size by removing sections or shortening content.`,
+        { tokens, maxTokens, sections: this.getSectionSizes(optimized) }
+      );
+    }
 
-    // 5. Validate structure
-    this.validate(optimized);
+    // 4. Validate structure
+    this.validateStructure(optimized);
 
     return optimized;
   }
 
-  private async fitTokenBudget(prompt: string, maxTokens: number): Promise<string> {
-    const tokens = await this.countTokens(prompt);
-
-    if (tokens <= maxTokens) {
-      return prompt;
+  /**
+   * Compress chat history using a lightweight model
+   * This is SAFE because we're not modifying system instructions
+   */
+  async compressChatHistory(
+    messages: Message[],
+    targetTokens: number
+  ): Promise<Message[]> {
+    if (!this.compressionModel) {
+      // Fallback: just truncate oldest messages
+      return this.truncateMessages(messages, targetTokens);
     }
 
-    // Intelligently trim less important sections
-    return this.trim(prompt, maxTokens);
+    const currentTokens = await this.countTokens(
+      messages.map(m => m.content).join('\n')
+    );
+
+    if (currentTokens <= targetTokens) {
+      return messages; // No compression needed
+    }
+
+    // Keep most recent messages, compress older ones
+    const recentCount = 5; // Always keep last 5 messages intact
+    const recentMessages = messages.slice(-recentCount);
+    const oldMessages = messages.slice(0, -recentCount);
+
+    if (oldMessages.length === 0) {
+      return recentMessages; // Can't compress further
+    }
+
+    // Compress old messages into a summary
+    const summary = await this.summarizeMessages(oldMessages);
+
+    return [
+      {
+        role: 'system',
+        content: `Previous conversation summary:\n${summary}`
+      },
+      ...recentMessages
+    ];
   }
 
+  /**
+   * Use lightweight AI model to summarize old messages
+   */
+  private async summarizeMessages(messages: Message[]): Promise<string> {
+    const conversationText = messages
+      .map(m => `${m.role}: ${m.content}`)
+      .join('\n');
+
+    const response = await this.compressionModel!.chat({
+      conversationId: 'compression',
+      userMessage: `Summarize this conversation concisely, preserving key facts and context:\n\n${conversationText}`,
+      systemPrompt: 'You are a conversation summarizer. Extract and preserve important facts, decisions, and context.',
+      availableTools: []
+    });
+
+    return response.content;
+  }
+
+  /**
+   * Deterministic: remove duplicate consecutive lines
+   */
+  private deduplicateLines(text: string): string {
+    const lines = text.split('\n');
+    const deduped: string[] = [];
+    let lastLine = '';
+
+    for (const line of lines) {
+      const normalized = line.trim();
+      if (normalized !== lastLine.trim()) {
+        deduped.push(line);
+        lastLine = line;
+      }
+    }
+
+    return deduped.join('\n');
+  }
+
+  /**
+   * Deterministic: normalize whitespace
+   */
+  private normalizeWhitespace(text: string): string {
+    return text
+      .replace(/\n{3,}/g, '\n\n')   // Max 2 newlines
+      .replace(/ {2,}/g, ' ')        // Single spaces
+      .replace(/\t/g, '  ')          // Tabs to 2 spaces
+      .trim();
+  }
+
+  /**
+   * Count tokens using proper tokenizer
+   */
   private async countTokens(text: string): Promise<number> {
-    // Use tiktoken or similar
-    return text.length / 4; // Rough estimate
+    return this.tokenizer.count(text);
+  }
+
+  /**
+   * Get size of each section for helpful error messages
+   */
+  private getSectionSizes(prompt: string): Record<string, number> {
+    const sections = this.extractSections(prompt);
+    const sizes: Record<string, number> = {};
+
+    for (const section of sections) {
+      sizes[section.name] = this.tokenizer.count(section.content);
+    }
+
+    return sizes;
+  }
+
+  /**
+   * Validate critical sections exist
+   */
+  private validateStructure(prompt: string): void {
+    const required = ['# IDENTITY', '# GOALS'];
+
+    for (const section of required) {
+      if (!prompt.includes(section)) {
+        throw new Error(`Required section missing: ${section}`);
+      }
+    }
+  }
+
+  private extractSections(prompt: string): PromptSection[] {
+    // Implementation: split by # headers
+    const sections: PromptSection[] = [];
+    const lines = prompt.split('\n');
+    let currentSection: PromptSection | null = null;
+
+    for (const line of lines) {
+      if (line.startsWith('# ')) {
+        if (currentSection) {
+          sections.push(currentSection);
+        }
+        currentSection = {
+          name: line.replace('# ', '').trim(),
+          content: line + '\n'
+        };
+      } else if (currentSection) {
+        currentSection.content += line + '\n';
+      }
+    }
+
+    if (currentSection) {
+      sections.push(currentSection);
+    }
+
+    return sections;
+  }
+
+  private truncateMessages(messages: Message[], targetTokens: number): Message[] {
+    // Simple truncation: keep most recent messages
+    let tokens = 0;
+    const kept: Message[] = [];
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msgTokens = this.tokenizer.count(messages[i].content);
+      if (tokens + msgTokens > targetTokens) break;
+
+      kept.unshift(messages[i]);
+      tokens += msgTokens;
+    }
+
+    return kept;
+  }
+}
+
+/**
+ * Custom error for prompts exceeding token budget
+ */
+export class PromptTooLargeError extends Error {
+  constructor(
+    message: string,
+    public readonly details: {
+      tokens: number;
+      maxTokens: number;
+      sections: Record<string, number>;
+    }
+  ) {
+    super(message);
+    this.name = 'PromptTooLargeError';
   }
 }
 ```
@@ -1491,94 +1618,6 @@ export class VectorMemory {
 
 ---
 
-## Agent Communication & Orchestration
-
-### Multi-Agent Communication
-
-```typescript
-/**
- * Enables agents to communicate and collaborate
- */
-export class AgentOrchestrator {
-
-  private agents: Map<string, Agent> = new Map();
-  private messageQueue: MessageQueue;
-
-  /**
-   * Register an agent
-   */
-  register(id: string, agent: Agent): void {
-    this.agents.set(id, agent);
-  }
-
-  /**
-   * Send a message from one agent to another
-   */
-  async sendMessage(
-    from: string,
-    to: string,
-    message: AgentMessage
-  ): Promise<void> {
-    const recipient = this.agents.get(to);
-    if (!recipient) {
-      throw new Error(`Agent not found: ${to}`);
-    }
-
-    await this.messageQueue.enqueue({
-      from,
-      to,
-      message,
-      timestamp: new Date()
-    });
-  }
-
-  /**
-   * Coordinate a complex task across multiple agents
-   */
-  async coordinate(task: ComplexTask): Promise<TaskResult> {
-    // 1. Decompose task into subtasks
-    const subtasks = this.decompose(task);
-
-    // 2. Assign subtasks to appropriate agents
-    const assignments = await this.assign(subtasks);
-
-    // 3. Execute in parallel where possible
-    const results = await Promise.all(
-      assignments.map(a => this.executeAssignment(a))
-    );
-
-    // 4. Synthesize results
-    return this.synthesize(results);
-  }
-
-  private async assign(subtasks: SubTask[]): Promise<Assignment[]> {
-    return subtasks.map(subtask => {
-      // Find best agent for this subtask
-      const agentId = this.findBestAgent(subtask);
-      return { subtask, agentId };
-    });
-  }
-
-  private findBestAgent(subtask: SubTask): string {
-    // Score each agent based on capabilities
-    let bestScore = 0;
-    let bestAgent = '';
-
-    for (const [id, agent] of this.agents) {
-      const score = this.scoreAgent(agent, subtask);
-      if (score > bestScore) {
-        bestScore = score;
-        bestAgent = id;
-      }
-    }
-
-    return bestAgent;
-  }
-}
-```
-
----
-
 ## Error Handling & Resilience
 
 ### Robust Error Handling
@@ -1716,22 +1755,22 @@ export class CircuitBreaker {
 
 ```typescript
 /**
- * Trace agent's thinking process
+ * Trace agent interactions and context
  */
-export class ThinkingTracer {
+export class InteractionTracer {
 
   private traces: Map<string, Trace> = new Map();
 
-  startSession(sessionId: string): void {
-    this.traces.set(sessionId, {
-      id: sessionId,
+  startInteraction(interactionId: string): void {
+    this.traces.set(interactionId, {
+      id: interactionId,
       steps: [],
       startTime: Date.now()
     });
   }
 
-  log(sessionId: string, step: string, data: any): void {
-    const trace = this.traces.get(sessionId);
+  log(interactionId: string, step: string, data: any): void {
+    const trace = this.traces.get(interactionId);
     if (!trace) return;
 
     trace.steps.push({
@@ -1741,8 +1780,8 @@ export class ThinkingTracer {
     });
   }
 
-  endSession(sessionId: string): Trace | undefined {
-    const trace = this.traces.get(sessionId);
+  endInteraction(interactionId: string): Trace | undefined {
+    const trace = this.traces.get(interactionId);
     if (trace) {
       trace.endTime = Date.now();
       trace.duration = trace.endTime - trace.startTime;
@@ -1753,43 +1792,32 @@ export class ThinkingTracer {
   /**
    * Export trace for debugging
    */
-  export(sessionId: string): string {
-    const trace = this.traces.get(sessionId);
+  export(interactionId: string): string {
+    const trace = this.traces.get(interactionId);
     if (!trace) return '';
 
     return JSON.stringify(trace, null, 2);
   }
-}
 
-/**
- * Explain agent decisions
- */
-export class DecisionExplainer {
+  /**
+   * Get performance metrics for an interaction
+   */
+  getMetrics(interactionId: string): InteractionMetrics {
+    const trace = this.traces.get(interactionId);
+    if (!trace) return null;
 
-  explain(decision: Decision): Explanation {
     return {
-      decision: decision.action,
-      reasoning: decision.reasoning,
-      factors: this.extractFactors(decision),
-      alternatives: this.generateAlternatives(decision),
-      confidence: decision.confidence,
-      risks: this.identifyRisks(decision)
+      duration: trace.duration,
+      stepCount: trace.steps.length,
+      memoryRetrievalTime: this.getStepDuration(trace, 'memory_retrieval'),
+      aiResponseTime: this.getStepDuration(trace, 'ai_response'),
+      toolExecutionTime: this.getStepDuration(trace, 'tool_execution')
     };
   }
 
-  private extractFactors(decision: Decision): Factor[] {
-    // Extract key factors that influenced the decision
-    return decision.reasoning.factors;
-  }
-
-  private generateAlternatives(decision: Decision): Alternative[] {
-    // What else could the agent have done?
-    return decision.reasoning.alternatives;
-  }
-
-  private identifyRisks(decision: Decision): Risk[] {
-    // What could go wrong with this decision?
-    return decision.reasoning.risks;
+  private getStepDuration(trace: Trace, stepName: string): number {
+    const step = trace.steps.find(s => s.step === stepName);
+    return step ? step.duration : 0;
   }
 }
 
@@ -1864,48 +1892,46 @@ export class AgentLogger {
 - System prompts are hierarchical and optimized
 - Basic logging and tracing works
 
-### Phase 2: Intelligence (Week 3-4)
+### Phase 2: Core Pillars (Week 3-4)
 
 **Goals:**
 - Add memory systems
-- Implement reasoning engine
+- Build goal tracking
 - Build capability management
 - Add knowledge base
 
 **Tasks:**
-1. Implement MemoryManager with multi-tier memory
-2. Create ReasoningEngine with CoT
+1. Implement MemoryManager with multi-tier memory (short-term, long-term, vector)
+2. Create GoalSystem with progress tracking
 3. Build CapabilityManager and Skill system
-4. Implement KnowledgeBase with RAG
-5. Add reflection and learning
-6. Integration tests
+4. Implement KnowledgeBase with RAG integration
+5. Integration tests for all 6 pillars working together
 
 **Success Criteria:**
 - Agents remember context across conversations
-- Agents use step-by-step reasoning
-- Capabilities are properly managed
-- Agents can retrieve relevant knowledge
+- Goals are tracked and influence agent behavior
+- Capabilities are properly organized and accessible
+- Agents can retrieve relevant knowledge from knowledge base
 
 ### Phase 3: Specialization (Week 5-6)
 
 **Goals:**
 - Create agent hierarchy
 - Build specialized agents
-- Implement agent teams
-- Add orchestration
+- Validate 6 pillars in production scenarios
 
 **Tasks:**
 1. Create BaseAgent abstract class
 2. Build SalesAgent specialization
 3. Build SupportAgent specialization
 4. Build MedicalSchedulerAgent
-5. Implement AgentTeam and AgentOrchestrator
-6. Real-world testing
+5. Real-world testing with actual use cases
+6. Fine-tune system prompts based on results
 
 **Success Criteria:**
 - Specialized agents outperform generic agents
-- Agent teams can collaborate
-- Complex tasks can be decomposed and delegated
+- All 6 pillars work together seamlessly
+- Agents demonstrate consistent personality and goal alignment
 
 ### Phase 4: Resilience (Week 7-8)
 
@@ -1959,27 +1985,41 @@ export class AgentLogger {
 
 **Why:** An Agent should be an intelligent entity with behavior, not just a configuration object. The Agent class encapsulates all intelligence, state, and capabilities.
 
-### 2. **Hierarchical System Prompts**
+### 2. **Six Core Pillars**
 
-**Why:** Simple string concatenation doesn't scale. We need structured, optimized prompts with clear sections, priorities, and channel-specific adaptations.
+**Why:** Every agent needs these fundamental components to be effective:
+- **Identity**: Defines who the agent is and their role
+- **Personality**: Defines how the agent communicates and behaves
+- **Knowledge**: What the agent knows and can reference
+- **Capabilities**: What the agent can do (skills + tools)
+- **Memory**: What the agent remembers across interactions
+- **Goals**: What the agent is trying to achieve
 
-### 3. **Multi-Tier Memory**
+### 3. **No Explicit Reasoning/Planning Engines**
+
+**Why:** Modern AI models (Claude, GPT-4, etc.) handle reasoning and planning natively. Explicit frameworks in system prompts are redundant and can constrain the model's natural abilities. We trust the AI provider to handle this intelligently.
+
+### 4. **Hierarchical System Prompts**
+
+**Why:** Simple string concatenation doesn't scale. We need structured, optimized prompts built from the six pillars with clear sections, priorities, and channel-specific adaptations.
+
+### 5. **Multi-Tier Memory**
 
 **Why:** Different types of memory serve different purposes. Short-term for conversation context, long-term for persistent facts, vector for semantic retrieval.
 
-### 4. **Capability-Based Architecture**
+### 6. **Capability-Based Architecture**
 
 **Why:** Tools alone aren't enough. Capabilities group related skills and tools into coherent functional units that agents can leverage.
 
-### 5. **Observability First**
+### 7. **Observability First**
 
-**Why:** Without visibility into agent thinking, we can't debug, improve, or trust the system. Tracing, logging, and explanation are first-class concerns.
+**Why:** Without visibility into agent interactions, we can't debug, improve, or trust the system. Tracing, logging, and metrics are first-class concerns.
 
-### 6. **Graceful Degradation**
+### 8. **Graceful Degradation**
 
 **Why:** AI systems will fail. We need multiple layers of fallback to ensure users are never left hanging.
 
-### 7. **Builder Pattern**
+### 9. **Builder Pattern**
 
 **Why:** Creating complex agents with many configuration options is error-prone. The builder pattern provides type safety and discoverability.
 

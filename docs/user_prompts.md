@@ -1,1 +1,27 @@
-I want the agent system to be more robust. We create like a class for the Agent, we provide it with everything it needs. A detailed system prompt with hierachy and enhancements. That makes the agent the best it can be, can you write a markdown, braintorming how to improve our current Agent design? 
+We were doing this:
+
+
+Update Todos
+
+Implement CapabilityManager and Skill system
+
+Implement MemoryManager with three-tier architecture
+
+Implement GoalSystem
+
+Implement SystemPromptBuilder
+
+Implement PromptOptimizer
+
+Implement observability components (AgentLogger, InteractionTracer)
+
+Create example usage and tests
+
+Now let's implement the GoalSystem:
+Write c:\Users\kenne\Documents\Workplace\packages\ai-receptionist\src\agent\goals\GoalSystem.ts
+⎿
+247 lines
+/**
+ * GoalSystem - Defines what the agent aims to achieve
+ *
+ * The Goals pillar 
