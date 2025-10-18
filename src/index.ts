@@ -34,6 +34,7 @@ export { Tools } from './tools';
 
 export { TwilioProvider } from './providers/communication/twilio.provider';
 export { OpenAIProvider } from './providers/ai/openai.provider';
+export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
 export { GoogleCalendarProvider } from './providers/calendar/google-calendar.provider';
 
 // ============================================================================

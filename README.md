@@ -131,9 +131,68 @@ const client = new AIReceptionist({
 
 📖 See [TREE_SHAKING.md](TREE_SHAKING.md) for optimization guide
 
+### 1.5. OpenRouter - Dynamic Model Switching
+
+OpenRouter provider gives you access to **100+ AI models** from multiple providers (OpenAI, Anthropic, Google, Meta, Mistral, etc.) and the ability to **switch models at runtime**.
+
+```typescript
+import { AIReceptionist, OPENROUTER_MODELS } from '@loctelli/ai-receptionist';
+
+const client = new AIReceptionist({
+  ai: {
+    provider: 'openrouter',
+    apiKey: process.env.OPENROUTER_API_KEY!,
+    model: OPENROUTER_MODELS.anthropic.claude35Sonnet,
+  },
+  agent: { name: 'Alex', role: 'Assistant' }
+});
+
+await client.initialize();
+
+// Get the provider to switch models
+const provider = client['aiProvider'];
+
+// Switch to GPT-4 Turbo
+provider.setModel(OPENROUTER_MODELS.openai.gpt4Turbo);
+await client.chat('user-1', { message: 'Hello from GPT-4!' });
+
+// Switch to Google Gemini
+provider.setModel(OPENROUTER_MODELS.google.geminiPro15);
+await client.chat('user-1', { message: 'Hello from Gemini!' });
+
+// Switch to Meta Llama
+provider.setModel(OPENROUTER_MODELS.meta.llama3_70b);
+await client.chat('user-1', { message: 'Hello from Llama!' });
+
+// List all available models
+const models = await provider.listAvailableModels();
+console.log(`${models.length} models available`);
+
+// Validate before switching
+const isValid = await provider.validateModel('anthropic/claude-3-opus');
+if (isValid) {
+  provider.setModel('anthropic/claude-3-opus');
+}
+```
+
+**Available model constants:**
+- `OPENROUTER_MODELS.openai.*` - GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
+- `OPENROUTER_MODELS.anthropic.*` - Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
+- `OPENROUTER_MODELS.google.*` - Gemini Pro, Gemini Pro 1.5
+- `OPENROUTER_MODELS.meta.*` - Llama 3 70B, Llama 3 8B
+- `OPENROUTER_MODELS.mistral.*` - Mistral Large, Medium, Mixtral
+
+📖 See [examples/openrouter-model-switching.ts](examples/openrouter-model-switching.ts) for complete example
+
 ### 2. Agent-Centric Design
 
 Each `AIReceptionist` instance represents one AI agent with unified personality across all channels.
+
+📖 **See [docs/AGENT_SYSTEM.md](docs/AGENT_SYSTEM.md) for complete guide on:**
+- Defining agent personality and identity
+- Building custom system prompts
+- Adding tools to agents
+- Complete agent examples
 
 ```typescript
 // Sarah is the same agent across all channels

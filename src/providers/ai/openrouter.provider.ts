@@ -29,6 +29,36 @@ import { AIModelConfig, AgentConfig, ChatOptions, AIResponse, ITool } from '../.
  * - Cost optimization
  * - Full type safety
  */
+/**
+ * Popular OpenRouter models organized by provider
+ */
+export const OPENROUTER_MODELS = {
+  openai: {
+    gpt4Turbo: 'openai/gpt-4-turbo',
+    gpt4: 'openai/gpt-4',
+    gpt35Turbo: 'openai/gpt-3.5-turbo',
+  },
+  anthropic: {
+    claude3Opus: 'anthropic/claude-3-opus',
+    claude3Sonnet: 'anthropic/claude-3-sonnet',
+    claude3Haiku: 'anthropic/claude-3-haiku',
+    claude35Sonnet: 'anthropic/claude-3.5-sonnet',
+  },
+  google: {
+    geminiPro: 'google/gemini-pro',
+    geminiPro15: 'google/gemini-pro-1.5',
+  },
+  meta: {
+    llama3_70b: 'meta-llama/llama-3-70b-instruct',
+    llama3_8b: 'meta-llama/llama-3-8b-instruct',
+  },
+  mistral: {
+    mistralLarge: 'mistralai/mistral-large',
+    mistralMedium: 'mistralai/mistral-medium',
+    mixtral: 'mistralai/mixtral-8x7b-instruct',
+  },
+} as const;
+
 export class OpenRouterProvider extends BaseProvider {
   readonly name = 'openrouter';
   readonly type = 'ai' as const;
@@ -39,6 +69,7 @@ export class OpenRouterProvider extends BaseProvider {
 
   private client: OpenAI | null = null;
   private readonly agentConfig: AgentConfig;
+  private currentModel: string;
 
   constructor(
     private readonly config: AIModelConfig,
@@ -46,6 +77,7 @@ export class OpenRouterProvider extends BaseProvider {
   ) {
     super();
     this.agentConfig = agentConfig;
+    this.currentModel = config.model;
   }
 
   async initialize(): Promise<void> {
@@ -67,6 +99,72 @@ export class OpenRouterProvider extends BaseProvider {
     console.log('[OpenRouterProvider] Initialized successfully');
   }
 
+  /**
+   * Switch to a different model at runtime
+   * @param model - The model identifier (e.g., 'anthropic/claude-3-opus', 'google/gemini-pro')
+   * @throws Error if model identifier is invalid
+   */
+  setModel(model: string): void {
+    if (!model || typeof model !== 'string') {
+      throw new Error('Model identifier must be a non-empty string');
+    }
+
+    if (!model.includes('/')) {
+      throw new Error(
+        'Invalid model identifier format. Expected format: "provider/model-name" (e.g., "anthropic/claude-3-opus")'
+      );
+    }
+
+    console.log(`[OpenRouterProvider] Switching model from ${this.currentModel} to ${model}`);
+    this.currentModel = model;
+  }
+
+  /**
+   * Validate if a model is available on OpenRouter
+   * @param model - The model identifier to validate
+   * @returns True if the model is available, false otherwise
+   */
+  async validateModel(model: string): Promise<boolean> {
+    try {
+      const availableModels = await this.listAvailableModels();
+      return availableModels.some(m => m.id === model);
+    } catch (error) {
+      console.error('[OpenRouterProvider] Model validation failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get the currently active model
+   */
+  getCurrentModel(): string {
+    return this.currentModel;
+  }
+
+  /**
+   * List available models from OpenRouter
+   * @returns Array of available model objects
+   */
+  async listAvailableModels(): Promise<Array<{ id: string; name: string; provider: string }>> {
+    this.ensureInitialized();
+
+    if (!this.client) {
+      throw new Error('OpenRouter client not initialized');
+    }
+
+    try {
+      const response = await this.client.models.list();
+      return response.data.map((model: any) => ({
+        id: model.id,
+        name: model.name || model.id,
+        provider: model.id.split('/')[0] || 'unknown',
+      }));
+    } catch (error) {
+      console.error('[OpenRouterProvider] Failed to list models:', error);
+      throw error;
+    }
+  }
+
   async chat(options: ChatOptions): Promise<AIResponse> {
     this.ensureInitialized();
 
@@ -75,7 +173,7 @@ export class OpenRouterProvider extends BaseProvider {
     }
 
     console.log(`[OpenRouterProvider] Chat request for conversation: ${options.conversationId}`);
-    console.log(`[OpenRouterProvider] Model: ${this.config.model}`);
+    console.log(`[OpenRouterProvider] Model: ${this.currentModel}`);
     console.log(`[OpenRouterProvider] User message: ${options.userMessage}`);
     console.log(`[OpenRouterProvider] Available tools: ${options.availableTools?.length || 0}`);
 
@@ -85,7 +183,7 @@ export class OpenRouterProvider extends BaseProvider {
     try {
       // OpenRouter supports OpenAI-compatible function calling
       const response = await this.client.chat.completions.create({
-        model: this.config.model,
+        model: this.currentModel,
         messages,
         tools: tools && tools.length > 0 ? tools : undefined,
         temperature: this.config.temperature ?? 0.7,
