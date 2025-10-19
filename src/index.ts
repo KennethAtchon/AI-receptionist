@@ -18,6 +18,7 @@ export { AIReceptionist } from './client';
 
 export { Agent } from './agent/core/Agent';
 export { AgentBuilder } from './agent/core/AgentBuilder';
+export { PillarManager } from './agent/core/PillarManager';
 export { Capability } from './agent/capabilities/Capability';
 export { Skill } from './agent/capabilities/Skill';
 export { SystemPromptBuilder } from './agent/prompt/SystemPromptBuilder';

@@ -17,35 +17,47 @@ import type {
 } from '../types';
 
 export class PersonalityEngineImpl implements PersonalityEngine {
-  public readonly traits: PersonalityTrait[];
-  public readonly communicationStyle: CommunicationStyleConfig;
-  public readonly tone: string;
-  public readonly formalityLevel: number;
-  public readonly emotionalIntelligence: 'low' | 'medium' | 'high';
-  public readonly adaptability: 'low' | 'medium' | 'high';
-  public readonly conflictStyle: string;
-  public readonly decisionStyle: string;
-  public readonly stressResponse: string;
-  public readonly adaptabilityRules: string[];
+  private _traits: PersonalityTrait[];
+  private _communicationStyle: CommunicationStyleConfig;
+  private _tone: string;
+  private _formalityLevel: number;
+  private _emotionalIntelligence: 'low' | 'medium' | 'high';
+  private _adaptability: 'low' | 'medium' | 'high';
+  private _conflictStyle: string;
+  private _decisionStyle: string;
+  private _stressResponse: string;
+  private _adaptabilityRules: string[];
+
+  // Getters for readonly access
+  public get traits(): PersonalityTrait[] { return this._traits; }
+  public get communicationStyle(): CommunicationStyleConfig { return this._communicationStyle; }
+  public get tone(): string { return this._tone; }
+  public get formalityLevel(): number { return this._formalityLevel; }
+  public get emotionalIntelligence(): 'low' | 'medium' | 'high' { return this._emotionalIntelligence; }
+  public get adaptability(): 'low' | 'medium' | 'high' { return this._adaptability; }
+  public get conflictStyle(): string { return this._conflictStyle; }
+  public get decisionStyle(): string { return this._decisionStyle; }
+  public get stressResponse(): string { return this._stressResponse; }
+  public get adaptabilityRules(): string[] { return this._adaptabilityRules; }
 
   constructor(config: PersonalityConfig) {
     // Process traits
-    this.traits = this.processTraits(config.traits || ['professional', 'helpful', 'patient']);
+    this._traits = this.processTraits(config.traits || ['professional', 'helpful', 'patient']);
 
     // Process communication style
-    this.communicationStyle = this.processCommunicationStyle(config.communicationStyle);
-    this.tone = this.communicationStyle.tone || 'professional';
-    this.formalityLevel = this.communicationStyle.formalityLevel || 7;
+    this._communicationStyle = this.processCommunicationStyle(config.communicationStyle);
+    this._tone = this._communicationStyle.tone || 'professional';
+    this._formalityLevel = this._communicationStyle.formalityLevel || 7;
 
     // Set behavioral attributes
-    this.emotionalIntelligence = config.emotionalIntelligence || 'high';
-    this.adaptability = config.adaptability || 'high';
-    this.conflictStyle = config.conflictStyle || 'collaborative';
-    this.decisionStyle = config.decisionStyle || 'analytical';
-    this.stressResponse = config.stressResponse || 'remain calm and focused';
+    this._emotionalIntelligence = config.emotionalIntelligence || 'high';
+    this._adaptability = config.adaptability || 'high';
+    this._conflictStyle = config.conflictStyle || 'collaborative';
+    this._decisionStyle = config.decisionStyle || 'analytical';
+    this._stressResponse = config.stressResponse || 'remain calm and focused';
 
     // Set adaptability rules
-    this.adaptabilityRules = config.adaptabilityRules || [
+    this._adaptabilityRules = config.adaptabilityRules || [
       'Mirror the user\'s formality level',
       'Increase empathy when detecting frustration',
       'Simplify language when detecting confusion',
@@ -239,5 +251,57 @@ export class PersonalityEngineImpl implements PersonalityEngine {
     description += `- Under Stress: ${this.stressResponse}\n`;
 
     return description;
+  }
+
+  /**
+   * Add a new personality trait
+   */
+  public addTrait(trait: string | PersonalityTrait): void {
+    const newTrait: PersonalityTrait = typeof trait === 'string'
+      ? { name: trait, description: this.getTraitDescription(trait), weight: 1 }
+      : trait;
+
+    // Check if trait already exists
+    const exists = this._traits.some(t => t.name.toLowerCase() === newTrait.name.toLowerCase());
+    if (!exists) {
+      this._traits.push(newTrait);
+    }
+  }
+
+  /**
+   * Remove a personality trait by name
+   */
+  public removeTrait(traitName: string): void {
+    this._traits = this._traits.filter(t => t.name.toLowerCase() !== traitName.toLowerCase());
+  }
+
+  /**
+   * Update a personality trait
+   */
+  public updateTrait(traitName: string, updates: Partial<PersonalityTrait>): void {
+    const trait = this._traits.find(t => t.name.toLowerCase() === traitName.toLowerCase());
+    if (trait) {
+      Object.assign(trait, updates);
+    }
+  }
+
+  /**
+   * Update communication style
+   */
+  public updateCommunicationStyle(style: Partial<CommunicationStyleConfig>): void {
+    this._communicationStyle = { ...this._communicationStyle, ...style };
+    if (style.tone) {
+      this._tone = style.tone;
+    }
+    if (style.formalityLevel !== undefined) {
+      this._formalityLevel = style.formalityLevel;
+    }
+  }
+
+  /**
+   * Update formality level
+   */
+  public setFormalityLevel(level: number): void {
+    this._formalityLevel = Math.max(1, Math.min(10, level)); // Clamp between 1-10
   }
 }

@@ -11,28 +11,38 @@
 import type { KnowledgeConfig, KnowledgeBase, LanguageConfig } from '../types';
 
 export class KnowledgeBaseImpl implements KnowledgeBase {
-  public readonly domain: string;
-  public readonly expertise: string[];
-  public readonly languages: LanguageConfig;
-  public readonly certifications: string[];
-  public readonly industries: string[];
-  public readonly knownDomains: string[];
-  public readonly limitations: string[];
-  public readonly uncertaintyThreshold: string;
+  private _domain: string;
+  private _expertise: string[];
+  private _languages: LanguageConfig;
+  private _certifications: string[];
+  private _industries: string[];
+  private _knownDomains: string[];
+  private _limitations: string[];
+  private _uncertaintyThreshold: string;
+
+  // Readonly getters
+  public get domain(): string { return this._domain; }
+  public get expertise(): string[] { return [...this._expertise]; }
+  public get languages(): LanguageConfig { return { ...this._languages }; }
+  public get certifications(): string[] { return [...this._certifications]; }
+  public get industries(): string[] { return [...this._industries]; }
+  public get knownDomains(): string[] { return [...this._knownDomains]; }
+  public get limitations(): string[] { return [...this._limitations]; }
+  public get uncertaintyThreshold(): string { return this._uncertaintyThreshold; }
 
   constructor(config: KnowledgeConfig) {
-    this.domain = config.domain;
-    this.expertise = config.expertise || [];
-    this.languages = this.processLanguages(config.languages);
-    this.certifications = config.certifications || [];
-    this.industries = config.industries || [];
-    this.knownDomains = config.knownDomains || [this.domain];
-    this.limitations = config.limitations || [
+    this._domain = config.domain;
+    this._expertise = config.expertise || [];
+    this._languages = this.processLanguages(config.languages);
+    this._certifications = config.certifications || [];
+    this._industries = config.industries || [];
+    this._knownDomains = config.knownDomains || [this._domain];
+    this._limitations = config.limitations || [
       'Information outside my domain of expertise',
       'Real-time data I don\'t have access to',
       'Personal opinions or subjective matters'
     ];
-    this.uncertaintyThreshold = config.uncertaintyThreshold ||
+    this._uncertaintyThreshold = config.uncertaintyThreshold ||
       'I will say "I don\'t know" when I\'m not confident in my answer or when the question is outside my expertise.';
   }
 
@@ -157,5 +167,138 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
   public isLimitedKnowledge(topic: string): boolean {
     const topicLower = topic.toLowerCase();
     return this.limitations.some(l => l.toLowerCase().includes(topicLower));
+  }
+
+  // ==================== UPDATE METHODS ====================
+
+  /**
+   * Update the primary domain
+   */
+  public updateDomain(domain: string): void {
+    this._domain = domain;
+    // Ensure domain is in knownDomains
+    if (!this._knownDomains.includes(domain)) {
+      this._knownDomains.push(domain);
+    }
+  }
+
+  /**
+   * Add area of expertise
+   */
+  public addExpertise(area: string): void {
+    if (!this._expertise.includes(area)) {
+      this._expertise.push(area);
+    }
+  }
+
+  /**
+   * Remove area of expertise
+   */
+  public removeExpertise(area: string): void {
+    this._expertise = this._expertise.filter(e => e !== area);
+  }
+
+  /**
+   * Add a language
+   */
+  public addLanguage(language: string, proficiency: 'fluent' | 'conversational' = 'fluent'): void {
+    if (proficiency === 'fluent') {
+      if (!this._languages.fluent) {
+        this._languages.fluent = [];
+      }
+      if (!this._languages.fluent.includes(language)) {
+        this._languages.fluent.push(language);
+      }
+    } else {
+      if (!this._languages.conversational) {
+        this._languages.conversational = [];
+      }
+      if (!this._languages.conversational.includes(language)) {
+        this._languages.conversational.push(language);
+      }
+    }
+  }
+
+  /**
+   * Remove a language
+   */
+  public removeLanguage(language: string): void {
+    if (this._languages.fluent) {
+      this._languages.fluent = this._languages.fluent.filter(l => l !== language);
+    }
+    if (this._languages.conversational) {
+      this._languages.conversational = this._languages.conversational.filter(l => l !== language);
+    }
+  }
+
+  /**
+   * Add certification
+   */
+  public addCertification(certification: string): void {
+    if (!this._certifications.includes(certification)) {
+      this._certifications.push(certification);
+    }
+  }
+
+  /**
+   * Remove certification
+   */
+  public removeCertification(certification: string): void {
+    this._certifications = this._certifications.filter(c => c !== certification);
+  }
+
+  /**
+   * Add industry knowledge
+   */
+  public addIndustry(industry: string): void {
+    if (!this._industries.includes(industry)) {
+      this._industries.push(industry);
+    }
+  }
+
+  /**
+   * Remove industry knowledge
+   */
+  public removeIndustry(industry: string): void {
+    this._industries = this._industries.filter(i => i !== industry);
+  }
+
+  /**
+   * Add known domain
+   */
+  public addKnownDomain(domain: string): void {
+    if (!this._knownDomains.includes(domain)) {
+      this._knownDomains.push(domain);
+    }
+  }
+
+  /**
+   * Remove known domain
+   */
+  public removeKnownDomain(domain: string): void {
+    this._knownDomains = this._knownDomains.filter(d => d !== domain);
+  }
+
+  /**
+   * Add limitation
+   */
+  public addLimitation(limitation: string): void {
+    if (!this._limitations.includes(limitation)) {
+      this._limitations.push(limitation);
+    }
+  }
+
+  /**
+   * Remove limitation
+   */
+  public removeLimitation(limitation: string): void {
+    this._limitations = this._limitations.filter(l => l !== limitation);
+  }
+
+  /**
+   * Update uncertainty threshold
+   */
+  public updateUncertaintyThreshold(threshold: string): void {
+    this._uncertaintyThreshold = threshold;
   }
 }

@@ -67,7 +67,11 @@ export class TextResource {
       return response;
 
     } catch (err) {
-      logger.error(`[TextResource] Failed to generate text`, { error: err, prompt: options.prompt });
+      logger.error(
+        `[TextResource] Failed to generate text`,
+        err instanceof Error ? err : new Error(String(err)),
+        { prompt: options.prompt }
+      );
       throw err;
     }
   }

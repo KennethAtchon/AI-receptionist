@@ -52,6 +52,7 @@ export class Agent {
 
   // ==================== SUPPORTING SYSTEMS ====================
   private readonly promptBuilder: SystemPromptBuilder;
+  private cachedSystemPrompt: string | null = null;
 
   // ==================== STATE ====================
   private state: AgentStatus;
@@ -159,16 +160,19 @@ export class Agent {
       const memoryContext = await this.memory.retrieve(request.input);
       this.tracer.log('memory_retrieval', memoryContext);
 
-      // 2. Build context-aware system prompt
-      const systemPrompt = await this.promptBuilder.build({
-        identity: this.identity,
-        personality: this.personality,
-        knowledge: this.knowledge,
-        goals: this.goals.getCurrent(),
-        capabilities: this.capabilities.list(),
-        memoryContext,
-        channel: request.channel
-      });
+      // 2. Build context-aware system prompt (with dynamic memory and channel info)
+      // Use cached base prompt + dynamic context
+      const systemPrompt = memoryContext || request.channel
+        ? await this.promptBuilder.build({
+            identity: this.identity,
+            personality: this.personality,
+            knowledge: this.knowledge,
+            goals: this.goals.getCurrent(),
+            capabilities: this.capabilities.list(),
+            memoryContext,
+            channel: request.channel
+          })
+        : this.cachedSystemPrompt!;
 
       // 3. Execute with AI provider
       const response = await this.execute(request, systemPrompt, memoryContext);
@@ -264,7 +268,7 @@ export class Agent {
    * Rebuild system prompt (can be called to refresh)
    */
   public async rebuildSystemPrompt(): Promise<void> {
-    const prompt = await this.promptBuilder.build({
+    this.cachedSystemPrompt = await this.promptBuilder.build({
       identity: this.identity,
       personality: this.personality,
       knowledge: this.knowledge,
@@ -273,7 +277,7 @@ export class Agent {
     });
 
     this.logger.debug('System prompt rebuilt', {
-      length: prompt.length,
+      length: this.cachedSystemPrompt.length,
       sections: this.promptBuilder.getSections()
     });
   }
@@ -290,6 +294,16 @@ export class Agent {
       capabilityCount: this.capabilities.count(),
       performance: this.performanceMetrics
     };
+  }
+
+  /**
+   * Get the current system prompt (returns cached version)
+   */
+  public getSystemPrompt(): string {
+    if (!this.cachedSystemPrompt) {
+      throw new Error('System prompt not yet built. Call initialize() first.');
+    }
+    return this.cachedSystemPrompt;
   }
 
   /**
@@ -365,6 +379,54 @@ export class Agent {
    */
   public setConversationService(service: any): void {
     this.conversationService = service;
+  }
+
+  // ==================== PILLAR UPDATE METHODS ====================
+  // Direct access to pillar components for PillarManager
+
+  public getIdentity() { return this.identity; }
+  public getPersonality() { return this.personality; }
+  public getKnowledge() { return this.knowledge; }
+  public getGoals() { return this.goals; }
+  public getMemory() { return this.memory; }
+  public getCapabilities() { return this.capabilities; }
+
+  // Personality Pillar Updates
+
+  /**
+   * Add a personality trait and rebuild system prompt
+   */
+  public async addPersonalityTrait(trait: string | { name: string; description: string; weight?: number }): Promise<void> {
+    this.personality.addTrait(trait);
+    await this.rebuildSystemPrompt();
+    this.logger.info('Personality trait added', { trait });
+  }
+
+  /**
+   * Remove a personality trait and rebuild system prompt
+   */
+  public async removePersonalityTrait(traitName: string): Promise<void> {
+    this.personality.removeTrait(traitName);
+    await this.rebuildSystemPrompt();
+    this.logger.info('Personality trait removed', { traitName });
+  }
+
+  /**
+   * Update communication style and rebuild system prompt
+   */
+  public async updateCommunicationStyle(style: Partial<any>): Promise<void> {
+    this.personality.updateCommunicationStyle(style);
+    await this.rebuildSystemPrompt();
+    this.logger.info('Communication style updated', { style });
+  }
+
+  /**
+   * Set formality level and rebuild system prompt
+   */
+  public async setFormalityLevel(level: number): Promise<void> {
+    this.personality.setFormalityLevel(level);
+    await this.rebuildSystemPrompt();
+    this.logger.info('Formality level updated', { level });
   }
 
   /**

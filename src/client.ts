@@ -13,6 +13,7 @@ import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
 import { MCPAdapter } from './adapters/mcp/mcp-adapter';
+import { PillarManager } from './agent/core/PillarManager';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider } from './providers/communication/twilio.provider';
@@ -91,6 +92,7 @@ export class AIReceptionist {
   // Internal components
   private config: AIReceptionistConfig;
   private agent!: Agent; // The six-pillar agent instance
+  private pillarManager!: PillarManager; // Manages runtime pillar updates
   private twilioProvider?: TwilioProvider;
   private aiProvider!: OpenAIProvider | OpenRouterProvider;
   private calendarProvider?: GoogleCalendarProvider;
@@ -194,7 +196,10 @@ export class AIReceptionist {
 
     await this.agent.initialize();
 
-    // 7. Initialize communication providers if configured (lazy loaded)
+    // 7. Initialize pillar manager for runtime updates
+    this.pillarManager = new PillarManager(this.agent);
+
+    // 8. Initialize communication providers if configured (lazy loaded)
     if (this.config.providers.communication?.twilio) {
       const { TwilioProvider } = await import('./providers/communication/twilio.provider');
       this.twilioProvider = new TwilioProvider(this.config.providers.communication.twilio);
@@ -375,6 +380,37 @@ export class AIReceptionist {
     }
 
     return this.mcpAdapter;
+  }
+
+  /**
+   * Get pillar manager for runtime agent configuration updates
+   *
+   * Use this to update the agent's six pillars at runtime:
+   * - Identity: Who the agent is
+   * - Personality: How the agent behaves
+   * - Knowledge: What the agent knows
+   * - Capabilities: What the agent can do
+   * - Memory: What the agent remembers
+   * - Goals: What the agent aims to achieve
+   *
+   * All updates automatically propagate to all channels (text, email, calls, etc.)
+   *
+   * @example
+   * ```typescript
+   * // Update personality
+   * await client.pillars.addPersonalityTrait('enthusiastic');
+   * await client.pillars.setFormalityLevel(7);
+   *
+   * // Update multiple settings at once
+   * await client.pillars.updatePersonality({
+   *   traits: ['professional', 'helpful'],
+   *   communicationStyle: { primary: 'consultative', formalityLevel: 7 }
+   * });
+   * ```
+   */
+  get pillars(): PillarManager {
+    this.ensureInitialized();
+    return this.pillarManager;
   }
 
   /**
