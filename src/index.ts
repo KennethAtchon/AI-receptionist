@@ -32,6 +32,7 @@ export { InteractionTracer } from './agent/observability/InteractionTracer';
 export { CallsResource } from './resources/calls.resource';
 export { SMSResource } from './resources/sms.resource';
 export { EmailResource } from './resources/email.resource';
+export { TextResource } from './resources/text.resource';
 
 // ============================================================================
 // Tools (Tool System)
@@ -169,6 +170,8 @@ export type {
   CallSession,
   SMSSession,
   EmailSession,
+  GenerateTextOptions,
+  TextResponse,
 
   // Events
   ToolExecutionEvent,

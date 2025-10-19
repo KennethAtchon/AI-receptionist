@@ -104,9 +104,20 @@ describe('Integration: Agent Workflow', () => {
       // Clone with different personality
       const bob = sarah.clone({
         agent: {
-          name: 'Bob',
-          role: 'Technical Support',
-          personality: 'patient and technical',
+          identity: {
+            name: 'Bob',
+            role: 'Technical Support',
+            title: 'Support Engineer',
+          },
+          personality: {
+            traits: [
+              { name: 'patient', description: 'Patient and understanding' },
+              { name: 'technical', description: 'Technically knowledgeable' }
+            ],
+            communicationStyle: {
+              primary: 'analytical' as const,
+            },
+          },
         },
       });
 

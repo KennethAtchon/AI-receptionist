@@ -22,6 +22,7 @@ import type { CallService } from './services/call.service';
 import type { CallsResource } from './resources/calls.resource';
 import type { SMSResource } from './resources/sms.resource';
 import type { EmailResource } from './resources/email.resource';
+import type { TextResource } from './resources/text.resource';
 
 /**
  * AIReceptionist - Agent-centric AI SDK
@@ -84,6 +85,7 @@ export class AIReceptionist {
   public readonly calls?: CallsResource;
   public readonly sms?: SMSResource;
   public readonly email?: EmailResource;
+  public readonly text?: TextResource;
 
   // Internal components
   private config: AIReceptionistConfig;
@@ -225,6 +227,10 @@ export class AIReceptionist {
     const { EmailResource } = await import('./resources/email.resource');
     (this as any).email = new EmailResource();
 
+    // 10. Initialize text resource (always available - for testing agent independently)
+    const { TextResource } = await import('./resources/text.resource');
+    (this as any).text = new TextResource(this.agent);
+
     this.initialized = true;
 
     logger.info(`[AIReceptionist] Initialized successfully`);
@@ -232,7 +238,8 @@ export class AIReceptionist {
     logger.info(`[AIReceptionist] - Available channels: ${[
       this.calls ? 'calls' : null,
       this.sms ? 'sms' : null,
-      this.email ? 'email' : null
+      this.email ? 'email' : null,
+      this.text ? 'text' : null
     ].filter(Boolean).join(', ')}`);
   }
 

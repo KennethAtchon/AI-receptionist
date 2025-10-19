@@ -447,3 +447,18 @@ export interface EmailSession {
   status: 'queued' | 'sent' | 'delivered' | 'failed';
   sentAt?: Date;
 }
+
+export interface GenerateTextOptions {
+  prompt: string;
+  conversationId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface TextResponse {
+  text: string;
+  metadata?: {
+    timestamp: Date;
+    conversationId: string;
+    [key: string]: any;
+  };
+}

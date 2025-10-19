@@ -41,13 +41,18 @@ describe('AIReceptionist', () => {
       } as any;
 
       expect(() => new AIReceptionist(invalidConfig)).toThrow(
-        'Agent configuration is required'
+        'Agent identity configuration is required'
       );
     });
 
     it('should_throw_error_when_model_config_missing', () => {
       const invalidConfig = {
-        agent: baseConfig.agent,
+        agent: {
+          identity: {
+            name: 'Test',
+            role: 'Test Role',
+          },
+        },
         providers: {},
       } as any;
 
