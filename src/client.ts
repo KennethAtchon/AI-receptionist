@@ -12,6 +12,7 @@ import { setupStandardTools } from './tools/standard';
 import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
+import { MCPAdapter } from './adapters/mcp/mcp-adapter';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider } from './providers/communication/twilio.provider';
@@ -97,6 +98,7 @@ export class AIReceptionist {
   private toolExecutor!: ToolExecutionService;
   private toolRegistry!: ToolRegistry;
   private callService?: CallService;
+  private mcpAdapter?: MCPAdapter;
   private initialized = false;
 
   constructor(config: AIReceptionistConfig) {
@@ -333,6 +335,46 @@ export class AIReceptionist {
   public getAgent(): Agent {
     this.ensureInitialized();
     return this.agent;
+  }
+
+  /**
+   * Get MCP adapter
+   *
+   * Enables Model Context Protocol access to tools.
+   * The MCP adapter provides a thin translation layer that exposes
+   * tools through the MCP protocol without modifying the existing tool system.
+   *
+   * @example
+   * ```typescript
+   * // Access MCP adapter
+   * const mcpAdapter = client.mcp;
+   *
+   * // List available tools via MCP
+   * const toolsList = await mcpAdapter.handleToolsList();
+   * console.log('Available MCP tools:', toolsList.tools);
+   *
+   * // Call a tool via MCP
+   * const result = await mcpAdapter.handleToolCall({
+   *   name: 'calendar_check_availability',
+   *   arguments: { date: '2025-10-19', duration: 60 }
+   * });
+   * ```
+   */
+  get mcp(): MCPAdapter {
+    this.ensureInitialized();
+
+    if (!this.mcpAdapter) {
+      this.mcpAdapter = new MCPAdapter(this.toolRegistry, {
+        defaultChannel: 'call',
+        metadata: {
+          sdk: 'ai-receptionist',
+          agentName: this.config.agent.identity.name,
+          agentRole: this.config.agent.identity.role
+        }
+      });
+    }
+
+    return this.mcpAdapter;
   }
 
   /**

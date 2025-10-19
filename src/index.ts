@@ -66,6 +66,22 @@ export { CallService } from './services/call.service';
 export { InMemoryConversationStore } from './storage/in-memory-conversation.store';
 
 // ============================================================================
+// Adapters (Protocol Adapters)
+// ============================================================================
+
+export { MCPAdapter, MCPServer } from './adapters/mcp';
+export type {
+  MCPTool,
+  MCPToolListResponse,
+  MCPToolCallRequest,
+  MCPToolCallResponse,
+  MCPContent,
+  MCPContentType,
+  MCPServerConfig,
+  MCPAdapterOptions
+} from './adapters/mcp';
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
