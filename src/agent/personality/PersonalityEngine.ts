@@ -101,22 +101,34 @@ export class PersonalityEngineImpl implements PersonalityEngine {
   ): CommunicationStyleConfig {
     if (!style) {
       return {
-        primary: 'professional',
+        primary: 'consultative',
         tone: 'professional',
         formalityLevel: 7
       };
     }
 
     if (typeof style === 'string') {
+      // Map string style to valid tone values
+      const toneMap: Record<string, 'casual' | 'formal' | 'friendly' | 'professional'> = {
+        'casual': 'casual',
+        'friendly': 'friendly',
+        'professional': 'professional',
+        'formal': 'formal',
+        'consultative': 'professional',
+        'empathetic': 'friendly',
+        'analytical': 'professional',
+        'assertive': 'professional'
+      };
+
       return {
         primary: style as any,
-        tone: style,
+        tone: toneMap[style.toLowerCase()] || 'professional',
         formalityLevel: this.getDefaultFormalityLevel(style)
       };
     }
 
     return {
-      primary: style.primary || 'professional',
+      primary: style.primary || 'consultative',
       tone: style.tone || 'professional',
       formalityLevel: style.formalityLevel || 7
     };

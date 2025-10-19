@@ -79,7 +79,7 @@ export class GoogleCalendarProvider extends BaseProvider {
       // TODO: Actual health check
       return true;
     } catch (error) {
-      logger.error('[GoogleCalendarProvider] Health check failed:', error);
+      logger.error('[GoogleCalendarProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }

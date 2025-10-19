@@ -109,7 +109,7 @@ export class AIReceptionist {
     }
 
     if (config.debug) {
-      logger.info('[AIReceptionist] Created instance for agent:', config.agent.identity.name);
+      logger.info('[AIReceptionist] Created instance for agent', { name: config.agent.identity.name });
     }
   }
 
@@ -198,12 +198,13 @@ export class AIReceptionist {
 
       // Initialize call service (lazy loaded)
       const { CallService } = await import('./services/call.service');
+      const agentId = `agent-${this.config.agent.identity.name.toLowerCase().replace(/\s+/g, '-')}`;
       this.callService = new CallService(
         this.twilioProvider,
         this.aiProvider,
         this.conversationService,
         this.toolExecutor,
-        this.config.agent
+        agentId
       );
 
       // Initialize resources (lazy loaded)

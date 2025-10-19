@@ -78,7 +78,7 @@ export class ToolRegistry {
       const result = await handler(parameters, context);
       return result;
     } catch (error) {
-      logger.error(`[ToolRegistry] Tool execution failed:`, error);
+      logger.error(`[ToolRegistry] Tool execution failed:`, error instanceof Error ? error : new Error(String(error)));
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

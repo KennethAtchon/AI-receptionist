@@ -17,7 +17,7 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { BaseProvider } from '../base.provider';
-import { AIModelConfig, AgentConfig, ChatOptions, AIResponse, ITool } from '../../types';
+import { AIModelConfig, ChatOptions, AIResponse, ITool } from '../../types';
 import { logger } from '../../utils/logger';
 
 /**
@@ -69,20 +69,17 @@ export class OpenRouterProvider extends BaseProvider {
   private static readonly SDK_TITLE = 'AI Receptionist SDK';
 
   private client: OpenAI | null = null;
-  private readonly agentConfig: AgentConfig;
   private currentModel: string;
 
   constructor(
-    private readonly config: AIModelConfig,
-    agentConfig: AgentConfig
+    private readonly config: AIModelConfig
   ) {
     super();
-    this.agentConfig = agentConfig;
     this.currentModel = config.model;
   }
 
   async initialize(): Promise<void> {
-    logger.info('[OpenRouterProvider] Initializing with model:', this.config.model);
+    logger.info('[OpenRouterProvider] Initializing with model', { model: this.config.model });
 
     // OpenRouter uses OpenAI-compatible API with custom base URL
     this.client = new OpenAI({
@@ -130,7 +127,7 @@ export class OpenRouterProvider extends BaseProvider {
       const availableModels = await this.listAvailableModels();
       return availableModels.some(m => m.id === model);
     } catch (error) {
-      logger.error('[OpenRouterProvider] Model validation failed:', error);
+      logger.error('[OpenRouterProvider] Model validation failed:', error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }
@@ -161,7 +158,7 @@ export class OpenRouterProvider extends BaseProvider {
         provider: model.id.split('/')[0] || 'unknown',
       }));
     } catch (error) {
-      logger.error('[OpenRouterProvider] Failed to list models:', error);
+      logger.error('[OpenRouterProvider] Failed to list models:', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -193,7 +190,7 @@ export class OpenRouterProvider extends BaseProvider {
 
       return this.parseResponse(response);
     } catch (error) {
-      logger.error('[OpenRouterProvider] Chat error:', error);
+      logger.error('[OpenRouterProvider] Chat error:', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -204,12 +201,13 @@ export class OpenRouterProvider extends BaseProvider {
   private buildMessages(options: ChatOptions): ChatCompletionMessageParam[] {
     const messages: ChatCompletionMessageParam[] = [];
 
-    // System message with agent personality
-    messages.push({
-      role: 'system',
-      content: this.agentConfig.systemPrompt ||
-        `You are ${this.agentConfig.name}, a ${this.agentConfig.role}. ${this.agentConfig.personality || ''}\n\n${this.agentConfig.instructions || ''}`
-    });
+    // System message (if provided)
+    if (options.systemPrompt) {
+      messages.push({
+        role: 'system',
+        content: options.systemPrompt
+      });
+    }
 
     // Conversation history
     if (options.conversationHistory) {
@@ -301,7 +299,7 @@ export class OpenRouterProvider extends BaseProvider {
       await this.client.models.list();
       return true;
     } catch (error) {
-      logger.error('[OpenRouterProvider] Health check failed:', error);
+      logger.error('[OpenRouterProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }

@@ -11,15 +11,15 @@ export enum LogLevel {
   NONE = 4,
 }
 
-export interface LogContext {
+export interface LoggerContext {
   [key: string]: unknown;
 }
 
 export interface ILogger {
-  debug(message: string, context?: LogContext): void;
-  info(message: string, context?: LogContext): void;
-  warn(message: string, context?: LogContext): void;
-  error(message: string, error?: Error, context?: LogContext): void;
+  debug(message: string, context?: LoggerContext): void;
+  info(message: string, context?: LoggerContext): void;
+  warn(message: string, context?: LoggerContext): void;
+  error(message: string, error?: Error, context?: LoggerContext): void;
   setLevel(level: LogLevel): void;
   getLevel(): LogLevel;
 }
@@ -77,25 +77,25 @@ export class Logger implements ILogger {
     return this._level;
   }
 
-  debug(message: string, context?: LogContext): void {
+  debug(message: string, context?: LoggerContext): void {
     if (this._level <= LogLevel.DEBUG) {
       this.log('DEBUG', message, context);
     }
   }
 
-  info(message: string, context?: LogContext): void {
+  info(message: string, context?: LoggerContext): void {
     if (this._level <= LogLevel.INFO) {
       this.log('INFO', message, context);
     }
   }
 
-  warn(message: string, context?: LogContext): void {
+  warn(message: string, context?: LoggerContext): void {
     if (this._level <= LogLevel.WARN) {
       this.log('WARN', message, context);
     }
   }
 
-  error(message: string, error?: Error, context?: LogContext): void {
+  error(message: string, error?: Error, context?: LoggerContext): void {
     if (this._level <= LogLevel.ERROR) {
       const errorContext = {
         ...context,
@@ -111,7 +111,7 @@ export class Logger implements ILogger {
     }
   }
 
-  private log(level: string, message: string, context?: LogContext): void {
+  private log(level: string, message: string, context?: LoggerContext): void {
     const timestamp = this._enableTimestamps ? new Date().toISOString() : '';
     const color = this._enableColors ? this.getColor(level) : '';
     const reset = this._enableColors ? '\x1b[0m' : '';
@@ -179,9 +179,9 @@ export function createLogger(prefix: string, config?: Omit<LoggerConfig, 'prefix
  * Convenience export for backward compatibility
  */
 export const logger = {
-  debug: (message: string, context?: LogContext) => globalLogger.debug(message, context),
-  info: (message: string, context?: LogContext) => globalLogger.info(message, context),
-  warn: (message: string, context?: LogContext) => globalLogger.warn(message, context),
-  error: (message: string, error?: Error, context?: LogContext) =>
+  debug: (message: string, context?: LoggerContext) => globalLogger.debug(message, context),
+  info: (message: string, context?: LoggerContext) => globalLogger.info(message, context),
+  warn: (message: string, context?: LoggerContext) => globalLogger.warn(message, context),
+  error: (message: string, error?: Error, context?: LoggerContext) =>
     globalLogger.error(message, error, context),
 };

@@ -6,7 +6,7 @@
 import { TwilioProvider } from '../providers/communication/twilio.provider';
 import { ConversationService } from './conversation.service';
 import { ToolExecutionService } from './tool-execution.service';
-import { MakeCallOptions, CallSession, AgentConfig, IAIProvider } from '../types';
+import { MakeCallOptions, CallSession, IAIProvider } from '../types';
 import { logger } from '../utils/logger';
 
 export class CallService {
@@ -15,7 +15,7 @@ export class CallService {
     private aiProvider: IAIProvider,
     private conversationService: ConversationService,
     private toolExecutor: ToolExecutionService,
-    private agentConfig: AgentConfig,
+    private agentId: string,
     private webhookBaseUrl: string = 'http://localhost:3000'
   ) {}
 
@@ -28,7 +28,6 @@ export class CallService {
     // 1. Create conversation context
     const conversation = await this.conversationService.create({
       channel: 'call',
-      agentConfig: this.agentConfig,
       metadata: options.metadata
     });
 
@@ -105,7 +104,7 @@ export class CallService {
             channel: 'call',
             conversationId: conversation.id,
             callSid,
-            agent: this.agentConfig
+            agentId: this.agentId
           }
         );
 

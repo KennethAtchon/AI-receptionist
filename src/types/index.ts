@@ -241,6 +241,7 @@ export interface ChatOptions {
   conversationHistory?: ConversationMessage[];
   availableTools?: ITool[];
   toolResults?: ToolResult[];
+  systemPrompt?: string;
 }
 
 export interface AIResponse {

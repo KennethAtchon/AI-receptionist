@@ -19,7 +19,7 @@ export class TwilioProvider extends BaseProvider {
 
   async initialize(): Promise<void> {
     // TODO: Initialize Twilio client
-    logger.info('[TwilioProvider] Initializing with account:', this.config.accountSid);
+    logger.info('[TwilioProvider] Initializing with account', { accountSid: this.config.accountSid });
 
     // Placeholder: const twilio = require('twilio');
     // this.client = twilio(this.config.accountSid, this.config.authToken);
@@ -73,7 +73,7 @@ export class TwilioProvider extends BaseProvider {
       // await this.client.api.accounts(this.config.accountSid).fetch();
       return true;
     } catch (error) {
-      logger.error('[TwilioProvider] Health check failed:', error);
+      logger.error('[TwilioProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }

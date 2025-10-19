@@ -3,13 +3,12 @@
  * Manages conversation state and history
  */
 
-import { IConversationStore, Conversation, ConversationMessage, AgentConfig } from '../types';
+import { IConversationStore, Conversation, ConversationMessage } from '../types';
 import { InMemoryConversationStore } from '../storage/in-memory-conversation.store';
 import { logger } from '../utils/logger';
 
 export interface CreateConversationOptions {
   channel: 'call' | 'sms' | 'email';
-  agentConfig: AgentConfig;
   metadata?: Record<string, any>;
   callSid?: string;
   messageSid?: string;

@@ -18,7 +18,6 @@ import type {
   AgentRequest,
   AgentResponse,
   AgentState,
-  AgentStatus,
   Identity,
   PersonalityEngine,
   KnowledgeBase,
@@ -28,6 +27,8 @@ import type {
   MemoryContext,
   PerformanceMetrics
 } from '../types';
+
+import { AgentStatus } from '../types';
 
 import { IdentityImpl } from '../identity/Identity';
 import { PersonalityEngineImpl } from '../personality/PersonalityEngine';
@@ -91,7 +92,8 @@ export class Agent {
     this.promptBuilder = new SystemPromptBuilder();
 
     // Initialize observability
-    this.logger = new AgentLogger(this.identity.name);
+    const agentId = `agent-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    this.logger = new AgentLogger(agentId, this.identity.name);
     this.tracer = new InteractionTracer();
 
     // Set external dependencies
@@ -155,7 +157,7 @@ export class Agent {
     try {
       // 1. Retrieve relevant context from memory
       const memoryContext = await this.memory.retrieve(request.input);
-      this.tracer.log(interactionId, 'memory_retrieval', memoryContext);
+      this.tracer.log('memory_retrieval', memoryContext);
 
       // 2. Build context-aware system prompt
       const systemPrompt = await this.promptBuilder.build({
@@ -170,7 +172,7 @@ export class Agent {
 
       // 3. Execute with AI provider
       const response = await this.execute(request, systemPrompt, memoryContext);
-      this.tracer.log(interactionId, 'response', response);
+      this.tracer.log('response', response);
 
       // 4. Update memory
       await this.memory.store({
@@ -197,7 +199,7 @@ export class Agent {
       this.state = AgentStatus.ERROR;
       return this.handleError(error as Error, request);
     } finally {
-      this.tracer.endInteraction(interactionId);
+      this.tracer.endInteraction();
       this.state = AgentStatus.READY;
     }
   }

@@ -1,34 +1,35 @@
 /**
  * Test Fixtures - Agent Configurations
+ *
+ * NOTE: These fixtures use the old AgentConfig type which has been replaced
+ * with the six-pillar AgentConfiguration. These are kept for reference but
+ * commented out until they are updated to use the new architecture.
  */
 
-import { AgentConfig } from '../../types';
+// TODO: Update these fixtures to use AgentConfiguration
+// import { AgentConfiguration } from '../../types';
 
-export const mockAgentSarah: AgentConfig = {
-  name: 'Sarah',
-  role: 'Sales Representative',
-  personality: 'friendly and enthusiastic',
-  tone: 'friendly',
-  instructions: 'Help customers with product inquiries and bookings',
-};
+// export const mockAgentSarah: AgentConfiguration = {
+//   identity: {
+//     name: 'Sarah',
+//     role: 'Sales Representative',
+//   },
+//   personality: {
+//     traits: ['friendly', 'enthusiastic'],
+//     communicationStyle: 'friendly'
+//   }
+// };
 
-export const mockAgentBob: AgentConfig = {
-  name: 'Bob',
-  role: 'Support Specialist',
-  personality: 'patient and helpful',
-  tone: 'professional',
-  systemPrompt: 'You are a helpful support specialist',
-};
+// export const mockAgentBob: AgentConfiguration = {
+//   identity: {
+//     name: 'Bob',
+//     role: 'Support Specialist',
+//   }
+// };
 
-export const mockAgentTech: AgentConfig = {
-  name: 'TechBot',
-  role: 'Technical Support',
-  personality: 'precise and knowledgeable',
-  tone: 'formal',
-  voice: {
-    provider: 'elevenlabs',
-    voiceId: 'tech-voice-001',
-    stability: 0.8,
-    similarityBoost: 0.7,
-  },
-};
+// export const mockAgentTech: AgentConfiguration = {
+//   identity: {
+//     name: 'TechBot',
+//     role: 'Technical Support',
+//   }
+// };

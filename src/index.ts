@@ -69,7 +69,7 @@ export { InMemoryConversationStore } from './storage/in-memory-conversation.stor
 // ============================================================================
 
 export { logger, configureLogger, createLogger, getLogger, LogLevel } from './utils/logger';
-export type { ILogger, LoggerConfig, LogContext } from './utils/logger';
+export type { ILogger, LoggerConfig, LoggerContext } from './utils/logger';
 
 // ============================================================================
 // Types (All type exports)

@@ -6,7 +6,7 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { BaseProvider } from '../base.provider';
-import { AIModelConfig, AgentConfig, ChatOptions, AIResponse, ITool } from '../../types';
+import { AIModelConfig, ChatOptions, AIResponse, ITool } from '../../types';
 import { logger } from '../../utils/logger';
 
 /**
@@ -23,18 +23,15 @@ export class OpenAIProvider extends BaseProvider {
   readonly type = 'ai' as const;
 
   private client: OpenAI | null = null;
-  private readonly agentConfig: AgentConfig;
 
   constructor(
-    private readonly config: AIModelConfig,
-    agentConfig: AgentConfig
+    private readonly config: AIModelConfig
   ) {
     super();
-    this.agentConfig = agentConfig;
   }
 
   async initialize(): Promise<void> {
-    logger.info('[OpenAIProvider] Initializing with model:', this.config.model);
+    logger.info('[OpenAIProvider] Initializing with model', { model: this.config.model });
 
     this.client = new OpenAI({
       apiKey: this.config.apiKey,
@@ -71,7 +68,7 @@ export class OpenAIProvider extends BaseProvider {
 
       return this.parseResponse(response);
     } catch (error) {
-      logger.error('[OpenAIProvider] Chat error:', error);
+      logger.error('[OpenAIProvider] Chat error:', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -82,12 +79,13 @@ export class OpenAIProvider extends BaseProvider {
   private buildMessages(options: ChatOptions): ChatCompletionMessageParam[] {
     const messages: ChatCompletionMessageParam[] = [];
 
-    // System message with agent personality
-    messages.push({
-      role: 'system',
-      content: this.agentConfig.systemPrompt ||
-        `You are ${this.agentConfig.name}, a ${this.agentConfig.role}. ${this.agentConfig.personality || ''}\n\n${this.agentConfig.instructions || ''}`
-    });
+    // System message (if provided)
+    if (options.systemPrompt) {
+      messages.push({
+        role: 'system',
+        content: options.systemPrompt
+      });
+    }
 
     // Conversation history
     if (options.conversationHistory) {
@@ -179,7 +177,7 @@ export class OpenAIProvider extends BaseProvider {
       await this.client.models.list();
       return true;
     } catch (error) {
-      logger.error('[OpenAIProvider] Health check failed:', error);
+      logger.error('[OpenAIProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }
