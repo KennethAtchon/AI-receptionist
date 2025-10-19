@@ -15,19 +15,81 @@ export interface IProvider {
 }
 
 // ============================================================================
-// Agent Configuration
+// Agent Configuration (Six-Pillar Architecture)
 // ============================================================================
 
-export interface AgentConfig {
-  name: string;
-  role: string;
-  personality?: string;
-  systemPrompt?: string;
-  instructions?: string;
-  tone?: 'formal' | 'casual' | 'friendly' | 'professional';
-  voice?: VoiceConfig;
-}
+// Import types that we need to use in this file
+import type {
+  IdentityConfig as AgentIdentityConfig,
+  PersonalityConfig as AgentPersonalityConfig,
+  KnowledgeConfig as AgentKnowledgeConfig,
+  GoalConfig as AgentGoalConfig,
+  MemoryConfig as AgentMemoryConfig
+} from '../agent/types';
 
+// Re-export agent enums (as values, not types)
+export { AgentStatus } from '../agent/types';
+
+// Re-export all agent types from the agent module
+export type {
+  // Core Agent Types
+  AgentConfiguration,
+  AgentRequest,
+  AgentResponse,
+  AgentState,
+
+  // Identity Pillar
+  Identity,
+  IdentityConfig,
+
+  // Personality Pillar
+  PersonalityEngine,
+  PersonalityConfig,
+  PersonalityTrait,
+  CommunicationStyleConfig,
+
+  // Knowledge Pillar
+  KnowledgeBase,
+  KnowledgeConfig,
+  LanguageConfig,
+
+  // Capabilities Pillar
+  Capability,
+  CapabilityConfig,
+  CapabilityManager,
+  Skill,
+  SkillDefinition,
+
+  // Memory Pillar
+  Memory,
+  MemoryConfig,
+  MemoryContext,
+  MemoryManager,
+  MemoryStats,
+  Message,
+
+  // Goals Pillar
+  Goal,
+  GoalConfig,
+  GoalSystem,
+
+  // Prompt System
+  PromptContext,
+  PromptSection,
+  PromptExample,
+
+  // Observability
+  LogContext,
+  Trace,
+  TraceStep,
+  InteractionMetrics,
+  PerformanceMetrics,
+
+  // Common
+  Channel
+} from '../agent/types';
+
+// Voice configuration for TTS
 export interface VoiceConfig {
   provider?: 'elevenlabs' | 'google' | 'amazon';
   voiceId?: string;
@@ -76,7 +138,8 @@ export interface ExecutionContext {
   callSid?: string;
   messageSid?: string;
   metadata?: Record<string, any>;
-  agent: AgentConfig;
+  // Reference to the agent (will be set by the system)
+  agentId?: string;
 }
 
 export interface JSONSchema {
@@ -217,8 +280,26 @@ export interface CalendarEvent {
 // ============================================================================
 
 export interface AIReceptionistConfig {
-  // Core agent configuration
-  agent: AgentConfig;
+  // Core agent configuration (Six-Pillar Architecture)
+  agent: {
+    // Identity - Who the agent is
+    identity: AgentIdentityConfig;
+
+    // Personality - How the agent behaves (optional, has defaults)
+    personality?: AgentPersonalityConfig;
+
+    // Knowledge - What the agent knows (optional, has defaults)
+    knowledge?: AgentKnowledgeConfig;
+
+    // Goals - What the agent aims to achieve (optional, has defaults)
+    goals?: AgentGoalConfig;
+
+    // Memory - What the agent remembers (optional, has defaults)
+    memory?: AgentMemoryConfig;
+
+    // Voice configuration for TTS (optional)
+    voice?: VoiceConfig;
+  };
 
   // AI model configuration
   model: AIModelConfig;

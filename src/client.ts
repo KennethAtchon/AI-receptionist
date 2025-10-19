@@ -1,6 +1,6 @@
 /**
  * AI Receptionist SDK - Main Client
- * Agent-centric architecture with clone pattern for multi-agent support
+ * Agent-centric architecture with six-pillar agent system
  */
 
 import type { AIReceptionistConfig } from './types';
@@ -10,6 +10,8 @@ import { ToolRegistry } from './tools/registry';
 import { InMemoryConversationStore } from './storage/in-memory-conversation.store';
 import { setupStandardTools } from './tools/standard';
 import { logger } from './utils/logger';
+import { Agent } from './agent/core/Agent';
+import { AgentBuilder } from './agent/core/AgentBuilder';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider } from './providers/communication/twilio.provider';
@@ -30,9 +32,25 @@ import type { EmailResource } from './resources/email.resource';
  * ```typescript
  * const sarah = new AIReceptionist({
  *   agent: {
- *     name: 'Sarah',
- *     role: 'Sales Representative',
- *     personality: 'friendly and enthusiastic'
+ *     identity: {
+ *       name: 'Sarah',
+ *       role: 'Sales Representative',
+ *       title: 'Senior Sales Specialist'
+ *     },
+ *     personality: {
+ *       traits: [
+ *         { name: 'friendly', description: 'Warm and welcoming' },
+ *         { name: 'enthusiastic', description: 'Energetic and positive' }
+ *       ],
+ *       communicationStyle: { primary: 'consultative' }
+ *     },
+ *     knowledge: {
+ *       domain: 'B2B Sales',
+ *       expertise: ['product knowledge', 'sales techniques']
+ *     },
+ *     goals: {
+ *       primary: 'Convert leads into customers'
+ *     }
  *   },
  *   model: {
  *     provider: 'openai',
@@ -69,6 +87,7 @@ export class AIReceptionist {
 
   // Internal components
   private config: AIReceptionistConfig;
+  private agent!: Agent; // The six-pillar agent instance
   private twilioProvider?: TwilioProvider;
   private aiProvider!: OpenAIProvider | OpenRouterProvider;
   private calendarProvider?: GoogleCalendarProvider;
@@ -82,15 +101,15 @@ export class AIReceptionist {
     this.config = config;
 
     // Validate required config
-    if (!config.agent) {
-      throw new Error('Agent configuration is required');
+    if (!config.agent?.identity) {
+      throw new Error('Agent identity configuration is required');
     }
     if (!config.model) {
       throw new Error('Model configuration is required');
     }
 
     if (config.debug) {
-      logger.info('[AIReceptionist] Created instance for agent:', config.agent.name);
+      logger.info('[AIReceptionist] Created instance for agent:', config.agent.identity.name);
     }
   }
 
@@ -104,7 +123,7 @@ export class AIReceptionist {
       return;
     }
 
-    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.name}`);
+    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity.name}`);
 
     // 1. Initialize conversation store
     this.conversationService = new ConversationService(
@@ -141,12 +160,12 @@ export class AIReceptionist {
     switch (this.config.model.provider) {
       case 'openai': {
         const { OpenAIProvider } = await import('./providers/ai/openai.provider');
-        this.aiProvider = new OpenAIProvider(this.config.model, this.config.agent);
+        this.aiProvider = new OpenAIProvider(this.config.model);
         break;
       }
       case 'openrouter': {
         const { OpenRouterProvider } = await import('./providers/ai/openrouter.provider');
-        this.aiProvider = new OpenRouterProvider(this.config.model, this.config.agent);
+        this.aiProvider = new OpenRouterProvider(this.config.model);
         break;
       }
       case 'anthropic':
@@ -156,6 +175,20 @@ export class AIReceptionist {
         throw new Error(`Unknown AI provider: ${this.config.model.provider}`);
     }
     await this.aiProvider.initialize();
+
+    // 7. Create and initialize the Agent instance (Six-Pillar Architecture)
+    this.agent = AgentBuilder.create()
+      .withIdentity(this.config.agent.identity)
+      .withPersonality(this.config.agent.personality || {})
+      .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
+      .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
+      .withMemory(this.config.agent.memory || { type: 'simple', contextWindow: 20 })
+      .withAIProvider(this.aiProvider)
+      .withToolExecutor(this.toolExecutor)
+      .withConversationService(this.conversationService)
+      .build();
+
+    await this.agent.initialize();
 
     // 7. Initialize communication providers if configured (lazy loaded)
     if (this.config.providers.communication?.twilio) {
@@ -211,12 +244,16 @@ export class AIReceptionist {
    * const sarah = new AIReceptionist({ ... });
    * await sarah.initialize();
    *
-   * // Create Bob with same infrastructure but different personality
+   * // Create Bob with same infrastructure but different identity/personality
    * const bob = sarah.clone({
    *   agent: {
-   *     name: 'Bob',
-   *     role: 'Support Specialist',
-   *     personality: 'patient and helpful'
+   *     identity: {
+   *       name: 'Bob',
+   *       role: 'Support Specialist'
+   *     },
+   *     personality: {
+   *       traits: [{ name: 'patient', description: 'Patient and helpful' }]
+   *     }
    *   },
    *   tools: {
    *     defaults: ['ticketing', 'knowledgeBase']
@@ -229,10 +266,17 @@ export class AIReceptionist {
     logger.info(`[AIReceptionist] Cloning instance with overrides`);
 
     const clonedConfig: AIReceptionistConfig = {
-      // Merge agent config
+      // Merge agent config (deep merge for six pillars)
       agent: {
-        ...this.config.agent,
-        ...overrides.agent
+        identity: {
+          ...this.config.agent.identity,
+          ...overrides.agent?.identity
+        },
+        personality: overrides.agent?.personality || this.config.agent.personality,
+        knowledge: overrides.agent?.knowledge || this.config.agent.knowledge,
+        goals: overrides.agent?.goals || this.config.agent.goals,
+        memory: overrides.agent?.memory || this.config.agent.memory,
+        voice: overrides.agent?.voice || this.config.agent.voice
       },
 
       // Use model from override or original
@@ -276,10 +320,22 @@ export class AIReceptionist {
   }
 
   /**
+   * Get the agent instance
+   */
+  public getAgent(): Agent {
+    this.ensureInitialized();
+    return this.agent;
+  }
+
+  /**
    * Dispose of all resources
    */
   async dispose(): Promise<void> {
     logger.info('[AIReceptionist] Disposing');
+
+    if (this.agent) {
+      await this.agent.dispose();
+    }
 
     if (this.twilioProvider) {
       await this.twilioProvider.dispose();

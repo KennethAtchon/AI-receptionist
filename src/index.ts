@@ -13,6 +13,19 @@
 export { AIReceptionist } from './client';
 
 // ============================================================================
+// Agent System (Six-Pillar Architecture)
+// ============================================================================
+
+export { Agent } from './agent/core/Agent';
+export { AgentBuilder } from './agent/core/AgentBuilder';
+export { Capability } from './agent/capabilities/Capability';
+export { Skill } from './agent/capabilities/Skill';
+export { SystemPromptBuilder } from './agent/prompt/SystemPromptBuilder';
+export { PromptOptimizer, PromptTooLargeError } from './agent/prompt/PromptOptimizer';
+export { AgentLogger, FileLogger } from './agent/observability/AgentLogger';
+export { InteractionTracer } from './agent/observability/InteractionTracer';
+
+// ============================================================================
 // Resources (User-facing API)
 // ============================================================================
 
@@ -65,10 +78,64 @@ export type { ILogger, LoggerConfig, LogContext } from './utils/logger';
 export type {
   // Main SDK config
   AIReceptionistConfig,
-
-  // Agent config
-  AgentConfig,
   VoiceConfig,
+
+  // Agent types (Six-Pillar Architecture)
+  AgentConfiguration,
+  AgentRequest,
+  AgentResponse,
+  AgentState,
+  AgentStatus,
+
+  // Identity Pillar
+  Identity,
+  IdentityConfig,
+
+  // Personality Pillar
+  PersonalityEngine,
+  PersonalityConfig,
+  PersonalityTrait,
+  CommunicationStyleConfig,
+
+  // Knowledge Pillar
+  KnowledgeBase,
+  KnowledgeConfig,
+  LanguageConfig,
+
+  // Capabilities Pillar
+  Capability as ICapability,
+  CapabilityConfig,
+  CapabilityManager,
+  Skill as ISkill,
+  SkillDefinition,
+
+  // Memory Pillar
+  Memory,
+  MemoryConfig,
+  MemoryContext,
+  MemoryManager,
+  MemoryStats,
+  Message,
+
+  // Goals Pillar
+  Goal,
+  GoalConfig,
+  GoalSystem,
+
+  // Prompt System
+  PromptContext,
+  PromptSection,
+  PromptExample,
+
+  // Observability
+  LogContext,
+  Trace,
+  TraceStep,
+  InteractionMetrics,
+  PerformanceMetrics,
+
+  // Common
+  Channel,
 
   // Tool system
   ITool,

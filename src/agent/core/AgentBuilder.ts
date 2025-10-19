@@ -93,11 +93,41 @@ export class AgentBuilder {
   }
 
   /**
+   * Alias for withProvider for clarity
+   */
+  public withAIProvider(provider: any): this {
+    return this.withProvider(provider);
+  }
+
+  /**
+   * Set the tool executor (OPTIONAL - for integration with existing SDK)
+   */
+  public withToolExecutor(executor: any): this {
+    (this.config as any).toolExecutor = executor;
+    return this;
+  }
+
+  /**
+   * Set the conversation service (OPTIONAL - for integration with existing SDK)
+   */
+  public withConversationService(service: any): this {
+    (this.config as any).conversationService = service;
+    return this;
+  }
+
+  /**
    * Set observability configuration (OPTIONAL)
    */
   public withObservability(config: ObservabilityConfig): this {
     this.config.observability = config;
     return this;
+  }
+
+  /**
+   * Create a new builder instance
+   */
+  public static create(): AgentBuilder {
+    return new AgentBuilder();
   }
 
   /**
