@@ -325,35 +325,117 @@ registry.unregister('old-tool');
 const callTools = registry.listAvailable('call');
 ```
 
-### 5. Configurable Storage
+### 5. Database Integration & Memory Persistence 🗄️
 
-**Development (in-memory):**
+The SDK uses a **Memory-Centric Architecture** where the agent's memory system is the single source of truth. Database integration provides automatic persistence with **5 powerful database tools** that are auto-registered when you configure storage.
+
+**Quick Setup with PostgreSQL:**
 ```typescript
-const client = new AIReceptionist({
-  // ... config
-  // Defaults to InMemoryConversationStore
+import { AIReceptionist, DatabaseStorage } from '@loctelli/ai-receptionist';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
 });
-```
 
-**Production (persistent):**
-```typescript
-import { IConversationStore } from '@loctelli/ai-receptionist';
+const db = drizzle(pool);
 
-class DatabaseConversationStore implements IConversationStore {
-  constructor(private db: Database) {}
-
-  async save(conversation: Conversation): Promise<void> {
-    await this.db.conversations.create(conversation);
+const receptionist = new AIReceptionist({
+  agent: {
+    identity: {
+      name: 'Sarah',
+      role: 'Sales Representative'
+    },
+    // Configure memory with database persistence
+    memory: {
+      contextWindow: 20,
+      longTermEnabled: true,
+      longTermStorage: new DatabaseStorage({
+        db,
+        autoMigrate: true // Automatically creates tables
+      }),
+      autoPersist: {
+        minImportance: 7, // Auto-save important memories
+        types: ['decision', 'tool_execution', 'system']
+      }
+    }
+  },
+  model: {
+    provider: 'openai',
+    apiKey: process.env.OPENAI_API_KEY!,
+    model: 'gpt-4'
   }
+});
 
-  // ... implement other methods
-}
+await receptionist.initialize();
 
-const client = new AIReceptionist({
-  // ... config
-  conversationStore: new DatabaseConversationStore(db)
+// 5 database tools are automatically registered! 🎉
+// - save_customer_info
+// - find_customer
+// - log_call_outcome
+// - remember_preference
+// - recall_preference
+```
+
+**What Gets Auto-Created:**
+- `ai_receptionist_memory` - All agent memories (conversations, decisions, tool executions)
+- `ai_receptionist_leads` - Customer/lead information
+- `ai_receptionist_call_logs` - Call outcomes and summaries
+
+**AI Can Now Automatically:**
+```typescript
+// During conversations, AI can:
+// 1. Save customer info
+"Can I get your email?"
+→ AI calls save_customer_info({ email: 'john@example.com' })
+
+// 2. Remember preferences
+"I prefer morning appointments"
+→ AI calls remember_preference({ key: 'preferred_time', value: 'morning' })
+
+// 3. Log outcomes
+After booking → AI calls log_call_outcome({
+  outcome: 'appointment_booked',
+  summary: 'Booked demo for Tuesday 2pm'
+})
+
+// 4. Find returning customers
+→ AI calls find_customer({ email: 'john@example.com' })
+
+// 5. Recall preferences
+→ AI calls recall_preference({ key: 'preferred_time' })
+```
+
+**Supported Databases:**
+- **PostgreSQL** (recommended for production)
+- **MySQL** (via `drizzle-orm/mysql2`)
+- **SQLite** (via `drizzle-orm/better-sqlite3`)
+- **In-Memory** (for testing)
+
+**Query Memories:**
+```typescript
+// Get conversation history
+const history = await receptionist.agent.memory.getConversationHistory('conv_123');
+
+// Get recent call memories
+const calls = await receptionist.agent.memory.getChannelHistory('call', {
+  limit: 20
+});
+
+// Advanced search
+const important = await receptionist.agent.memory.search({
+  type: ['decision', 'tool_execution'],
+  channel: 'call',
+  minImportance: 8,
+  keywords: ['appointment', 'booked'],
+  orderBy: 'timestamp',
+  orderDirection: 'desc'
 });
 ```
+
+📖 **Complete Guide:** [docs/database-integration.md](docs/database-integration.md)
+📖 **Example:** [examples/database-integration-example.ts](examples/database-integration-example.ts)
 
 ### 6. Event Monitoring
 
@@ -492,18 +574,24 @@ examples/
 5. **Strategy Pattern** - Channel-specific tool handlers
 6. **Clone Pattern** - Easy multi-agent setup
 
-## What's Implemented (Barebones)
+## What's Implemented
 
 ✅ Complete type system
-✅ Provider layer (Twilio, OpenAI, Google Calendar)
+✅ Provider layer (Twilio, OpenAI, OpenRouter, Google Calendar)
 ✅ Service layer (Conversation, ToolExecution, Call)
 ✅ Tool registry and builder
 ✅ Resource layer (Calls, SMS, Email)
 ✅ Main AIReceptionist client with clone pattern
-✅ In-memory conversation store
+✅ **Six-Pillar Agent Architecture** (Identity, Personality, Knowledge, Capabilities, Memory, Goals)
+✅ **Memory-Centric Architecture** with database persistence
+✅ **Database Storage** (PostgreSQL, MySQL, SQLite support)
+✅ **5 Auto-Registered Database Tools** (save_customer_info, find_customer, log_call_outcome, remember_preference, recall_preference)
+✅ **In-memory storage** for testing
 ✅ Standard tools (calendar, booking, CRM) - placeholder implementations
 ✅ Event callbacks for monitoring
-✅ Comprehensive example
+✅ **Runtime pillar updates** via PillarManager
+✅ **MCP (Model Context Protocol) adapter**
+✅ Comprehensive examples and documentation
 
 ## What's TODO (Actual Implementation)
 

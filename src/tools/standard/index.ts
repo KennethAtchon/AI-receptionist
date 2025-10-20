@@ -1,12 +1,16 @@
 /**
  * Standard Tool Library
- * Setup standard tools (calendar, booking, CRM)
+ * Setup standard tools (calendar, booking, CRM, database)
  */
 
 import { ToolRegistry } from '../registry';
 import { ToolBuilder } from '../builder';
 import { ToolConfig, ProviderConfig } from '../../types';
 import { logger } from '../../utils/logger';
+
+// Re-export database tools for external use
+export { setupDatabaseTools } from './database-tools';
+export type { DatabaseToolsConfig } from './database-tools';
 
 /**
  * Setup standard tools based on configuration

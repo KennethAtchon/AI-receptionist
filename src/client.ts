@@ -196,10 +196,20 @@ export class AIReceptionist {
 
     await this.agent.initialize();
 
-    // 7. Initialize pillar manager for runtime updates
+    // 8. Auto-register database tools if long-term memory storage is enabled
+    if (this.config.agent.memory?.longTermEnabled && this.config.agent.memory?.longTermStorage) {
+      logger.info('[AIReceptionist] Auto-registering database tools (memory storage enabled)');
+      const { setupDatabaseTools } = await import('./tools/standard/database-tools');
+      setupDatabaseTools(this.toolRegistry, {
+        agent: this.agent,
+        storage: this.config.agent.memory.longTermStorage,
+      });
+    }
+
+    // 9. Initialize pillar manager for runtime updates
     this.pillarManager = new PillarManager(this.agent);
 
-    // 8. Initialize communication providers if configured (lazy loaded)
+    // 10. Initialize communication providers if configured (lazy loaded)
     if (this.config.providers.communication?.twilio) {
       const { TwilioProvider } = await import('./providers/communication/twilio.provider');
       this.twilioProvider = new TwilioProvider(this.config.providers.communication.twilio);
@@ -223,18 +233,18 @@ export class AIReceptionist {
       (this as any).sms = new SMSResource(this.twilioProvider);
     }
 
-    // 8. Initialize calendar provider if configured (lazy loaded)
+    // 11. Initialize calendar provider if configured (lazy loaded)
     if (this.config.providers.calendar?.google) {
       const { GoogleCalendarProvider } = await import('./providers/calendar/google-calendar.provider');
       this.calendarProvider = new GoogleCalendarProvider(this.config.providers.calendar.google);
       await this.calendarProvider.initialize();
     }
 
-    // 9. Initialize email resource (basic for now) (lazy loaded)
+    // 12. Initialize email resource (basic for now) (lazy loaded)
     const { EmailResource } = await import('./resources/email.resource');
     (this as any).email = new EmailResource();
 
-    // 10. Initialize text resource (always available - for testing agent independently)
+    // 13. Initialize text resource (always available - for testing agent independently)
     const { TextResource } = await import('./resources/text.resource');
     (this as any).text = new TextResource(this.agent);
 

@@ -1,11 +1,7 @@
 You need a way to update pillars at the AIReceptionist client level so it propagates to all endpoints (text, email, calls, etc.). Let me add methods to the AIReceptionist client - Done will test
 
 
-Add a way to add the database to the AI, "we create tables".
-
-
-We left off with database-integration and memory-architecture-refractor, identify where we left off and implement the remaining.
-
+----------
 
 When you register tools, it automatically gets added as a function call the AI can use right? 
 
