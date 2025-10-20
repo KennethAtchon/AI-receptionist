@@ -2,16 +2,16 @@
  * LongTermMemory - Persistent memory storage
  *
  * Stores important information that should be remembered across conversations.
- * Uses a conversation store backend for persistence.
+ * Uses generic IStorage backend for persistence.
  */
 
-import type { Memory, IConversationStore } from '../types';
+import type { Memory, IStorage, MemorySearchQuery } from '../types';
 
 export class LongTermMemory {
-  private readonly storage: IConversationStore;
+  private readonly storage: IStorage;
   private cache: Map<string, Memory> = new Map();
 
-  constructor(storage: IConversationStore) {
+  constructor(storage: IStorage) {
     this.storage = storage;
   }
 
@@ -19,13 +19,8 @@ export class LongTermMemory {
    * Add a memory to long-term storage
    */
   public async add(memory: Memory): Promise<void> {
-    // Store in persistent database
-    await this.storage.save({
-      id: memory.id,
-      content: memory.content,
-      metadata: memory.metadata,
-      timestamp: memory.timestamp
-    });
+    // Store in persistent storage
+    await this.storage.save(memory);
 
     // Update cache
     this.cache.set(memory.id, memory);
@@ -34,7 +29,7 @@ export class LongTermMemory {
   /**
    * Search for memories matching a query
    */
-  public async search(query: any): Promise<Memory[]> {
+  public async search(query: MemorySearchQuery): Promise<Memory[]> {
     const results = await this.storage.search(query);
     return results;
   }
@@ -42,12 +37,22 @@ export class LongTermMemory {
   /**
    * Get a specific memory by ID
    */
-  public get(id: string): Memory | undefined {
-    return this.cache.get(id);
+  public async get(id: string): Promise<Memory | null> {
+    // Check cache first
+    if (this.cache.has(id)) {
+      return this.cache.get(id)!;
+    }
+
+    // Fetch from storage
+    const memory = await this.storage.get(id);
+    if (memory) {
+      this.cache.set(id, memory);
+    }
+    return memory;
   }
 
   /**
-   * Check if a memory exists
+   * Check if a memory exists (in cache)
    */
   public has(id: string): boolean {
     return this.cache.has(id);

@@ -1,15 +1,10 @@
-You need a way to update pillars at the AIReceptionist client level so it propagates to all endpoints (text, email, calls, etc.). Let me add methods to the AIReceptionist client
+You need a way to update pillars at the AIReceptionist client level so it propagates to all endpoints (text, email, calls, etc.). Let me add methods to the AIReceptionist client - Done will test
 
 
-Add a way to add the database to the AI, and there can be a flag to have like "AI created tables" or "integrate into my tables" which will be complex, should we even have an integrate into my 
-tables option?
+Add a way to add the database to the AI, "we create tables".
 
 
-Check if we have prompt summarizer, for chat history that go beyond the set default (or user set) limits, check if the prompt summarizer uses the model the user provides,
-Example: for 50 message history, summarize first 40, keep the 10 for pure context, provide the default numbers that are standard
-
-
-Do we need "conversation store" doesn't agents have a memory system that handles all convo anyways? this seems redundant, we need to store stuff per channel, then an easy way to do it is to just mark the channel when the agent stores the operations it did 
+We left off with database-integration and memory-architecture-refractor, identify where we left off and implement the remaining.
 
 
 When you register tools, it automatically gets added as a function call the AI can use right? 

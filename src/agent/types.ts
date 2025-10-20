@@ -171,18 +171,56 @@ export interface CapabilityManager {
 // ==================== MEMORY ====================
 
 export interface Message {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp?: Date;
+  toolCall?: ToolCall;
+  toolResult?: ToolResult;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  parameters: any;
+}
+
+export interface ToolResult {
+  success: boolean;
+  data?: any;
+  error?: string;
 }
 
 export interface Memory {
+  // Core fields
   id: string;
   content: string;
-  metadata: Record<string, unknown>;
   timestamp: Date;
-  importance?: number;
-  type?: 'conversation' | 'decision' | 'error' | 'fact';
+  type: 'conversation' | 'decision' | 'error' | 'tool_execution' | 'system';
+  importance?: number; // 1-10, determines if saved to long-term
+
+  // Channel tracking
+  channel?: 'call' | 'sms' | 'email';
+
+  // Session metadata
+  sessionMetadata?: {
+    conversationId?: string;
+    callSid?: string;
+    messageSid?: string;
+    emailId?: string;
+    status?: 'active' | 'completed' | 'failed';
+    duration?: number; // For calls
+    participants?: string[]; // Phone numbers, emails, etc.
+  };
+
+  // Role tracking (like messages)
+  role?: 'system' | 'user' | 'assistant' | 'tool';
+
+  // Tool execution tracking
+  toolCall?: ToolCall;
+  toolResult?: ToolResult;
+
+  // Additional metadata
+  metadata?: Record<string, unknown>;
   goalAchieved?: boolean;
 }
 
@@ -192,13 +230,87 @@ export interface MemoryContext {
   semantic?: Memory[];
 }
 
+export interface MemorySearchQuery {
+  // Full-text search
+  keywords?: string[];
+
+  // Filter by type
+  type?: Memory['type'] | Memory['type'][];
+
+  // Filter by channel
+  channel?: 'call' | 'sms' | 'email';
+
+  // Filter by conversation
+  conversationId?: string;
+
+  // Filter by date range
+  startDate?: Date;
+  endDate?: Date;
+
+  // Filter by importance
+  minImportance?: number;
+
+  // Filter by role
+  role?: 'system' | 'user' | 'assistant' | 'tool';
+
+  // Pagination
+  limit?: number;
+  offset?: number;
+
+  // Sorting
+  orderBy?: 'timestamp' | 'importance';
+  orderDirection?: 'asc' | 'desc';
+}
+
+export interface IStorage {
+  /**
+   * Save a memory to persistent storage
+   */
+  save(memory: Memory): Promise<void>;
+
+  /**
+   * Save multiple memories in batch
+   */
+  saveBatch(memories: Memory[]): Promise<void>;
+
+  /**
+   * Get a specific memory by ID
+   */
+  get(id: string): Promise<Memory | null>;
+
+  /**
+   * Search memories with flexible query
+   */
+  search(query: MemorySearchQuery): Promise<Memory[]>;
+
+  /**
+   * Delete a memory
+   */
+  delete(id: string): Promise<void>;
+
+  /**
+   * Health check
+   */
+  healthCheck(): Promise<boolean>;
+}
+
 export interface MemoryConfig {
-  type?: 'simple' | 'vector';
-  contextWindow?: number;
+  // Short-term config
+  contextWindow?: number; // Default: 20 messages
+
+  // Long-term config
   longTermEnabled?: boolean;
-  longTermStorage?: any; // IConversationStore
+  longTermStorage?: IStorage; // Generic storage interface
+
+  // Vector config
   vectorEnabled?: boolean;
-  vectorStore?: any; // IVectorStore
+  vectorStore?: IVectorStore;
+
+  // Auto-persistence rules
+  autoPersist?: {
+    minImportance?: number; // Auto-save if importance >= this
+    types?: Memory['type'][]; // Auto-save these types
+  };
 }
 
 export interface MemoryStats {
@@ -208,11 +320,28 @@ export interface MemoryStats {
 }
 
 export interface MemoryManager {
-  retrieve(input: string): Promise<MemoryContext>;
+  retrieve(input: string, context?: {
+    conversationId?: string;
+    channel?: 'call' | 'sms' | 'email';
+  }): Promise<MemoryContext>;
   store(memory: Memory): Promise<void>;
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   getStats(): MemoryStats;
+
+  // New methods for conversation management
+  getConversationHistory(conversationId: string): Promise<Memory[]>;
+  getChannelHistory(channel: 'call' | 'sms' | 'email', options?: {
+    limit?: number;
+    conversationId?: string;
+  }): Promise<Memory[]>;
+  search(query: MemorySearchQuery): Promise<Memory[]>;
+  startSession(session: {
+    conversationId: string;
+    channel: 'call' | 'sms' | 'email';
+    metadata?: Record<string, any>;
+  }): Promise<void>;
+  endSession(conversationId: string, summary?: string): Promise<void>;
 }
 
 // ==================== GOALS ====================
@@ -392,11 +521,6 @@ export interface ITokenizer {
 }
 
 // ==================== STORAGE INTERFACES ====================
-
-export interface IConversationStore {
-  save(data: any): Promise<void>;
-  search(query: any): Promise<Memory[]>;
-}
 
 export interface IVectorStore {
   upsert(data: { id: string; vector: number[]; metadata: any }): Promise<void>;

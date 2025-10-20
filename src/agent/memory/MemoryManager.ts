@@ -12,7 +12,9 @@ import type {
   MemoryConfig,
   Memory,
   MemoryContext,
-  MemoryStats
+  MemoryStats,
+  MemorySearchQuery,
+  Message
 } from '../types';
 
 import { ShortTermMemory } from './ShortTermMemory';
@@ -52,29 +54,47 @@ export class MemoryManagerImpl implements IMemoryManager {
   /**
    * Retrieve relevant context for current interaction
    */
-  public async retrieve(input: string): Promise<MemoryContext> {
-    const context: MemoryContext = {
+  public async retrieve(input: string, context?: {
+    conversationId?: string;
+    channel?: 'call' | 'sms' | 'email';
+  }): Promise<MemoryContext> {
+    const memoryContext: MemoryContext = {
       shortTerm: [],
       longTerm: [],
       semantic: []
     };
 
     // Get recent conversation context from short-term memory
-    const recentMemories = await this.shortTerm.getRecent(10);
-    context.shortTerm = this.shortTerm.toMessages();
+    if (context?.conversationId) {
+      const conversationMemories = this.shortTerm.getAll().filter(
+        m => m.sessionMetadata?.conversationId === context.conversationId
+      );
+      memoryContext.shortTerm = this.convertMemoriesToMessages(conversationMemories);
+    } else {
+      memoryContext.shortTerm = this.shortTerm.toMessages();
+    }
 
     // Get relevant long-term memories (if available)
     if (this.longTerm) {
       try {
-        // Simple keyword-based search for now
-        // In production, this would use more sophisticated retrieval
         const keywords = this.extractKeywords(input);
-        context.longTerm = await this.longTerm.search({
+        const searchQuery: MemorySearchQuery = {
           keywords,
-          limit: 5
-        });
+          limit: 5,
+          minImportance: 5 // Only important memories
+        };
+
+        // Add context filters
+        if (context?.conversationId) {
+          searchQuery.conversationId = context.conversationId;
+        }
+        if (context?.channel) {
+          searchQuery.channel = context.channel;
+        }
+
+        const longTermMemories = await this.longTerm.search(searchQuery);
+        memoryContext.longTerm = longTermMemories;
       } catch (error) {
-        // Long-term search failed, continue without it
         console.warn('Long-term memory search failed:', error);
       }
     }
@@ -82,20 +102,18 @@ export class MemoryManagerImpl implements IMemoryManager {
     // Get semantically similar interactions (if available)
     if (this.vector) {
       try {
-        // In production, you would generate embeddings for the input
-        // For now, this is a placeholder
         const embedding = await this.generateEmbedding(input);
-        context.semantic = await this.vector.similaritySearch(embedding, {
+        const semanticMemories = await this.vector.similaritySearch(embedding, {
           limit: 3,
           threshold: 0.8
         });
+        memoryContext.semantic = semanticMemories;
       } catch (error) {
-        // Vector search failed, continue without it
         console.warn('Vector memory search failed:', error);
       }
     }
 
-    return context;
+    return memoryContext;
   }
 
   /**
@@ -125,15 +143,32 @@ export class MemoryManagerImpl implements IMemoryManager {
    * Determine if a memory should be persisted to long-term storage
    */
   private shouldPersist(memory: Memory): boolean {
-    // Persist if:
-    // - User shared important information (high importance)
+    // Use auto-persist rules if configured
+    if (this.config.autoPersist) {
+      const { minImportance, types } = this.config.autoPersist;
+
+      if (minImportance && memory.importance && memory.importance >= minImportance) {
+        return true;
+      }
+
+      if (types && types.includes(memory.type)) {
+        return true;
+      }
+    }
+
+    // Default rules: Persist if:
+    // - High importance (> 7)
     // - Decision was made
     // - Error occurred (for learning)
     // - Goal was achieved
+    // - Tool was executed
+    // - System event
     return (
       (memory.importance !== undefined && memory.importance > 7) ||
       memory.type === 'decision' ||
       memory.type === 'error' ||
+      memory.type === 'tool_execution' ||
+      memory.type === 'system' ||
       memory.goalAchieved === true
     );
   }
@@ -187,5 +222,133 @@ export class MemoryManagerImpl implements IMemoryManager {
     if (this.longTerm) {
       this.longTerm.clearCache();
     }
+  }
+
+  // ==================== NEW METHODS FOR CONVERSATION MANAGEMENT ====================
+
+  /**
+   * Get all memories for a specific conversation
+   */
+  public async getConversationHistory(conversationId: string): Promise<Memory[]> {
+    if (!this.longTerm) {
+      // Fallback to short-term if no long-term storage
+      return this.shortTerm.getAll().filter(
+        m => m.sessionMetadata?.conversationId === conversationId
+      );
+    }
+
+    return this.longTerm.search({
+      conversationId,
+      orderBy: 'timestamp',
+      orderDirection: 'asc'
+    });
+  }
+
+  /**
+   * Get all memories for a specific channel
+   */
+  public async getChannelHistory(
+    channel: 'call' | 'sms' | 'email',
+    options?: { limit?: number; conversationId?: string }
+  ): Promise<Memory[]> {
+    if (!this.longTerm) {
+      return this.shortTerm.getAll().filter(m => m.channel === channel);
+    }
+
+    return this.longTerm.search({
+      channel,
+      conversationId: options?.conversationId,
+      limit: options?.limit,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+  }
+
+  /**
+   * Search memories with advanced filtering
+   */
+  public async search(query: MemorySearchQuery): Promise<Memory[]> {
+    if (!this.longTerm) {
+      // Basic filtering on short-term memory
+      let results = this.shortTerm.getAll();
+
+      if (query.channel) {
+        results = results.filter(m => m.channel === query.channel);
+      }
+
+      if (query.conversationId) {
+        results = results.filter(
+          m => m.sessionMetadata?.conversationId === query.conversationId
+        );
+      }
+
+      if (query.type) {
+        const types = Array.isArray(query.type) ? query.type : [query.type];
+        results = results.filter(m => types.includes(m.type));
+      }
+
+      return results.slice(0, query.limit || 10);
+    }
+
+    return this.longTerm.search(query);
+  }
+
+  /**
+   * Create a new conversation session
+   */
+  public async startSession(session: {
+    conversationId: string;
+    channel: 'call' | 'sms' | 'email';
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    const memory: Memory = {
+      id: `session-start-${session.conversationId}`,
+      content: `Started ${session.channel} conversation`,
+      timestamp: new Date(),
+      type: 'system',
+      channel: session.channel,
+      sessionMetadata: {
+        conversationId: session.conversationId,
+        status: 'active'
+      },
+      metadata: session.metadata,
+      importance: 5
+    };
+
+    await this.store(memory);
+  }
+
+  /**
+   * End a conversation session
+   */
+  public async endSession(conversationId: string, summary?: string): Promise<void> {
+    const memory: Memory = {
+      id: `session-end-${conversationId}`,
+      content: summary || 'Conversation ended',
+      timestamp: new Date(),
+      type: 'system',
+      sessionMetadata: {
+        conversationId,
+        status: 'completed'
+      },
+      importance: 7 // Higher importance for session summaries
+    };
+
+    await this.store(memory);
+  }
+
+  // ==================== HELPER METHODS ====================
+
+  /**
+   * Convert Memory objects to Message format
+   */
+  private convertMemoriesToMessages(memories: Memory[]): Message[] {
+    return memories.map(memory => ({
+      role: memory.role || 'assistant',
+      content: memory.content,
+      timestamp: memory.timestamp,
+      toolCall: memory.toolCall,
+      toolResult: memory.toolResult
+    }));
   }
 }

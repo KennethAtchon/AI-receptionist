@@ -66,7 +66,11 @@ export type {
   MemoryContext,
   MemoryManager,
   MemoryStats,
+  MemorySearchQuery,
   Message,
+  IStorage,
+  ToolCall as AgentToolCall,
+  ToolResult as AgentToolResult,
 
   // Goals Pillar
   Goal,
@@ -150,9 +154,13 @@ export interface JSONSchema {
 }
 
 // ============================================================================
-// Conversation & Memory Types
+// Conversation & Memory Types (DEPRECATED - Use Agent Memory System)
 // ============================================================================
 
+/**
+ * @deprecated Use agent.memory.getConversationHistory() instead
+ * Kept for backwards compatibility only
+ */
 export interface Conversation {
   id: string;
   channel: 'call' | 'sms' | 'email';
@@ -165,6 +173,9 @@ export interface Conversation {
   messageSid?: string;
 }
 
+/**
+ * @deprecated Use Message from agent types instead
+ */
 export interface ConversationMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
@@ -179,6 +190,11 @@ export interface ToolCall {
   parameters: any;
 }
 
+/**
+ * @deprecated Use IStorage from agent types instead
+ * The new Memory-Centric Architecture stores all conversation data
+ * in the agent's memory system with IStorage implementations.
+ */
 export interface IConversationStore {
   save(conversation: Conversation): Promise<void>;
   get(conversationId: string): Promise<Conversation | null>;
@@ -189,6 +205,9 @@ export interface IConversationStore {
   list(filters?: ConversationFilters): Promise<Conversation[]>;
 }
 
+/**
+ * @deprecated Use MemorySearchQuery from agent types instead
+ */
 export interface ConversationFilters {
   channel?: 'call' | 'sms' | 'email';
   status?: 'active' | 'completed' | 'failed';
@@ -312,6 +331,19 @@ export interface AIReceptionistConfig {
   providers: ProviderConfig;
 
   // Optional features
+  /**
+   * @deprecated Use agent.memory.longTermStorage instead
+   * The new Memory-Centric Architecture stores all conversation data
+   * in the agent's memory system. Configure storage via agent.memory.longTermStorage.
+   *
+   * Example:
+   * agent: {
+   *   memory: {
+   *     longTermEnabled: true,
+   *     longTermStorage: new DatabaseStorage({ db })
+   *   }
+   * }
+   */
   conversationStore?: IConversationStore;
   notifications?: NotificationConfig;
   analytics?: AnalyticsConfig;
