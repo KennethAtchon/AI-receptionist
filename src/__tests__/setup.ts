@@ -31,7 +31,9 @@ expect.extend({
   },
 });
 
-// Extend Jest matchers
+// Extend Jest matchers - must be at module level
+export {};
+
 declare global {
   namespace jest {
     interface Matchers<R> {

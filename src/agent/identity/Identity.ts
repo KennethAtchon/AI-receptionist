@@ -10,6 +10,8 @@
 
 import type { IdentityConfig, Identity } from '../types';
 
+export { Identity };
+
 export class IdentityImpl implements Identity {
   private _name: string;
   private _role: string;

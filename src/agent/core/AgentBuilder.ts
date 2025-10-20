@@ -175,8 +175,8 @@ export class AgentBuilder {
 
     // Validate memory configuration
     if (this.config.memory) {
-      if (this.config.memory.type === 'vector' && !this.config.memory.vectorStore) {
-        errors.push('Vector store is required when memory type is "vector"');
+      if (this.config.memory.vectorEnabled && !this.config.memory.vectorStore) {
+        errors.push('Vector store is required when vectorEnabled is true');
       }
       if (this.config.memory.longTermEnabled && !this.config.memory.longTermStorage) {
         errors.push('Long-term storage is required when longTermEnabled is true');

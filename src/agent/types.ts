@@ -52,6 +52,12 @@ export interface Identity {
   certifications: string[];
   summary(): string;
   toJSON(): Record<string, unknown>;
+  updateRole(role: string): void;
+  updateTitle(title: string): void;
+  updateBackstory(backstory: string): void;
+  setAuthorityLevel(level: 'low' | 'medium' | 'high'): void;
+  addSpecialization(specialization: string): void;
+  removeSpecialization(specialization: string): void;
 }
 
 // ==================== PERSONALITY ====================
@@ -92,6 +98,10 @@ export interface PersonalityEngine {
   adaptabilityRules: string[];
   getErrorMessage(channel: Channel): string;
   toJSON(): Record<string, unknown>;
+  addTrait(trait: string | PersonalityTrait): void;
+  removeTrait(traitName: string): void;
+  updateCommunicationStyle(style: Partial<CommunicationStyleConfig>): void;
+  setFormalityLevel(level: number): void;
 }
 
 // ==================== KNOWLEDGE ====================
@@ -124,6 +134,13 @@ export interface KnowledgeBase {
   load(): Promise<void>;
   dispose(): Promise<void>;
   toJSON(): Record<string, unknown>;
+  updateDomain(domain: string): void;
+  addExpertise(area: string): void;
+  removeExpertise(area: string): void;
+  addLanguage(language: string, proficiency?: 'fluent' | 'conversational'): void;
+  removeLanguage(language: string): void;
+  addIndustry(industry: string): void;
+  removeIndustry(industry: string): void;
 }
 
 // ==================== CAPABILITIES ====================
@@ -148,6 +165,7 @@ export interface Capability {
   skills: Skill[];
   tools: any[]; // ITool[] from your tool system
   supportedChannels: Channel[];
+  toJSON?(): Record<string, unknown>;
 }
 
 export interface CapabilityConfig {
@@ -342,6 +360,8 @@ export interface MemoryManager {
     metadata?: Record<string, any>;
   }): Promise<void>;
   endSession(conversationId: string, summary?: string): Promise<void>;
+  clearShortTerm(): void;
+  clearLongTerm(): void;
 }
 
 // ==================== GOALS ====================
@@ -366,6 +386,9 @@ export interface GoalSystem {
   getCurrent(): Goal[];
   trackProgress(request: AgentRequest, response: AgentResponse): Promise<void>;
   toJSON(): Record<string, unknown>;
+  addGoal(goal: Goal): void;
+  removeGoal(name: string): boolean;
+  updateGoal(name: string, updates: Partial<Goal>): boolean;
 }
 
 // ==================== AGENT REQUEST/RESPONSE ====================

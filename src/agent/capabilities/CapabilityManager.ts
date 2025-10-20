@@ -175,7 +175,7 @@ export class CapabilityManagerImpl implements ICapabilityManager {
    */
   public toJSON(): Record<string, unknown> {
     return {
-      capabilities: Array.from(this.capabilities.values()).map(c => c.toJSON()),
+      capabilities: Array.from(this.capabilities.values()).map(c => c.toJSON?.() || { name: c.name, description: c.description }),
       totalSkills: this.skills.size
     };
   }

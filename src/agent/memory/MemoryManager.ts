@@ -224,6 +224,22 @@ export class MemoryManagerImpl implements IMemoryManager {
     }
   }
 
+  /**
+   * Clear short-term memory only
+   */
+  public clearShortTerm(): void {
+    this.shortTerm.clear();
+  }
+
+  /**
+   * Clear long-term memory cache
+   */
+  public clearLongTerm(): void {
+    if (this.longTerm) {
+      this.longTerm.clearCache();
+    }
+  }
+
   // ==================== NEW METHODS FOR CONVERSATION MANAGEMENT ====================
 
   /**

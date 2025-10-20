@@ -110,7 +110,7 @@ function createSaveCustomerInfoTool(config: DatabaseToolsConfig) {
         };
 
         // Store in agent memory
-        await config.agent.memory.store(customerMemory);
+        await config.agent.getMemory().store(customerMemory);
 
         // Build response based on channel
         const customerFields = [
@@ -135,10 +135,10 @@ function createSaveCustomerInfoTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[SaveCustomerInfo] Failed to save customer data', { error });
+        logger.error('[SaveCustomerInfo] Failed to save customer data', { error: error instanceof Error ? error.message : String(error) });
         return {
           success: false,
-          error: 'Failed to save customer information',
+          error: error instanceof Error ? error.message : 'Failed to save customer information',
           response: {
             speak: 'I apologize, but I encountered an error saving your information. Let me try again.',
             message: 'Error saving information. Please try again.',
@@ -181,9 +181,9 @@ function createFindCustomerTool(config: DatabaseToolsConfig) {
 
       try {
         // Search in memory for customer records
-        const memories = await config.agent.memory.search({
+        const memories = await config.agent.getMemory().search({
           type: 'decision',
-          keywords: [params.email, params.phone].filter(Boolean),
+          keywords: [params.email, params.phone].filter(Boolean) as string[],
           limit: 10,
         });
 
@@ -206,7 +206,13 @@ function createFindCustomerTool(config: DatabaseToolsConfig) {
 
         // Get the most recent customer record
         const latestCustomer = customerMemories[0];
-        const customerData = latestCustomer.metadata?.customerData || {};
+        const customerData = (latestCustomer.metadata?.customerData || {}) as {
+          name?: string;
+          email?: string;
+          phone?: string;
+          company?: string;
+          notes?: string;
+        };
 
         return {
           success: true,
@@ -222,10 +228,10 @@ function createFindCustomerTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[FindCustomer] Search failed', { error });
+        logger.error('[FindCustomer] Search failed', { error: error instanceof Error ? error.message : String(error) });
         return {
           success: false,
-          error: 'Failed to search for customer',
+          error: error instanceof Error ? error.message : 'Failed to search for customer',
           response: {
             speak: 'I had trouble searching for that information.',
             message: 'Search error.',
@@ -304,7 +310,7 @@ function createLogCallOutcomeTool(config: DatabaseToolsConfig) {
         };
 
         // Store in agent memory
-        await config.agent.memory.store(outcomeMemory);
+        await config.agent.getMemory().store(outcomeMemory);
 
         return {
           success: true,
@@ -319,10 +325,10 @@ function createLogCallOutcomeTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[LogCallOutcome] Failed to log outcome', { error });
+        logger.error('[LogCallOutcome] Failed to log outcome', { error: error instanceof Error ? error.message : String(error) });
         return {
           success: false,
-          error: 'Failed to log call outcome',
+          error: error instanceof Error ? error.message : 'Failed to log call outcome',
           response: {
             speak: 'I had trouble logging that information.',
             message: 'Error logging outcome.',
@@ -391,7 +397,7 @@ function createRememberPreferenceTool(config: DatabaseToolsConfig) {
         };
 
         // Store in agent memory
-        await config.agent.memory.store(preferenceMemory);
+        await config.agent.getMemory().store(preferenceMemory);
 
         return {
           success: true,
@@ -407,10 +413,10 @@ function createRememberPreferenceTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[RememberPreference] Failed to store preference', { error });
+        logger.error('[RememberPreference] Failed to store preference', { error: error instanceof Error ? error.message : String(error) });
         return {
           success: false,
-          error: 'Failed to remember preference',
+          error: error instanceof Error ? error.message : 'Failed to remember preference',
           response: {
             speak: 'I had trouble saving that preference.',
             message: 'Error saving preference.',
@@ -447,7 +453,7 @@ function createRecallPreferenceTool(config: DatabaseToolsConfig) {
 
       try {
         // Search in memory for preference records
-        const memories = await config.agent.memory.search({
+        const memories = await config.agent.getMemory().search({
           type: 'decision',
           keywords: [params.key],
           limit: 5,
@@ -491,10 +497,10 @@ function createRecallPreferenceTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[RecallPreference] Failed to recall preference', { error });
+        logger.error('[RecallPreference] Failed to recall preference', { error: error instanceof Error ? error.message : String(error) });
         return {
           success: false,
-          error: 'Failed to recall preference',
+          error: error instanceof Error ? error.message : 'Failed to recall preference',
           response: {
             speak: 'I had trouble recalling that information.',
             message: 'Error recalling preference.',

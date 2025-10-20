@@ -188,7 +188,7 @@ export class AIReceptionist {
       .withPersonality(this.config.agent.personality || {})
       .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
       .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
-      .withMemory(this.config.agent.memory || { type: 'simple', contextWindow: 20 })
+      .withMemory(this.config.agent.memory || { contextWindow: 20 })
       .withAIProvider(this.aiProvider)
       .withToolExecutor(this.toolExecutor)
       .withConversationService(this.conversationService)
