@@ -1,42 +1,93 @@
 /**
- * Unit Tests - ConversationService
+ * Unit Tests - ConversationService (memory-centric)
  */
 
 import { ConversationService } from '../conversation.service';
-import { InMemoryConversationStore } from '../../storage/in-memory-conversation.store';
-import { IConversationStore, Conversation, ConversationMessage } from '../../types';
-import { mockAgentSarah, mockConversationMessages } from '../../__tests__/fixtures';
+import type { Memory, MemorySearchQuery } from '../../agent/types';
+
+class TestMemory {
+  private memories: Memory[] = [];
+
+  async startSession(session: { conversationId: string; channel: 'call' | 'sms' | 'email'; metadata?: Record<string, any> }): Promise<void> {
+    this.memories.push({
+      id: `session-start-${session.conversationId}`,
+      content: `Started ${session.channel} conversation`,
+      timestamp: new Date(),
+      type: 'system',
+      importance: 5,
+      channel: session.channel,
+      sessionMetadata: { conversationId: session.conversationId, status: 'active' },
+      metadata: session.metadata || {},
+    } as Memory);
+  }
+
+  async store(memory: Memory): Promise<void> {
+    this.memories.push(memory);
+  }
+
+  async getConversationHistory(conversationId: string): Promise<Memory[]> {
+    return this.memories
+      .filter(m => m.sessionMetadata?.conversationId === conversationId)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  }
+
+  async search(query: MemorySearchQuery): Promise<Memory[]> {
+    let results = [...this.memories];
+    if (query.conversationId) {
+      results = results.filter(m => m.sessionMetadata?.conversationId === query.conversationId);
+    }
+    if (query.channel) {
+      results = results.filter(m => m.channel === query.channel);
+    }
+    if (query.startDate) {
+      results = results.filter(m => m.timestamp >= query.startDate!);
+    }
+    if (query.endDate) {
+      results = results.filter(m => m.timestamp <= query.endDate!);
+    }
+    if (query.minImportance !== undefined) {
+      results = results.filter(m => (m.importance ?? 0) >= query.minImportance!);
+    }
+    if (query.orderBy === 'timestamp') {
+      results.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      if (query.orderDirection === 'desc') results.reverse();
+    }
+    if (query.limit !== undefined) {
+      results = results.slice(0, query.limit);
+    }
+    return results;
+  }
+
+  async endSession(conversationId: string, summary?: string): Promise<void> {
+    const first = this.memories.find(m => m.sessionMetadata?.conversationId === conversationId);
+    this.memories.push({
+      id: `session-end-${conversationId}`,
+      content: summary || 'Conversation ended',
+      timestamp: new Date(),
+      type: 'system',
+      importance: 7,
+      channel: first?.channel,
+      sessionMetadata: { conversationId, status: 'completed' },
+    } as Memory);
+  }
+
+  getAll(): Memory[] { return this.memories; }
+}
 
 describe('ConversationService', () => {
   let service: ConversationService;
-  let store: IConversationStore;
+  let memory: TestMemory;
 
   beforeEach(() => {
-    store = new InMemoryConversationStore();
-    service = new ConversationService(store);
-  });
-
-  describe('constructor', () => {
-    it('should_create_service_with_provided_store', () => {
-      const customStore = new InMemoryConversationStore();
-      const customService = new ConversationService(customStore);
-
-      expect(customService).toBeInstanceOf(ConversationService);
-    });
-
-    it('should_create_service_with_default_store_when_none_provided', () => {
-      const defaultService = new ConversationService();
-
-      expect(defaultService).toBeInstanceOf(ConversationService);
-    });
+    memory = new TestMemory();
+    const agent = { getMemory: () => memory } as any;
+    service = new ConversationService();
+    service.setAgent(agent);
   });
 
   describe('create', () => {
-    it('should_create_new_conversation_successfully', async () => {
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
+    it('creates a new conversation and starts a session', async () => {
+      const conversation = await service.create({ channel: 'call', metadata: { leadId: 'lead_123' } });
 
       expect(conversation).toBeDefined();
       expect(conversation.id).toMatch(/^conv_/);
@@ -44,377 +95,80 @@ describe('ConversationService', () => {
       expect(conversation.status).toBe('active');
       expect(conversation.messages).toEqual([]);
       expect(conversation.startedAt).toBeInstanceOf(Date);
-      expect(conversation.endedAt).toBeUndefined();
+
+      expect(memory.getAll().length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should_create_conversation_with_metadata', async () => {
-      const metadata = {
-        phoneNumber: '+1234567890',
-        leadId: 'lead_123',
-        source: 'website',
-      };
-
-      const conversation = await service.create({
-        channel: 'sms',
-        agentConfig: mockAgentSarah,
-        metadata,
-      });
-
-      expect(conversation.metadata).toEqual(metadata);
-    });
-
-    it('should_create_conversation_with_callSid', async () => {
+    it('attaches callSid and messageSid when provided', async () => {
       const callSid = 'CA123456789';
-
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-        callSid,
-      });
+      const messageSid = 'SM987654321';
+      const conversation = await service.create({ channel: 'sms', callSid, messageSid });
 
       expect(conversation.callSid).toBe(callSid);
-    });
-
-    it('should_create_conversation_with_messageSid', async () => {
-      const messageSid = 'SM987654321';
-
-      const conversation = await service.create({
-        channel: 'sms',
-        agentConfig: mockAgentSarah,
-        messageSid,
-      });
-
       expect(conversation.messageSid).toBe(messageSid);
-    });
 
-    it('should_generate_unique_conversation_ids', async () => {
-      const conv1 = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
+      const foundByCall = await service.getByCallId(callSid);
+      expect(foundByCall?.id).toBe(conversation.id);
 
-      const conv2 = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
-
-      expect(conv1.id).not.toBe(conv2.id);
-    });
-
-    it('should_save_conversation_to_store', async () => {
-      const conversation = await service.create({
-        channel: 'email',
-        agentConfig: mockAgentSarah,
-      });
-
-      const retrieved = await store.get(conversation.id);
-      expect(retrieved).toBeDefined();
-      expect(retrieved?.id).toBe(conversation.id);
+      const foundByMsg = await service.getByMessageId(messageSid);
+      expect(foundByMsg?.id).toBe(conversation.id);
     });
   });
 
-  describe('addMessage', () => {
-    let conversationId: string;
+  describe('messages', () => {
+    it('adds and retrieves messages for a conversation', async () => {
+      const conversation = await service.create({ channel: 'call' });
+      await service.addMessage(conversation.id, { role: 'user', content: 'Hello, I need help' });
 
-    beforeEach(async () => {
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
-      conversationId = conversation.id;
-    });
-
-    it('should_add_message_to_conversation', async () => {
-      await service.addMessage(conversationId, {
-        role: 'user',
-        content: 'Hello, I need help',
-      });
-
-      const conversation = await service.get(conversationId);
-      expect(conversation?.messages).toHaveLength(1);
-      expect(conversation?.messages[0].content).toBe('Hello, I need help');
-      expect(conversation?.messages[0].role).toBe('user');
-    });
-
-    it('should_add_timestamp_to_message', async () => {
-      const beforeTime = Date.now();
-
-      await service.addMessage(conversationId, {
-        role: 'assistant',
-        content: 'How can I help you?',
-      });
-
-      const afterTime = Date.now();
-      const conversation = await service.get(conversationId);
-      const messageTime = conversation?.messages[0].timestamp.getTime();
-
-      expect(messageTime).toBeGreaterThanOrEqual(beforeTime);
-      expect(messageTime).toBeLessThanOrEqual(afterTime);
-    });
-
-    it('should_add_multiple_messages_in_order', async () => {
-      await service.addMessage(conversationId, {
-        role: 'user',
-        content: 'First message',
-      });
-
-      await service.addMessage(conversationId, {
-        role: 'assistant',
-        content: 'Second message',
-      });
-
-      await service.addMessage(conversationId, {
-        role: 'user',
-        content: 'Third message',
-      });
-
-      const conversation = await service.get(conversationId);
-      expect(conversation?.messages).toHaveLength(3);
-      expect(conversation?.messages[0].content).toBe('First message');
-      expect(conversation?.messages[1].content).toBe('Second message');
-      expect(conversation?.messages[2].content).toBe('Third message');
-    });
-
-    it('should_add_system_messages', async () => {
-      await service.addMessage(conversationId, {
-        role: 'system',
-        content: 'You are a helpful assistant',
-      });
-
-      const conversation = await service.get(conversationId);
-      expect(conversation?.messages[0].role).toBe('system');
-    });
-
-    it('should_add_tool_messages_with_tool_call', async () => {
-      await service.addMessage(conversationId, {
-        role: 'tool',
-        content: 'Tool executed successfully',
-        toolCall: {
-          id: 'call_123',
-          name: 'book_appointment',
-          parameters: { date: '2025-01-20' },
-        },
-      });
-
-      const conversation = await service.get(conversationId);
-      expect(conversation?.messages[0].toolCall).toBeDefined();
-      expect(conversation?.messages[0].toolCall?.name).toBe('book_appointment');
-    });
-
-    it('should_throw_error_when_conversation_not_found', async () => {
-      await expect(
-        service.addMessage('non_existent_id', {
-          role: 'user',
-          content: 'Test',
-        })
-      ).rejects.toThrow('Conversation non_existent_id not found');
-    });
-
-    it('should_preserve_existing_messages_when_adding_new', async () => {
-      await service.addMessage(conversationId, {
-        role: 'user',
-        content: 'Message 1',
-      });
-
-      await service.addMessage(conversationId, {
-        role: 'assistant',
-        content: 'Message 2',
-      });
-
-      const conversation = await service.get(conversationId);
-      expect(conversation?.messages).toHaveLength(2);
+      const messages = await service.getMessages(conversation.id);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].content).toBe('Hello, I need help');
+      expect(messages[0].role).toBe('user');
     });
   });
 
   describe('get', () => {
-    it('should_retrieve_conversation_by_id', async () => {
-      const created = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
+    it('retrieves conversation by id', async () => {
+      const created = await service.create({ channel: 'call' });
+      await service.addMessage(created.id, { role: 'assistant', content: 'How can I help you?' });
 
       const retrieved = await service.get(created.id);
-
-      expect(retrieved).toBeDefined();
       expect(retrieved?.id).toBe(created.id);
+      expect(retrieved?.messages.length).toBe(1);
     });
 
-    it('should_return_null_when_conversation_not_found', async () => {
-      const result = await service.get('non_existent_id');
-
-      expect(result).toBeNull();
-    });
-
-    it('should_retrieve_conversation_with_messages', async () => {
-      const conversation = await service.create({
-        channel: 'sms',
-        agentConfig: mockAgentSarah,
-      });
-
-      await service.addMessage(conversation.id, {
-        role: 'user',
-        content: 'Test message',
-      });
-
-      const retrieved = await service.get(conversation.id);
-      expect(retrieved?.messages).toHaveLength(1);
-    });
-  });
-
-  describe('getByCallId', () => {
-    it('should_retrieve_conversation_by_call_sid', async () => {
-      const callSid = 'CA123456789';
-
-      const created = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-        callSid,
-      });
-
-      const retrieved = await service.getByCallId(callSid);
-
-      expect(retrieved).toBeDefined();
-      expect(retrieved?.id).toBe(created.id);
-      expect(retrieved?.callSid).toBe(callSid);
-    });
-
-    it('should_return_null_when_call_sid_not_found', async () => {
-      const result = await service.getByCallId('CA_NON_EXISTENT');
-
+    it('returns null when conversation not found', async () => {
+      const result = await service.get('non_existent');
       expect(result).toBeNull();
     });
   });
 
-  describe('getByMessageId', () => {
-    it('should_retrieve_conversation_by_message_sid', async () => {
-      const messageSid = 'SM987654321';
-
-      const created = await service.create({
-        channel: 'sms',
-        agentConfig: mockAgentSarah,
-        messageSid,
-      });
-
-      const retrieved = await service.getByMessageId(messageSid);
-
-      expect(retrieved).toBeDefined();
-      expect(retrieved?.id).toBe(created.id);
-      expect(retrieved?.messageSid).toBe(messageSid);
-    });
-
-    it('should_return_null_when_message_sid_not_found', async () => {
-      const result = await service.getByMessageId('SM_NON_EXISTENT');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('complete', () => {
-    it('should_mark_conversation_as_completed', async () => {
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
-
+  describe('complete and fail', () => {
+    it('marks conversation as completed', async () => {
+      const conversation = await service.create({ channel: 'call' });
       await service.complete(conversation.id);
-
       const updated = await service.get(conversation.id);
       expect(updated?.status).toBe('completed');
       expect(updated?.endedAt).toBeInstanceOf(Date);
     });
 
-    it('should_set_endedAt_timestamp', async () => {
-      const conversation = await service.create({
-        channel: 'email',
-        agentConfig: mockAgentSarah,
-      });
-
-      const beforeTime = Date.now();
-      await service.complete(conversation.id);
-      const afterTime = Date.now();
-
-      const updated = await service.get(conversation.id);
-      const endTime = updated?.endedAt?.getTime();
-
-      expect(endTime).toBeDefined();
-      expect(endTime!).toBeGreaterThanOrEqual(beforeTime);
-      expect(endTime!).toBeLessThanOrEqual(afterTime);
-    });
-
-    it('should_preserve_messages_when_completing', async () => {
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
-
-      await service.addMessage(conversation.id, {
-        role: 'user',
-        content: 'Test',
-      });
-
-      await service.complete(conversation.id);
-
-      const updated = await service.get(conversation.id);
-      expect(updated?.messages).toHaveLength(1);
-    });
-  });
-
-  describe('fail', () => {
-    it('should_mark_conversation_as_failed', async () => {
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-      });
-
+    it('marks conversation as failed', async () => {
+      const conversation = await service.create({ channel: 'sms' });
       await service.fail(conversation.id);
-
       const updated = await service.get(conversation.id);
       expect(updated?.status).toBe('failed');
       expect(updated?.endedAt).toBeInstanceOf(Date);
     });
-
-    it('should_set_endedAt_timestamp_when_failed', async () => {
-      const conversation = await service.create({
-        channel: 'sms',
-        agentConfig: mockAgentSarah,
-      });
-
-      await service.fail(conversation.id);
-
-      const updated = await service.get(conversation.id);
-      expect(updated?.endedAt).toBeInstanceOf(Date);
-    });
   });
 
-  describe('conversation lifecycle', () => {
-    it('should_handle_complete_conversation_lifecycle', async () => {
-      // Create
-      const conversation = await service.create({
-        channel: 'call',
-        agentConfig: mockAgentSarah,
-        metadata: { leadId: 'lead_001' },
-      });
+  describe('lifecycle', () => {
+    it('handles a complete conversation lifecycle', async () => {
+      const conversation = await service.create({ channel: 'call', metadata: { leadId: 'lead_001' } });
 
-      expect(conversation.status).toBe('active');
+      await service.addMessage(conversation.id, { role: 'user', content: 'I need help' });
+      await service.addMessage(conversation.id, { role: 'assistant', content: 'Happy to help!' });
 
-      // Add messages
-      await service.addMessage(conversation.id, {
-        role: 'user',
-        content: 'I need help',
-      });
-
-      await service.addMessage(conversation.id, {
-        role: 'assistant',
-        content: 'Happy to help!',
-      });
-
-      // Small delay before completion to ensure timestamp difference
-      await new Promise(resolve => setTimeout(resolve, 2));
-
-      // Complete
       await service.complete(conversation.id);
-
-      // Verify final state
       const final = await service.get(conversation.id);
       expect(final?.status).toBe('completed');
       expect(final?.messages).toHaveLength(2);

@@ -15,8 +15,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "isolatedModules": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "types": ["jest", "node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/examples/**", "**/storage/DatabaseStorage.ts", "**/storage/migrations.ts", "**/storage/schema.ts"]
+  "include": ["src/**/*", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/examples/**", "**/storage/DatabaseStorage.ts", "**/storage/migrations.ts", "**/storage/schema.ts"]
 }

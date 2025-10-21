@@ -233,8 +233,7 @@ export interface AIModelConfig {
 export interface ChatOptions {
   conversationId: string;
   userMessage: string;
-  // Accept either legacy ConversationMessage or new Message shape from agent types
-  conversationHistory?: ConversationMessage[] | import('../agent/types').Message[];
+  conversationHistory?: import('../agent/types').Message[];
   availableTools?: ITool[];
   toolResults?: ToolResult[];
   systemPrompt?: string;

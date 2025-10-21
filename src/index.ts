@@ -197,8 +197,6 @@ export type {
   JSONSchema,
 
   // Conversation & Memory
-  Conversation,
-  ConversationMessage,
   ToolCall,
   
 

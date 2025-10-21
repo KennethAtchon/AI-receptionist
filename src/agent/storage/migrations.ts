@@ -6,8 +6,11 @@
  */
 
 import type { Memory, IStorage } from '../types';
-import type { Conversation, ConversationMessage } from '../../types';
-import type { PgDatabase } from 'drizzle-orm/pg-core';
+import { logger } from '../../utils/logger';
+// Minimal PgDatabase type to avoid optional dependency requirement
+type PgDatabase<T = any> = {
+  execute: (query: any) => Promise<any[]>;
+};
 
 export interface MigrationOptions {
   sourceDb: PgDatabase<any>;
@@ -46,7 +49,7 @@ export async function migrateConversationsToMemory(
           const convMemories = convertConversationToMemories(conv);
           memories.push(...convMemories);
         } catch (error) {
-          console.error(`Failed to convert conversation ${conv.id}:`, error);
+          logger.error(`Failed to convert conversation ${conv.id}: ${(error as Error).message}`);
           errors++;
         }
       }
@@ -61,13 +64,13 @@ export async function migrateConversationsToMemory(
             onProgress(Math.min(i + batchSize, total), total);
           }
         } catch (error) {
-          console.error('Failed to save memory batch:', error);
+          logger.error(`Failed to save memory batch: ${(error as Error).message}`);
           errors += memories.length;
         }
       }
     }
   } catch (error) {
-    console.error('Migration failed:', error);
+    logger.error(`Migration failed: ${(error as Error).message}`);
     throw error;
   }
 

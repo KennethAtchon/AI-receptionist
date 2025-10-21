@@ -85,10 +85,19 @@ export class CallService {
     });
 
     // 3. Get AI response
+    const history = await this.conversationService.getMessages(conversation.id);
+    const agentHistory = history.map(m => ({
+      role: m.role as any,
+      content: m.content,
+      timestamp: m.timestamp,
+      toolCall: m.toolCall as any,
+      toolResult: m.toolResult as any
+    }));
+
     const aiResponse = await this.aiProvider.chat({
       conversationId: conversation.id,
       userMessage: userSpeech,
-      conversationHistory: conversation.messages,
+      conversationHistory: agentHistory,
       availableTools: this.toolExecutor.getToolsForChannel('call')
     });
 
@@ -117,10 +126,19 @@ export class CallService {
       }
 
       // Get final AI response after tool execution
+      const finalHistory = await this.conversationService.getMessages(conversation.id);
+      const finalAgentHistory = finalHistory.map(m => ({
+        role: m.role as any,
+        content: m.content,
+        timestamp: m.timestamp,
+        toolCall: m.toolCall as any,
+        toolResult: m.toolResult as any
+      }));
+
       const finalResponse = await this.aiProvider.chat({
         conversationId: conversation.id,
         userMessage: '',
-        conversationHistory: conversation.messages
+        conversationHistory: finalAgentHistory
       });
 
       // Add assistant response
