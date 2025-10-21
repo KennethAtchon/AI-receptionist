@@ -13,6 +13,7 @@ import { ToolBuilder } from '../builder';
 import { ToolRegistry } from '../registry';
 import type { Agent } from '../../agent/core/Agent';
 import type { IStorage } from '../../agent/types';
+import type { ToolResult } from '../../types';
 import { logger } from '../../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -135,7 +136,7 @@ function createSaveCustomerInfoTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[SaveCustomerInfo] Failed to save customer data', { error: error instanceof Error ? error.message : String(error) });
+        logger.error('[SaveCustomerInfo] Failed to save customer data', error instanceof Error ? error : undefined);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to save customer information',
@@ -144,7 +145,7 @@ function createSaveCustomerInfoTool(config: DatabaseToolsConfig) {
             message: 'Error saving information. Please try again.',
             text: 'Error saving customer information',
           },
-        };
+        } as ToolResult;
       }
     })
     .build();
@@ -228,7 +229,7 @@ function createFindCustomerTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[FindCustomer] Search failed', { error: error instanceof Error ? error.message : String(error) });
+        logger.error('[FindCustomer] Search failed', error instanceof Error ? error : undefined);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to search for customer',
@@ -237,7 +238,7 @@ function createFindCustomerTool(config: DatabaseToolsConfig) {
             message: 'Search error.',
             text: 'Error searching for customer',
           },
-        };
+        } as ToolResult;
       }
     })
     .build();
@@ -325,7 +326,7 @@ function createLogCallOutcomeTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[LogCallOutcome] Failed to log outcome', { error: error instanceof Error ? error.message : String(error) });
+        logger.error('[LogCallOutcome] Failed to log outcome', error instanceof Error ? error : undefined);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to log call outcome',
@@ -334,7 +335,7 @@ function createLogCallOutcomeTool(config: DatabaseToolsConfig) {
             message: 'Error logging outcome.',
             text: 'Error logging call outcome',
           },
-        };
+        } as ToolResult;
       }
     })
     .build();
@@ -413,7 +414,7 @@ function createRememberPreferenceTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[RememberPreference] Failed to store preference', { error: error instanceof Error ? error.message : String(error) });
+        logger.error('[RememberPreference] Failed to store preference', error instanceof Error ? error : undefined);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to remember preference',
@@ -422,7 +423,7 @@ function createRememberPreferenceTool(config: DatabaseToolsConfig) {
             message: 'Error saving preference.',
             text: 'Error remembering preference',
           },
-        };
+        } as ToolResult;
       }
     })
     .build();
@@ -497,7 +498,7 @@ function createRecallPreferenceTool(config: DatabaseToolsConfig) {
           },
         };
       } catch (error) {
-        logger.error('[RecallPreference] Failed to recall preference', { error: error instanceof Error ? error.message : String(error) });
+        logger.error('[RecallPreference] Failed to recall preference', error instanceof Error ? error : undefined);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to recall preference',
@@ -506,7 +507,7 @@ function createRecallPreferenceTool(config: DatabaseToolsConfig) {
             message: 'Error recalling preference.',
             text: 'Error recalling preference',
           },
-        };
+        } as ToolResult;
       }
     })
     .build();

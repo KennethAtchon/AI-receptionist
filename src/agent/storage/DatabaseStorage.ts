@@ -2,17 +2,15 @@
  * Database Storage Implementation
  * Uses Drizzle ORM for database persistence
  *
- * Supports PostgreSQL, MySQL, and SQLite through Drizzle's unified API.
+ * Supports PostgreSQL through Drizzle's API.
  */
 
 import type { Memory, IStorage, MemorySearchQuery } from '../types';
 import { eq, and, gte, lte, inArray, desc, asc, sql, or } from 'drizzle-orm';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
-import type { MySql2Database } from 'drizzle-orm/mysql2';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { memory } from './schema';
 
-type SupportedDatabase = PgDatabase<any> | MySql2Database<any> | BetterSQLite3Database<any>;
+type SupportedDatabase = PgDatabase<any>;
 
 export interface DatabaseStorageConfig {
   db: SupportedDatabase;
@@ -117,7 +115,7 @@ export class DatabaseStorage implements IStorage {
     let dbQuery = this.db.select().from(this.table);
 
     // Build WHERE clauses
-    const conditions: any[] = [];
+    const conditions: ReturnType<typeof eq>[] = [];
 
     // Filter by conversationId (using JSONB query)
     if (query.conversationId) {
@@ -151,7 +149,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Filter by importance
-    if (query.minImportance !== undefined) {
+    if (query.minImportance !== undefined && this.table.importance) {
       conditions.push(gte(this.table.importance, query.minImportance));
     }
 
@@ -160,7 +158,10 @@ export class DatabaseStorage implements IStorage {
       const keywordConditions = query.keywords.map(keyword =>
         sql`${this.table.content} ILIKE ${`%${keyword}%`}`
       );
-      conditions.push(or(...keywordConditions));
+      const keywordOr = or(...keywordConditions);
+      if (keywordOr) {
+        conditions.push(keywordOr);
+      }
     }
 
     // Apply WHERE conditions
@@ -173,9 +174,9 @@ export class DatabaseStorage implements IStorage {
     const orderDirection = query.orderDirection || 'desc';
     const orderColumn = this.table[orderBy as keyof typeof this.table];
 
-    if (orderColumn) {
+    if (orderColumn && typeof orderColumn !== 'function') {
       dbQuery = dbQuery.orderBy(
-        orderDirection === 'asc' ? asc(orderColumn) : desc(orderColumn)
+        orderDirection === 'asc' ? asc(orderColumn as any) : desc(orderColumn as any)
       ) as any;
     }
 
@@ -185,7 +186,7 @@ export class DatabaseStorage implements IStorage {
     dbQuery = dbQuery.limit(limit).offset(offset) as any;
 
     const results = await dbQuery;
-    return results.map(r => this.mapToMemory(r));
+    return results.map((r: any) => this.mapToMemory(r));
   }
 
   /**
@@ -234,7 +235,7 @@ export class DatabaseStorage implements IStorage {
   async count(): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)` })
-      .from(this.table);
+      .from(this.table) as any;
     return Number(result[0]?.count || 0);
   }
 

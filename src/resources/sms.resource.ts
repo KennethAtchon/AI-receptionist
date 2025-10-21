@@ -8,7 +8,7 @@ import { SendSMSOptions, SMSSession } from '../types';
 import { logger } from '../utils/logger';
 
 export class SMSResource {
-  constructor(private twilioProvider: TwilioProvider) {}
+  constructor(private getTwilioProvider: () => Promise<TwilioProvider>) {}
 
   /**
    * Send an SMS message
@@ -25,7 +25,9 @@ export class SMSResource {
   async send(options: SendSMSOptions): Promise<SMSSession> {
     logger.info(`[SMSResource] Sending SMS to ${options.to}`);
 
-    const messageSid = await this.twilioProvider.sendSMS(options.to, options.body);
+    // Lazy load Twilio provider on first use
+    const twilioProvider = await this.getTwilioProvider();
+    const messageSid = await twilioProvider.sendSMS(options.to, options.body);
 
     return {
       id: messageSid,

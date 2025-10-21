@@ -163,7 +163,6 @@ export interface Capability {
   name: string;
   description: string;
   skills: Skill[];
-  tools: any[]; // ITool[] from your tool system
   supportedChannels: Channel[];
   toJSON?(): Record<string, unknown>;
 }
@@ -172,18 +171,17 @@ export interface CapabilityConfig {
   name: string;
   description: string;
   skills?: SkillDefinition[];
-  tools?: any[];
   supportedChannels?: Channel[];
 }
 
 export interface CapabilityManager {
   register(capability: Capability): void;
   has(capabilityName: string): boolean;
-  getTools(channel: Channel): any[];
   list(): string[];
   count(): number;
   execute(skillName: string, params: any): Promise<any>;
   initialize(): Promise<void>;
+  getDescription(): string;
 }
 
 // ==================== MEMORY ====================

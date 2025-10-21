@@ -100,6 +100,20 @@ export type {
 } from './adapters/mcp';
 
 // ============================================================================
+// Core Infrastructure (Provider Management & Validation)
+// ============================================================================
+
+export { ProviderRegistry, ProviderProxy } from './core';
+export type { ICredentialValidator, ValidationResult } from './validation';
+export { TwilioValidator, OpenAIValidator, GoogleCalendarValidator } from './validation';
+export {
+  ProviderError,
+  CredentialValidationError,
+  ProviderNotConfiguredError,
+  ProviderInitializationError
+} from './errors/provider.errors';
+
+// ============================================================================
 // Utilities
 // ============================================================================
 

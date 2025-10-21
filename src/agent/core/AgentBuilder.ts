@@ -108,6 +108,14 @@ export class AgentBuilder {
   }
 
   /**
+   * Set the tool registry (OPTIONAL - source of truth for available tools)
+   */
+  public withToolRegistry(registry: any): this {
+    (this.config as any).toolRegistry = registry;
+    return this;
+  }
+
+  /**
    * Set the conversation service (OPTIONAL - for integration with existing SDK)
    */
   public withConversationService(service: any): this {

@@ -18,13 +18,19 @@ export class TwilioProvider extends BaseProvider {
   }
 
   async initialize(): Promise<void> {
-    // TODO: Initialize Twilio client
     logger.info('[TwilioProvider] Initializing with account', { accountSid: this.config.accountSid });
 
-    // Placeholder: const twilio = require('twilio');
-    // this.client = twilio(this.config.accountSid, this.config.authToken);
+    try {
+      // Dynamically import Twilio SDK (lazy loading)
+      const twilio = (await import('twilio')).default;
+      this.client = twilio(this.config.accountSid, this.config.authToken);
 
-    this.initialized = true;
+      this.initialized = true;
+      logger.info('[TwilioProvider] Initialized successfully');
+    } catch (error) {
+      logger.error('[TwilioProvider] Initialization failed:', error);
+      throw new Error(`Failed to initialize Twilio provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async makeCall(to: string, options: CallOptions): Promise<string> {
@@ -66,11 +72,15 @@ export class TwilioProvider extends BaseProvider {
   }
 
   async healthCheck(): Promise<boolean> {
-    if (!this.initialized) return false;
+    if (!this.initialized || !this.client) {
+      return false;
+    }
 
     try {
-      // TODO: Actual health check
-      // await this.client.api.accounts(this.config.accountSid).fetch();
+      // Lightweight API call to verify credentials
+      // Fetches account details - minimal cost, verifies authentication
+      await this.client.api.v2010.accounts(this.config.accountSid).fetch();
+      logger.info('[TwilioProvider] Health check passed');
       return true;
     } catch (error) {
       logger.error('[TwilioProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));

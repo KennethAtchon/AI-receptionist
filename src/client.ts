@@ -14,6 +14,10 @@ import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
 import { MCPAdapter } from './adapters/mcp/mcp-adapter';
 import { PillarManager } from './agent/core/PillarManager';
+import { ProviderRegistry } from './core/provider-registry';
+import { TwilioValidator } from './validation/twilio-validator';
+import { OpenAIValidator } from './validation/openai-validator';
+import { GoogleCalendarValidator } from './validation/google-calendar-validator';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider } from './providers/communication/twilio.provider';
@@ -93,9 +97,7 @@ export class AIReceptionist {
   private config: AIReceptionistConfig;
   private agent!: Agent; // The six-pillar agent instance
   private pillarManager!: PillarManager; // Manages runtime pillar updates
-  private twilioProvider?: TwilioProvider;
-  private aiProvider!: OpenAIProvider | OpenRouterProvider;
-  private calendarProvider?: GoogleCalendarProvider;
+  private providerRegistry!: ProviderRegistry; // Centralized provider management
   private conversationService!: ConversationService;
   private toolExecutor!: ToolExecutionService;
   private toolRegistry!: ToolRegistry;
@@ -162,41 +164,83 @@ export class AIReceptionist {
       this.config.onToolError
     );
 
-    // 6. Initialize AI provider based on configured provider (lazy loaded)
-    switch (this.config.model.provider) {
-      case 'openai': {
-        const { OpenAIProvider } = await import('./providers/ai/openai.provider');
-        this.aiProvider = new OpenAIProvider(this.config.model);
-        break;
-      }
-      case 'openrouter': {
-        const { OpenRouterProvider } = await import('./providers/ai/openrouter.provider');
-        this.aiProvider = new OpenRouterProvider(this.config.model);
-        break;
-      }
-      case 'anthropic':
-      case 'google':
-        throw new Error(`${this.config.model.provider} provider not yet implemented`);
-      default:
-        throw new Error(`Unknown AI provider: ${this.config.model.provider}`);
-    }
-    await this.aiProvider.initialize();
+    // 6. Initialize Provider Registry (Service Locator Pattern)
+    this.providerRegistry = new ProviderRegistry();
 
-    // 7. Create and initialize the Agent instance (Six-Pillar Architecture)
+    // 7. Register AI provider (always required, lazy loaded)
+    this.providerRegistry.registerIfConfigured(
+      'ai',
+      async () => {
+        switch (this.config.model.provider) {
+          case 'openai': {
+            const { OpenAIProvider } = await import('./providers/ai/openai.provider');
+            return new OpenAIProvider(this.config.model);
+          }
+          case 'openrouter': {
+            const { OpenRouterProvider } = await import('./providers/ai/openrouter.provider');
+            return new OpenRouterProvider(this.config.model);
+          }
+          case 'anthropic':
+          case 'google':
+            throw new Error(`${this.config.model.provider} provider not yet implemented`);
+          default:
+            throw new Error(`Unknown AI provider: ${this.config.model.provider}`);
+        }
+      },
+      new OpenAIValidator(),
+      this.config.model
+    );
+
+    // 8. Register Twilio provider ONLY if credentials configured (lazy loaded)
+    if (this.config.providers.communication?.twilio) {
+      this.providerRegistry.registerIfConfigured(
+        'twilio',
+        async () => {
+          const { TwilioProvider } = await import('./providers/communication/twilio.provider');
+          return new TwilioProvider(this.config.providers.communication!.twilio!);
+        },
+        new TwilioValidator(),
+        this.config.providers.communication.twilio
+      );
+    }
+
+    // 9. Register Google Calendar provider ONLY if credentials configured (lazy loaded)
+    if (this.config.providers.calendar?.google) {
+      this.providerRegistry.registerIfConfigured(
+        'google-calendar',
+        async () => {
+          const { GoogleCalendarProvider } = await import('./providers/calendar/google-calendar.provider');
+          return new GoogleCalendarProvider(this.config.providers.calendar!.google!);
+        },
+        new GoogleCalendarValidator(),
+        this.config.providers.calendar.google
+      );
+    }
+
+    // 10. Validate ALL registered providers early (fail fast on bad credentials)
+    logger.info('[AIReceptionist] Validating provider credentials...');
+    await this.providerRegistry.validateAll();
+    logger.info('[AIReceptionist] All credentials validated successfully');
+
+    // 11. Create and initialize the Agent instance (Six-Pillar Architecture)
+    // Get AI provider from registry (lazy loads on first access)
+    const aiProvider = await this.providerRegistry.get<OpenAIProvider | OpenRouterProvider>('ai');
+
     this.agent = AgentBuilder.create()
       .withIdentity(this.config.agent.identity)
       .withPersonality(this.config.agent.personality || {})
       .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
       .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
       .withMemory(this.config.agent.memory || { contextWindow: 20 })
-      .withAIProvider(this.aiProvider)
+      .withAIProvider(aiProvider)
       .withToolExecutor(this.toolExecutor)
+      .withToolRegistry(this.toolRegistry)  // ToolRegistry is source of truth for tools
       .withConversationService(this.conversationService)
       .build();
 
     await this.agent.initialize();
 
-    // 8. Auto-register database tools if long-term memory storage is enabled
+    // 12. Auto-register database tools if long-term memory storage is enabled
     if (this.config.agent.memory?.longTermEnabled && this.config.agent.memory?.longTermStorage) {
       logger.info('[AIReceptionist] Auto-registering database tools (memory storage enabled)');
       const { setupDatabaseTools } = await import('./tools/standard/database-tools');
@@ -206,51 +250,44 @@ export class AIReceptionist {
       });
     }
 
-    // 9. Initialize pillar manager for runtime updates
+    // 13. Initialize pillar manager for runtime updates
     this.pillarManager = new PillarManager(this.agent);
 
-    // 10. Initialize communication providers if configured (lazy loaded)
-    if (this.config.providers.communication?.twilio) {
-      const { TwilioProvider } = await import('./providers/communication/twilio.provider');
-      this.twilioProvider = new TwilioProvider(this.config.providers.communication.twilio);
-      await this.twilioProvider.initialize();
-
-      // Initialize call service (lazy loaded)
+    // 14. Initialize communication resources if Twilio is configured
+    // Resources use lazy provider access - providers load on first use
+    if (this.providerRegistry.has('twilio')) {
       const { CallService } = await import('./services/call.service');
+      const { CallsResource } = await import('./resources/calls.resource');
+      const { SMSResource } = await import('./resources/sms.resource');
+
       const agentId = `agent-${this.config.agent.identity.name.toLowerCase().replace(/\s+/g, '-')}`;
+
+      // CallService also uses lazy provider access
       this.callService = new CallService(
-        this.twilioProvider,
-        this.aiProvider,
+        await this.providerRegistry.get<TwilioProvider>('twilio'),
+        aiProvider,
         this.conversationService,
         this.toolExecutor,
         agentId
       );
 
-      // Initialize resources (lazy loaded)
-      const { CallsResource } = await import('./resources/calls.resource');
-      const { SMSResource } = await import('./resources/sms.resource');
+      // Pass lazy getter functions to resources
       (this as any).calls = new CallsResource(this.callService);
-      (this as any).sms = new SMSResource(this.twilioProvider);
+      (this as any).sms = new SMSResource(() => this.providerRegistry.get<TwilioProvider>('twilio'));
     }
 
-    // 11. Initialize calendar provider if configured (lazy loaded)
-    if (this.config.providers.calendar?.google) {
-      const { GoogleCalendarProvider } = await import('./providers/calendar/google-calendar.provider');
-      this.calendarProvider = new GoogleCalendarProvider(this.config.providers.calendar.google);
-      await this.calendarProvider.initialize();
-    }
-
-    // 12. Initialize email resource (basic for now) (lazy loaded)
+    // 15. Initialize email resource (basic for now, lazy loaded)
     const { EmailResource } = await import('./resources/email.resource');
     (this as any).email = new EmailResource();
 
-    // 13. Initialize text resource (always available - for testing agent independently)
+    // 16. Initialize text resource (always available - for testing agent independently)
     const { TextResource } = await import('./resources/text.resource');
     (this as any).text = new TextResource(this.agent);
 
     this.initialized = true;
 
     logger.info(`[AIReceptionist] Initialized successfully`);
+    logger.info(`[AIReceptionist] - Registered providers: ${this.providerRegistry.list().join(', ')}`);
     logger.info(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);
     logger.info(`[AIReceptionist] - Available channels: ${[
       this.calls ? 'calls' : null,
@@ -433,16 +470,9 @@ export class AIReceptionist {
       await this.agent.dispose();
     }
 
-    if (this.twilioProvider) {
-      await this.twilioProvider.dispose();
-    }
-
-    if (this.aiProvider) {
-      await this.aiProvider.dispose();
-    }
-
-    if (this.calendarProvider) {
-      await this.calendarProvider.dispose();
+    // Dispose all providers via registry
+    if (this.providerRegistry) {
+      await this.providerRegistry.disposeAll();
     }
 
     this.initialized = false;

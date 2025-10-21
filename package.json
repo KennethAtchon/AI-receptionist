@@ -65,7 +65,8 @@
     "test:ci": "jest --ci --coverage --maxWorkers=2",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "clean": "rm -rf node_modules"
   },
   "keywords": [
     "ai-receptionist",

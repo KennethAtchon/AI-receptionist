@@ -39,7 +39,6 @@ describe('CapabilityManager', () => {
         'appointment_management',
         'Manage appointments',
         [skill1, skill2],
-        [],
         ['call', 'sms']
       );
 
@@ -53,7 +52,7 @@ describe('CapabilityManager', () => {
 
   describe('has', () => {
     it('should return true for registered capabilities', () => {
-      const capability = new Capability('test_capability', 'Test', [], [], ['call']);
+      const capability = new Capability('test_capability', 'Test', [], ['call']);
       manager.register(capability);
 
       expect(manager.has('test_capability')).toBe(true);
@@ -66,7 +65,7 @@ describe('CapabilityManager', () => {
 
   describe('get', () => {
     it('should return registered capability', () => {
-      const capability = new Capability('test_capability', 'Test', [], [], ['call']);
+      const capability = new Capability('test_capability', 'Test', [], ['call']);
       manager.register(capability);
 
       const retrieved = manager.get('test_capability');
@@ -80,8 +79,8 @@ describe('CapabilityManager', () => {
 
   describe('getAll', () => {
     it('should return all registered capabilities', () => {
-      const cap1 = new Capability('cap1', 'Capability 1', [], [], ['call']);
-      const cap2 = new Capability('cap2', 'Capability 2', [], [], ['sms']);
+      const cap1 = new Capability('cap1', 'Capability 1', [], ['call']);
+      const cap2 = new Capability('cap2', 'Capability 2', [], ['sms']);
 
       manager.register(cap1);
       manager.register(cap2);
@@ -97,36 +96,10 @@ describe('CapabilityManager', () => {
     });
   });
 
-  describe('getTools', () => {
-    it('should return tools for specific channel', () => {
-      const callTool = { name: 'call_tool', description: 'Call tool' };
-      const smsTool = { name: 'sms_tool', description: 'SMS tool' };
-
-      const callCapability = new Capability('call_cap', 'Call Capability', [], [callTool], ['call']);
-      const smsCapability = new Capability('sms_cap', 'SMS Capability', [], [smsTool], ['sms']);
-      const multiCapability = new Capability('multi_cap', 'Multi Capability', [], [callTool, smsTool], ['call', 'sms']);
-
-      manager.register(callCapability);
-      manager.register(smsCapability);
-      manager.register(multiCapability);
-
-      const callTools = manager.getTools('call');
-      const smsTools = manager.getTools('sms');
-
-      expect(callTools).toContainEqual(callTool);
-      expect(smsTools).toContainEqual(smsTool);
-    });
-
-    it('should return empty array for channel with no tools', () => {
-      const tools = manager.getTools('email');
-      expect(tools).toEqual([]);
-    });
-  });
-
   describe('list', () => {
     it('should list all capability names', () => {
-      const cap1 = new Capability('cap1', 'Capability 1', [], [], ['call']);
-      const cap2 = new Capability('cap2', 'Capability 2', [], [], ['sms']);
+      const cap1 = new Capability('cap1', 'Capability 1', [], ['call']);
+      const cap2 = new Capability('cap2', 'Capability 2', [], ['sms']);
 
       manager.register(cap1);
       manager.register(cap2);
@@ -140,10 +113,10 @@ describe('CapabilityManager', () => {
     it('should count total capabilities', () => {
       expect(manager.count()).toBe(0);
 
-      manager.register(new Capability('cap1', 'Test', [], [], ['call']));
+      manager.register(new Capability('cap1', 'Test', [], ['call']));
       expect(manager.count()).toBe(1);
 
-      manager.register(new Capability('cap2', 'Test', [], [], ['sms']));
+      manager.register(new Capability('cap2', 'Test', [], ['sms']));
       expect(manager.count()).toBe(2);
     });
   });
@@ -162,7 +135,7 @@ describe('CapabilityManager', () => {
         execute: async () => ({})
       });
 
-      const capability = new Capability('test_cap', 'Test', [skill1, skill2], [], ['call']);
+      const capability = new Capability('test_cap', 'Test', [skill1, skill2], ['call']);
 
       manager.register(capability);
 
@@ -180,7 +153,7 @@ describe('CapabilityManager', () => {
         execute: mockExecute
       });
 
-      const capability = new Capability('test_cap', 'Test', [skill], [], ['call']);
+      const capability = new Capability('test_cap', 'Test', [skill], ['call']);
       manager.register(capability);
 
       const result = await manager.execute('test_skill', { data: 'test' });
@@ -203,7 +176,7 @@ describe('CapabilityManager', () => {
         prerequisites: ['required_skill']
       });
 
-      const capability = new Capability('test_cap', 'Test', [skill], [], ['call']);
+      const capability = new Capability('test_cap', 'Test', [skill], ['call']);
       manager.register(capability);
 
       await expect(
@@ -226,7 +199,7 @@ describe('CapabilityManager', () => {
         execute: async () => ({})
       });
 
-      const capability = new Capability('test_cap', 'Test', [skill1, skill2], [], ['call']);
+      const capability = new Capability('test_cap', 'Test', [skill1, skill2], ['call']);
       manager.register(capability);
 
       const skills = manager.getSkills('test_cap');
@@ -246,7 +219,7 @@ describe('CapabilityManager', () => {
         execute: async () => ({})
       });
 
-      const capability = new Capability('test_cap', 'Test', [skill], [], ['call']);
+      const capability = new Capability('test_cap', 'Test', [skill], ['call']);
       manager.register(capability);
 
       expect(manager.hasSkill('test_skill')).toBe(true);
@@ -269,7 +242,6 @@ describe('CapabilityManager', () => {
         'test_capability',
         'A test capability',
         [skill],
-        [],
         ['call', 'sms']
       );
 
@@ -298,7 +270,7 @@ describe('CapabilityManager', () => {
         execute: async () => ({})
       });
 
-      const capability = new Capability('test_cap', 'Test', [skill], [], ['call']);
+      const capability = new Capability('test_cap', 'Test', [skill], ['call']);
       manager.register(capability);
 
       const json = manager.toJSON();

@@ -57,22 +57,6 @@ export class CapabilityManagerImpl implements ICapabilityManager {
   }
 
   /**
-   * Get tools available for a specific channel
-   */
-  public getTools(channel: Channel): any[] {
-    const tools: any[] = [];
-
-    for (const capability of this.capabilities.values()) {
-      if (capability.supportedChannels.includes(channel)) {
-        tools.push(...capability.tools);
-      }
-    }
-
-    // Remove duplicates
-    return Array.from(new Set(tools));
-  }
-
-  /**
    * List all capability names
    */
   public list(): string[] {

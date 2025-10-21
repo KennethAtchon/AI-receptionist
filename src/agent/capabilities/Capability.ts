@@ -1,5 +1,9 @@
 /**
- * Capability - Represents a high-level capability composed of skills and tools
+ * Capability - Represents a high-level capability composed of skills
+ *
+ * Note: Tools are managed separately by ToolRegistry.
+ * Capabilities describe WHAT the agent can do conceptually.
+ * Tools in ToolRegistry are HOW the agent does it at runtime.
  */
 
 import type { Capability as ICapability, Channel, Skill } from '../types';
@@ -8,20 +12,17 @@ export class Capability implements ICapability {
   public readonly name: string;
   public readonly description: string;
   public readonly skills: Skill[];
-  public readonly tools: any[];
   public readonly supportedChannels: Channel[];
 
   constructor(
     name: string,
     description: string,
     skills: Skill[],
-    tools: any[],
     supportedChannels: Channel[]
   ) {
     this.name = name;
     this.description = description;
     this.skills = skills;
-    this.tools = tools;
     this.supportedChannels = supportedChannels;
   }
 
@@ -57,7 +58,7 @@ export class Capability implements ICapability {
         name: s.name,
         description: s.description
       })),
-      toolCount: this.tools.length,
+      skillCount: this.skills.length,
       supportedChannels: this.supportedChannels
     };
   }

@@ -20,11 +20,29 @@ export class GoogleCalendarProvider extends BaseProvider {
   async initialize(): Promise<void> {
     logger.info('[GoogleCalendarProvider] Initializing');
 
-    // TODO: Initialize Google Calendar client
-    // const { google } = require('googleapis');
-    // this.client = google.calendar({ version: 'v3', auth: this.config.apiKey });
+    try {
+      // Dynamically import Google APIs SDK (lazy loading)
+      const { google } = await import('googleapis');
 
-    this.initialized = true;
+      // Initialize with API key or service account credentials
+      if (this.config.credentials) {
+        const auth = new google.auth.GoogleAuth({
+          credentials: this.config.credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly']
+        });
+        this.client = google.calendar({ version: 'v3', auth });
+      } else if (this.config.apiKey) {
+        this.client = google.calendar({ version: 'v3', auth: this.config.apiKey });
+      } else {
+        throw new Error('No valid authentication method provided');
+      }
+
+      this.initialized = true;
+      logger.info('[GoogleCalendarProvider] Initialized successfully');
+    } catch (error) {
+      logger.error('[GoogleCalendarProvider] Initialization failed:', error instanceof Error ? error : new Error(String(error)));
+      throw new Error(`Failed to initialize Google Calendar provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async getAvailableSlots(date: Date, duration: number = 60): Promise<Date[]> {
@@ -73,10 +91,17 @@ export class GoogleCalendarProvider extends BaseProvider {
   }
 
   async healthCheck(): Promise<boolean> {
-    if (!this.initialized) return false;
+    if (!this.initialized || !this.client) {
+      return false;
+    }
 
     try {
-      // TODO: Actual health check
+      // Lightweight API call to verify credentials and calendar access
+      // Attempts to fetch calendar metadata - minimal cost, verifies permissions
+      await this.client.calendars.get({
+        calendarId: this.config.calendarId
+      });
+      logger.info('[GoogleCalendarProvider] Health check passed');
       return true;
     } catch (error) {
       logger.error('[GoogleCalendarProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));

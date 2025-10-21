@@ -61,6 +61,7 @@ export class Agent {
   // ==================== EXTERNAL DEPENDENCIES ====================
   private aiProvider: any; // IAIProvider
   private toolExecutor: any; // ToolExecutionService
+  private toolRegistry?: any; // ToolRegistry - source of truth for tools
   private conversationService?: any; // ConversationService
 
   // ==================== OBSERVABILITY ====================
@@ -99,6 +100,9 @@ export class Agent {
 
     // Set external dependencies
     this.aiProvider = config.aiProvider;
+    this.toolRegistry = (config as any).toolRegistry;
+    this.toolExecutor = (config as any).toolExecutor;
+    this.conversationService = (config as any).conversationService;
 
     // Initialize state
     this.state = AgentStatus.INITIALIZING;
@@ -217,11 +221,16 @@ export class Agent {
     memoryContext: MemoryContext
   ): Promise<AgentResponse> {
     // Execute with AI provider
+    // Get tools from ToolRegistry (source of truth for runtime tools)
+    const availableTools = this.toolRegistry
+      ? this.toolRegistry.listAvailable(request.channel)
+      : [];
+
     const aiResponse = await this.aiProvider.chat({
       conversationId: request.context.conversationId,
       userMessage: request.input,
       conversationHistory: memoryContext.shortTerm || [],
-      availableTools: this.capabilities.getTools(request.channel),
+      availableTools: availableTools,
       systemPrompt: systemPrompt
     });
 
@@ -372,6 +381,13 @@ export class Agent {
    */
   public setToolExecutor(executor: any): void {
     this.toolExecutor = executor;
+  }
+
+  /**
+   * Set tool registry (optional) - Source of truth for available tools
+   */
+  public setToolRegistry(registry: any): void {
+    this.toolRegistry = registry;
   }
 
   /**
