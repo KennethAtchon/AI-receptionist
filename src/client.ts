@@ -7,7 +7,6 @@ import type { AIReceptionistConfig } from './types';
 import { ConversationService } from './services/conversation.service';
 import { ToolExecutionService } from './services/tool-execution.service';
 import { ToolRegistry } from './tools/registry';
-import { InMemoryConversationStore } from './storage/in-memory-conversation.store';
 import { setupStandardTools } from './tools/standard';
 import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
@@ -133,10 +132,8 @@ export class AIReceptionist {
 
     logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity.name}`);
 
-    // 1. Initialize conversation store
-    this.conversationService = new ConversationService(
-      this.config.conversationStore || new InMemoryConversationStore()
-    );
+    // 1. Initialize conversation management (backed by agent memory)
+    this.conversationService = new ConversationService();
 
     // 2. Initialize tool registry
     this.toolRegistry = new ToolRegistry();
@@ -237,6 +234,9 @@ export class AIReceptionist {
       .withToolRegistry(this.toolRegistry)  // ToolRegistry is source of truth for tools
       .withConversationService(this.conversationService)
       .build();
+
+    // Link conversation service to agent (uses memory-centric architecture)
+    this.conversationService.setAgent(this.agent);
 
     await this.agent.initialize();
 
@@ -351,7 +351,6 @@ export class AIReceptionist {
       providers: this.config.providers,
 
       // Other config
-      conversationStore: overrides.conversationStore || this.config.conversationStore,
       notifications: overrides.notifications || this.config.notifications,
       analytics: overrides.analytics || this.config.analytics,
       debug: overrides.debug !== undefined ? overrides.debug : this.config.debug,

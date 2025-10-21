@@ -190,31 +190,7 @@ export interface ToolCall {
   parameters: any;
 }
 
-/**
- * @deprecated Use IStorage from agent types instead
- * The new Memory-Centric Architecture stores all conversation data
- * in the agent's memory system with IStorage implementations.
- */
-export interface IConversationStore {
-  save(conversation: Conversation): Promise<void>;
-  get(conversationId: string): Promise<Conversation | null>;
-  getByCallId(callSid: string): Promise<Conversation | null>;
-  getByMessageId(messageSid: string): Promise<Conversation | null>;
-  update(conversationId: string, updates: Partial<Conversation>): Promise<void>;
-  delete(conversationId: string): Promise<void>;
-  list(filters?: ConversationFilters): Promise<Conversation[]>;
-}
-
-/**
- * @deprecated Use MemorySearchQuery from agent types instead
- */
-export interface ConversationFilters {
-  channel?: 'call' | 'sms' | 'email';
-  status?: 'active' | 'completed' | 'failed';
-  startDate?: Date;
-  endDate?: Date;
-  limit?: number;
-}
+// (Removed IConversationStore and ConversationFilters in favor of memory-centric APIs)
 
 // ============================================================================
 // Communication Provider Types
@@ -257,7 +233,8 @@ export interface AIModelConfig {
 export interface ChatOptions {
   conversationId: string;
   userMessage: string;
-  conversationHistory?: ConversationMessage[];
+  // Accept either legacy ConversationMessage or new Message shape from agent types
+  conversationHistory?: ConversationMessage[] | import('../agent/types').Message[];
   availableTools?: ITool[];
   toolResults?: ToolResult[];
   systemPrompt?: string;
@@ -331,20 +308,6 @@ export interface AIReceptionistConfig {
   providers: ProviderConfig;
 
   // Optional features
-  /**
-   * @deprecated Use agent.memory.longTermStorage instead
-   * The new Memory-Centric Architecture stores all conversation data
-   * in the agent's memory system. Configure storage via agent.memory.longTermStorage.
-   *
-   * Example:
-   * agent: {
-   *   memory: {
-   *     longTermEnabled: true,
-   *     longTermStorage: new DatabaseStorage({ db })
-   *   }
-   * }
-   */
-  conversationStore?: IConversationStore;
   notifications?: NotificationConfig;
   analytics?: AnalyticsConfig;
   debug?: boolean;

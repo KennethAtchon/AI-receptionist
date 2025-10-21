@@ -1,10 +1,10 @@
 /**
  * Conversation Service
- * Manages conversation state and history
+ * Manages conversation state and history via the Agent Memory system
  */
 
-import { IConversationStore, Conversation, ConversationMessage } from '../types';
-import { InMemoryConversationStore } from '../storage/in-memory-conversation.store';
+import { Conversation, ConversationMessage } from '../types';
+import { Agent } from '../agent/core/Agent';
 import { logger } from '../utils/logger';
 
 export interface CreateConversationOptions {
@@ -15,18 +15,38 @@ export interface CreateConversationOptions {
 }
 
 export class ConversationService {
-  private store: IConversationStore;
+  private agent?: Agent;
 
-  constructor(store?: IConversationStore) {
-    this.store = store || new InMemoryConversationStore();
+  constructor() {}
+
+  setAgent(agent: Agent): void {
+    this.agent = agent;
   }
 
   /**
    * Create a new conversation
    */
   async create(options: CreateConversationOptions): Promise<Conversation> {
-    const conversation: Conversation = {
-      id: this.generateId(),
+    this.ensureAgent();
+    const conversationId = this.generateId();
+
+    await this.agent!.getMemory().startSession({
+      conversationId,
+      channel: options.channel,
+      metadata: options.metadata
+    });
+
+    if (options.callSid) {
+      await this.attachCallSid(conversationId, options.callSid);
+    }
+    if (options.messageSid) {
+      await this.attachMessageSid(conversationId, options.messageSid);
+    }
+
+    logger.info(`[ConversationService] Created conversation: ${conversationId} on channel: ${options.channel}`);
+
+    return {
+      id: conversationId,
       channel: options.channel,
       messages: [],
       metadata: options.metadata,
@@ -35,12 +55,6 @@ export class ConversationService {
       callSid: options.callSid,
       messageSid: options.messageSid
     };
-
-    await this.store.save(conversation);
-
-    logger.info(`[ConversationService] Created conversation: ${conversation.id} on channel: ${options.channel}`);
-
-    return conversation;
   }
 
   /**
@@ -50,19 +64,21 @@ export class ConversationService {
     conversationId: string,
     message: Omit<ConversationMessage, 'timestamp'>
   ): Promise<void> {
-    const conversation = await this.store.get(conversationId);
-    if (!conversation) {
-      throw new Error(`Conversation ${conversationId} not found`);
-    }
+    this.ensureAgent();
 
-    const messageWithTimestamp: ConversationMessage = {
-      ...message,
-      timestamp: new Date()
-    };
+    const channel = await this.getChannelForConversation(conversationId);
 
-    conversation.messages.push(messageWithTimestamp);
-
-    await this.store.update(conversationId, { messages: conversation.messages });
+    await this.agent!.getMemory().store({
+      id: `msg-${conversationId}-${Date.now()}`,
+      content: message.content,
+      timestamp: new Date(),
+      type: 'conversation',
+      channel,
+      role: message.role,
+      toolCall: (message as any).toolCall,
+      toolResult: (message as any).toolResult,
+      sessionMetadata: { conversationId }
+    });
 
     logger.info(`[ConversationService] Added message to ${conversationId}: ${message.role}`);
   }
@@ -71,32 +87,62 @@ export class ConversationService {
    * Get conversation by ID
    */
   async get(conversationId: string): Promise<Conversation | null> {
-    return this.store.get(conversationId);
+    this.ensureAgent();
+    const history = await this.agent!.getMemory().getConversationHistory(conversationId);
+    if (!history || history.length === 0) return null;
+    const first = history[0];
+    const last = history[history.length - 1];
+    const channel = first.channel as any || 'call';
+    const status = last.sessionMetadata?.status || 'active';
+    return {
+      id: conversationId,
+      channel,
+      messages: await this.getMessages(conversationId),
+      metadata: first.metadata as any,
+      status: status as any,
+      startedAt: first.timestamp,
+      endedAt: status !== 'active' ? last.timestamp : undefined,
+      callSid: first.sessionMetadata?.callSid,
+      messageSid: first.sessionMetadata?.messageSid
+    };
   }
 
   /**
    * Get conversation by call SID
    */
   async getByCallId(callSid: string): Promise<Conversation | null> {
-    return this.store.getByCallId(callSid);
+    this.ensureAgent();
+    const results = await this.agent!.getMemory().search({
+      keywords: [],
+      limit: 1,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+    const match = results.find(m => m.sessionMetadata?.callSid === callSid);
+    return match ? this.get(match.sessionMetadata!.conversationId!) : null;
   }
 
   /**
    * Get conversation by message SID
    */
   async getByMessageId(messageSid: string): Promise<Conversation | null> {
-    return this.store.getByMessageId(messageSid);
+    this.ensureAgent();
+    const results = await this.agent!.getMemory().search({
+      keywords: [],
+      limit: 1,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+    const match = results.find(m => m.sessionMetadata?.messageSid === messageSid);
+    return match ? this.get(match.sessionMetadata!.conversationId!) : null;
   }
 
   /**
    * Mark conversation as completed
    */
   async complete(conversationId: string): Promise<void> {
-    await this.store.update(conversationId, {
-      status: 'completed',
-      endedAt: new Date()
-    });
-
+    this.ensureAgent();
+    await this.agent!.getMemory().endSession(conversationId, 'Conversation completed');
     logger.info(`[ConversationService] Completed conversation: ${conversationId}`);
   }
 
@@ -104,12 +150,66 @@ export class ConversationService {
    * Mark conversation as failed
    */
   async fail(conversationId: string): Promise<void> {
-    await this.store.update(conversationId, {
-      status: 'failed',
-      endedAt: new Date()
+    this.ensureAgent();
+    await this.agent!.getMemory().store({
+      id: `session-failed-${conversationId}`,
+      content: 'Conversation failed',
+      timestamp: new Date(),
+      type: 'system',
+      sessionMetadata: { conversationId, status: 'failed' },
+      importance: 7
     });
-
     logger.info(`[ConversationService] Failed conversation: ${conversationId}`);
+  }
+
+  async getMessages(conversationId: string): Promise<ConversationMessage[]> {
+    this.ensureAgent();
+    const history = await this.agent!.getMemory().getConversationHistory(conversationId);
+    return history.map(m => ({
+      role: (m.role as any) || 'assistant',
+      content: m.content,
+      timestamp: m.timestamp,
+      toolCall: m.toolCall as any,
+      toolResult: m.toolResult as any
+    }));
+  }
+
+  async attachCallSid(conversationId: string, callSid: string): Promise<void> {
+    this.ensureAgent();
+    const channel = await this.getChannelForConversation(conversationId);
+    await this.agent!.getMemory().store({
+      id: `session-call-${conversationId}`,
+      content: 'Attached call SID',
+      timestamp: new Date(),
+      type: 'system',
+      channel,
+      sessionMetadata: { conversationId, callSid }
+    });
+  }
+
+  async attachMessageSid(conversationId: string, messageSid: string): Promise<void> {
+    this.ensureAgent();
+    const channel = await this.getChannelForConversation(conversationId);
+    await this.agent!.getMemory().store({
+      id: `session-message-${conversationId}`,
+      content: 'Attached message SID',
+      timestamp: new Date(),
+      type: 'system',
+      channel,
+      sessionMetadata: { conversationId, messageSid }
+    });
+  }
+
+  private async getChannelForConversation(conversationId: string): Promise<'call' | 'sms' | 'email'> {
+    const history = await this.agent!.getMemory().getConversationHistory(conversationId);
+    if (history.length === 0) return 'call';
+    return (history[0].channel as any) || 'call';
+  }
+
+  private ensureAgent(): void {
+    if (!this.agent) {
+      throw new Error('ConversationService not initialized with Agent. Call setAgent(agent).');
+    }
   }
 
   private generateId(): string {

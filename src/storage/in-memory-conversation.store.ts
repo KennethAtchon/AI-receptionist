@@ -1,12 +1,12 @@
 /**
- * In-Memory Conversation Store (Default)
- * Stores conversation history in memory (lost on restart)
+ * Deprecated legacy In-Memory Conversation Store
+ * Kept temporarily for backwards-compat tests; will be removed in next major.
  */
 
-import { IConversationStore, Conversation, ConversationFilters } from '../types';
+import { Conversation } from '../types';
 import { logger } from '../utils/logger';
 
-export class InMemoryConversationStore implements IConversationStore {
+export class InMemoryConversationStore {
   private conversations = new Map<string, Conversation>();
   private callIdIndex = new Map<string, string>(); // callSid -> conversationId
   private messageIdIndex = new Map<string, string>(); // messageSid -> conversationId
@@ -67,7 +67,7 @@ export class InMemoryConversationStore implements IConversationStore {
     logger.info(`[InMemoryStore] Deleted conversation: ${conversationId}`);
   }
 
-  async list(filters?: ConversationFilters): Promise<Conversation[]> {
+  async list(filters?: any): Promise<Conversation[]> {
     let conversations = Array.from(this.conversations.values());
 
     if (!filters) {

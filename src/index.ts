@@ -79,10 +79,6 @@ export {
 } from './agent/storage';
 export type { MigrationOptions } from './agent/storage';
 
-// Legacy Conversation Store (Deprecated)
-/** @deprecated Use InMemoryStorage or DatabaseStorage with agent.memory.longTermStorage instead */
-export { InMemoryConversationStore } from './storage/in-memory-conversation.store';
-
 // ============================================================================
 // Adapters (Protocol Adapters)
 // ============================================================================
@@ -204,8 +200,7 @@ export type {
   Conversation,
   ConversationMessage,
   ToolCall,
-  IConversationStore,
-  ConversationFilters,
+  
 
   // Providers
   IProvider,
