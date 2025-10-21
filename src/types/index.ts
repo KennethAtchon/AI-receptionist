@@ -154,13 +154,9 @@ export interface JSONSchema {
 }
 
 // ============================================================================
-// Conversation & Memory Types (DEPRECATED - Use Agent Memory System)
+// Conversation & Memory Types 
 // ============================================================================
 
-/**
- * @deprecated Use agent.memory.getConversationHistory() instead
- * Kept for backwards compatibility only
- */
 export interface Conversation {
   id: string;
   channel: 'call' | 'sms' | 'email';
@@ -173,9 +169,7 @@ export interface Conversation {
   messageSid?: string;
 }
 
-/**
- * @deprecated Use Message from agent types instead
- */
+
 export interface ConversationMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;

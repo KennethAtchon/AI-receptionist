@@ -1,3 +1,26 @@
+## ToolStore (Automatic Tool Execution Logging)
+
+The SDK can automatically persist tool executions and errors into the agent's memory. This enables querying prior tool outcomes during a conversation.
+
+Setup happens automatically when you initialize the client. Internally, a `ToolStore` is attached to the `ToolRegistry` and linked to the `Agent` after it is built.
+
+Access it at runtime:
+
+```ts
+const registry = client.getToolRegistry(); // manage tools
+const toolStore = (client as any).getToolStore?.(); // if using TypeScript, add a typed getter
+
+// Query recent tool executions for a conversation
+const recent = await toolStore.findExecutions({ conversationId, limit: 10 });
+
+// Get most recent success for a tool in this conversation
+const last = await toolStore.getLastExecution('book_appointment', conversationId);
+```
+
+Notes:
+- Memory logging requires agent memory to be enabled; long‑term storage improves persistence across sessions.
+- You can still use `onToolExecute`/`onToolError` callbacks for custom side effects; `ToolStore` focuses on memory persistence.
+
 # AI Receptionist SDK - New Architecture 🚀
 
 **Agent-centric AI communication SDK with extensible tool system and multi-channel support**

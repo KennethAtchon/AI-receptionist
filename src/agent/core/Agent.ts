@@ -407,44 +407,6 @@ export class Agent {
   public getMemory() { return this.memory; }
   public getCapabilities() { return this.capabilities; }
 
-  // Personality Pillar Updates
-
-  /**
-   * Add a personality trait and rebuild system prompt
-   */
-  public async addPersonalityTrait(trait: string | { name: string; description: string; weight?: number }): Promise<void> {
-    this.personality.addTrait(trait);
-    await this.rebuildSystemPrompt();
-    this.logger.info('Personality trait added', { trait });
-  }
-
-  /**
-   * Remove a personality trait and rebuild system prompt
-   */
-  public async removePersonalityTrait(traitName: string): Promise<void> {
-    this.personality.removeTrait(traitName);
-    await this.rebuildSystemPrompt();
-    this.logger.info('Personality trait removed', { traitName });
-  }
-
-  /**
-   * Update communication style and rebuild system prompt
-   */
-  public async updateCommunicationStyle(style: Partial<any>): Promise<void> {
-    this.personality.updateCommunicationStyle(style);
-    await this.rebuildSystemPrompt();
-    this.logger.info('Communication style updated', { style });
-  }
-
-  /**
-   * Set formality level and rebuild system prompt
-   */
-  public async setFormalityLevel(level: number): Promise<void> {
-    this.personality.setFormalityLevel(level);
-    await this.rebuildSystemPrompt();
-    this.logger.info('Formality level updated', { level });
-  }
-
   /**
    * Dispose of agent resources
    */

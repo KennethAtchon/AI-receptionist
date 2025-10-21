@@ -7,6 +7,7 @@ import type { AIReceptionistConfig } from './types';
 import { ConversationService } from './services/conversation.service';
 import { ToolExecutionService } from './services/tool-execution.service';
 import { ToolRegistry } from './tools/registry';
+import { ToolStore } from './tools/tool-store';
 import { setupStandardTools } from './tools/standard';
 import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
@@ -100,6 +101,7 @@ export class AIReceptionist {
   private conversationService!: ConversationService;
   private toolExecutor!: ToolExecutionService;
   private toolRegistry!: ToolRegistry;
+  private toolStore!: ToolStore;
   private callService?: CallService;
   private mcpAdapter?: MCPAdapter;
   private initialized = false;
@@ -135,8 +137,10 @@ export class AIReceptionist {
     // 1. Initialize conversation management (backed by agent memory)
     this.conversationService = new ConversationService();
 
-    // 2. Initialize tool registry
+    // 2. Initialize tool registry + tool store (for automatic logging)
     this.toolRegistry = new ToolRegistry();
+    this.toolStore = new ToolStore();
+    this.toolRegistry.setToolStore(this.toolStore);
 
     // 3. Setup standard tools if requested
     if (this.config.tools?.defaults) {
@@ -237,6 +241,9 @@ export class AIReceptionist {
 
     // Link conversation service to agent (uses memory-centric architecture)
     this.conversationService.setAgent(this.agent);
+
+    // Link tool store to agent (enables memory-backed tool logging)
+    this.toolStore.setAgent(this.agent);
 
     await this.agent.initialize();
 
@@ -378,6 +385,14 @@ export class AIReceptionist {
   getToolRegistry(): ToolRegistry {
     this.ensureInitialized();
     return this.toolRegistry;
+  }
+
+  /**
+   * Get the tool store (for querying previous tool executions)
+   */
+  getToolStore(): ToolStore {
+    this.ensureInitialized();
+    return this.toolStore;
   }
 
   /**

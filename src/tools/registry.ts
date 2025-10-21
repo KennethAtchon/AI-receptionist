@@ -5,9 +5,11 @@
 
 import { ITool, ExecutionContext, ToolResult } from '../types';
 import { logger } from '../utils/logger';
+import { ToolStore } from './tool-store';
 
 export class ToolRegistry {
   private tools = new Map<string, ITool>();
+  private toolStore?: ToolStore;
 
   /**
    * Register a new tool
@@ -18,6 +20,9 @@ export class ToolRegistry {
     }
     this.tools.set(tool.name, tool);
     logger.info(`[ToolRegistry] Registered tool: ${tool.name}`);
+    if (this.toolStore) {
+      void this.toolStore.logToolRegistered(tool.name);
+    }
   }
 
   /**
@@ -27,7 +32,17 @@ export class ToolRegistry {
     const removed = this.tools.delete(toolName);
     if (removed) {
       logger.info(`[ToolRegistry] Unregistered tool: ${toolName}`);
+      if (this.toolStore) {
+        void this.toolStore.logToolUnregistered(toolName);
+      }
     }
+  }
+
+  /**
+   * Attach a ToolStore for automatic execution logging
+   */
+  setToolStore(store: ToolStore): void {
+    this.toolStore = store;
   }
 
   /**
@@ -73,12 +88,27 @@ export class ToolRegistry {
     const handler = tool.handlers[handlerKey] || tool.handlers.default;
 
     logger.info(`[ToolRegistry] Executing tool '${toolName}' on channel '${context.channel}'`);
+    const startTime = Date.now();
 
     try {
       const result = await handler(parameters, context);
+      const duration = Date.now() - startTime;
+
+      // Persist to ToolStore (if configured)
+      if (this.toolStore) {
+        await this.toolStore.logExecution(toolName, parameters, result, context, duration);
+      }
+
       return result;
     } catch (error) {
       logger.error(`[ToolRegistry] Tool execution failed:`, error instanceof Error ? error : new Error(String(error)));
+      const duration = Date.now() - startTime;
+
+      // Log error to ToolStore (if configured)
+      if (this.toolStore) {
+        await this.toolStore.logError(toolName, parameters, error as any, context, duration);
+      }
+
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
