@@ -3,12 +3,12 @@
  * Manages conversation state and history via the Agent Memory system
  */
 
-import { Conversation, ConversationMessage } from '../types';
+import { Conversation, ConversationMessage, Channel } from '../types';
 import { Agent } from '../agent/core/Agent';
 import { logger } from '../utils/logger';
 
 export interface CreateConversationOptions {
-  channel: 'call' | 'sms' | 'email';
+  channel: Channel;
   metadata?: Record<string, any>;
   callSid?: string;
   messageSid?: string;
@@ -200,7 +200,7 @@ export class ConversationService {
     });
   }
 
-  private async getChannelForConversation(conversationId: string): Promise<'call' | 'sms' | 'email'> {
+  private async getChannelForConversation(conversationId: string): Promise<Channel> {
     const history = await this.agent!.getMemory().getConversationHistory(conversationId);
     if (history.length === 0) return 'call';
     return (history[0].channel as any) || 'call';

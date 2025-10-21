@@ -7,7 +7,7 @@
  */
 
 import { ToolRegistry } from '../../tools/registry';
-import { ExecutionContext, ITool } from '../../types';
+import { ExecutionContext, ITool, Channel } from '../../types';
 import { logger } from '../../utils/logger';
 import type {
   MCPToolListResponse,
@@ -41,7 +41,7 @@ import type {
  * ```
  */
 export class MCPAdapter {
-  private readonly defaultChannel: 'call' | 'sms' | 'email';
+  private readonly defaultChannel: Channel;
   private readonly defaultMetadata: Record<string, any>;
 
   constructor(
@@ -70,7 +70,7 @@ export class MCPAdapter {
    * @param channel - Optional channel filter
    * @returns MCP-formatted tool list
    */
-  async handleToolsList(channel?: 'call' | 'sms' | 'email'): Promise<MCPToolListResponse> {
+  async handleToolsList(channel?: Channel): Promise<MCPToolListResponse> {
     logger.info('[MCPAdapter] Handling tools/list request', { channel });
 
     const tools = this.toolRegistry.listAvailable(channel);

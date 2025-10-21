@@ -59,6 +59,14 @@ export class ToolBuilder {
   }
 
   /**
+   * Set handler for text
+   */
+  onText(handler: ToolHandler): this {
+    this.tool.handlers!.onText = handler;
+    return this;
+  }
+
+  /**
    * Set default handler (fallback for all channels)
    */
   default(handler: ToolHandler): this {

@@ -14,12 +14,14 @@ import type {
   MemoryContext,
   MemoryStats,
   MemorySearchQuery,
-  Message
+  Message,
+  Channel
 } from '../types';
 
 import { ShortTermMemory } from './ShortTermMemory';
 import { LongTermMemory } from './LongTermMemory';
 import { VectorMemory } from './VectorMemory';
+import { logger } from '../../utils/logger';
 
 export class MemoryManagerImpl implements IMemoryManager {
   private readonly shortTerm: ShortTermMemory;
@@ -56,7 +58,7 @@ export class MemoryManagerImpl implements IMemoryManager {
    */
   public async retrieve(input: string, context?: {
     conversationId?: string;
-    channel?: 'call' | 'sms' | 'email';
+    channel?: Channel;
   }): Promise<MemoryContext> {
     const memoryContext: MemoryContext = {
       shortTerm: [],
@@ -95,7 +97,7 @@ export class MemoryManagerImpl implements IMemoryManager {
         const longTermMemories = await this.longTerm.search(searchQuery);
         memoryContext.longTerm = longTermMemories;
       } catch (error) {
-        console.warn('Long-term memory search failed:', error);
+        logger.warn('[MemoryManager] Long-term memory search failed:', error);
       }
     }
 
@@ -109,7 +111,7 @@ export class MemoryManagerImpl implements IMemoryManager {
         });
         memoryContext.semantic = semanticMemories;
       } catch (error) {
-        console.warn('Vector memory search failed:', error);
+        logger.warn('[MemoryManager] Vector memory search failed:', error);
       }
     }
 
@@ -133,7 +135,7 @@ export class MemoryManagerImpl implements IMemoryManager {
           const embedding = await this.generateEmbedding(memory.content);
           await this.vector.add(embedding, memory);
         } catch (error) {
-          console.warn('Failed to store vector embedding:', error);
+          logger.warn('[MemoryManager] Failed to store vector embedding:', error);
         }
       }
     }
@@ -264,7 +266,7 @@ export class MemoryManagerImpl implements IMemoryManager {
    * Get all memories for a specific channel
    */
   public async getChannelHistory(
-    channel: 'call' | 'sms' | 'email',
+    channel: Channel,
     options?: { limit?: number; conversationId?: string }
   ): Promise<Memory[]> {
     if (!this.longTerm) {
@@ -314,7 +316,7 @@ export class MemoryManagerImpl implements IMemoryManager {
    */
   public async startSession(session: {
     conversationId: string;
-    channel: 'call' | 'sms' | 'email';
+    channel: Channel;
     metadata?: Record<string, any>;
   }): Promise<void> {
     const memory: Memory = {

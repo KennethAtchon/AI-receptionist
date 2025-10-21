@@ -24,7 +24,8 @@ import type {
   PersonalityConfig as AgentPersonalityConfig,
   KnowledgeConfig as AgentKnowledgeConfig,
   GoalConfig as AgentGoalConfig,
-  MemoryConfig as AgentMemoryConfig
+  MemoryConfig as AgentMemoryConfig,
+  Channel
 } from '../agent/types';
 
 // Re-export agent enums (as values, not types)
@@ -116,6 +117,7 @@ export interface ToolHandlers {
   onCall?: ToolHandler;
   onSMS?: ToolHandler;
   onEmail?: ToolHandler;
+  onText?: ToolHandler;
   default: ToolHandler;
 }
 
@@ -137,7 +139,7 @@ export interface ChannelResponse {
 }
 
 export interface ExecutionContext {
-  channel: 'call' | 'sms' | 'email';
+  channel: Channel;
   conversationId: string;
   callSid?: string;
   messageSid?: string;
@@ -159,7 +161,7 @@ export interface JSONSchema {
 
 export interface Conversation {
   id: string;
-  channel: 'call' | 'sms' | 'email';
+  channel: Channel;
   messages: ConversationMessage[];
   metadata?: Record<string, any>;
   status: 'active' | 'completed' | 'failed';
@@ -381,7 +383,7 @@ export interface ToolErrorEvent {
 
 export interface ConversationEvent {
   conversationId: string;
-  channel: 'call' | 'sms' | 'email';
+  channel: Channel;
   timestamp: Date;
   metadata?: Record<string, any>;
 }

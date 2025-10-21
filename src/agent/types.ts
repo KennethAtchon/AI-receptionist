@@ -12,7 +12,7 @@
 
 // ==================== CORE TYPES ====================
 
-export type Channel = 'call' | 'sms' | 'email';
+export type Channel = 'call' | 'sms' | 'email' | 'text';
 
 export enum AgentStatus {
   INITIALIZING = 'INITIALIZING',
@@ -215,7 +215,7 @@ export interface Memory {
   importance?: number; // 1-10, determines if saved to long-term
 
   // Channel tracking
-  channel?: 'call' | 'sms' | 'email';
+  channel?: Channel;
 
   // Session metadata
   sessionMetadata?: {
@@ -254,7 +254,7 @@ export interface MemorySearchQuery {
   type?: Memory['type'] | Memory['type'][];
 
   // Filter by channel
-  channel?: 'call' | 'sms' | 'email';
+  channel?: Channel;
 
   // Filter by conversation
   conversationId?: string;
@@ -338,7 +338,7 @@ export interface MemoryStats {
 export interface MemoryManager {
   retrieve(input: string, context?: {
     conversationId?: string;
-    channel?: 'call' | 'sms' | 'email';
+    channel?: Channel;
   }): Promise<MemoryContext>;
   store(memory: Memory): Promise<void>;
   initialize(): Promise<void>;
@@ -347,14 +347,14 @@ export interface MemoryManager {
 
   // New methods for conversation management
   getConversationHistory(conversationId: string): Promise<Memory[]>;
-  getChannelHistory(channel: 'call' | 'sms' | 'email', options?: {
+  getChannelHistory(channel: Channel, options?: {
     limit?: number;
     conversationId?: string;
   }): Promise<Memory[]>;
   search(query: MemorySearchQuery): Promise<Memory[]>;
   startSession(session: {
     conversationId: string;
-    channel: 'call' | 'sms' | 'email';
+    channel: Channel;
     metadata?: Record<string, any>;
   }): Promise<void>;
   endSession(conversationId: string, summary?: string): Promise<void>;

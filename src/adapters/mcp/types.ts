@@ -3,6 +3,8 @@
  * Based on Model Context Protocol specification
  */
 
+import { Channel } from '../../types';
+
 /**
  * MCP Tool Definition
  * Represents a tool in MCP format
@@ -72,6 +74,6 @@ export interface MCPServerConfig {
  * MCP Adapter Options
  */
 export interface MCPAdapterOptions {
-  defaultChannel?: 'call' | 'sms' | 'email';
+  defaultChannel?: Channel;
   metadata?: Record<string, any>;
 }

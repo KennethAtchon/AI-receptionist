@@ -3,7 +3,7 @@
  * Centralized management of AI tools/capabilities
  */
 
-import { ITool, ExecutionContext, ToolResult } from '../types';
+import { ITool, ExecutionContext, ToolResult, Channel } from '../types';
 import { logger } from '../utils/logger';
 import { ToolStore } from './tool-store';
 
@@ -55,7 +55,7 @@ export class ToolRegistry {
   /**
    * List all available tools, optionally filtered by channel
    */
-  listAvailable(channel?: 'call' | 'sms' | 'email'): ITool[] {
+  listAvailable(channel?: Channel): ITool[] {
     const allTools = Array.from(this.tools.values());
 
     if (!channel) {

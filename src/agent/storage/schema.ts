@@ -20,7 +20,7 @@ export const memory = pgTable('ai_receptionist_memory', {
   importance: integer('importance'),
 
   // Channel tracking
-  channel: text('channel'), // 'call' | 'sms' | 'email'
+  channel: text('channel'), // 'call' | 'sms' | 'email' | 'text'
 
   // Session metadata (stored as JSONB)
   sessionMetadata: jsonb('session_metadata').$type<{
@@ -73,7 +73,7 @@ export const leads = pgTable('ai_receptionist_leads', {
   name: text('name'),
   email: text('email'),
   phone: text('phone'),
-  source: text('source'), // 'call' | 'sms' | 'email'
+  source: text('source'), // 'call' | 'sms' | 'email' | 'text'
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

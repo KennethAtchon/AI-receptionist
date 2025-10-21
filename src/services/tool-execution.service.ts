@@ -4,20 +4,20 @@
  */
 
 import { ToolRegistry } from '../tools/registry';
-import { ExecutionContext, ToolResult, ToolExecutionEvent, ToolErrorEvent } from '../types';
+import { ExecutionContext, ToolResult, ToolExecutionEvent, ToolErrorEvent, Channel } from '../types';
 import { logger } from '../utils/logger';
 
 export class ToolExecutionService {
   constructor(
     private registry: ToolRegistry,
-    private onToolExecute?: (event: ToolExecutionEvent) => void,
-    private onToolError?: (event: ToolErrorEvent) => void
+    private onToolExecute?: (event: ToolExecutionEvent) => void, // passed by the user, fires when a tool is executed
+    private onToolError?: (event: ToolErrorEvent) => void, // passed by the user, fires when a tool execution fails
   ) {}
 
   /**
    * Get tools available for a specific channel
    */
-  getToolsForChannel(channel: 'call' | 'sms' | 'email') {
+  getToolsForChannel(channel: Channel) {
     return this.registry.listAvailable(channel);
   }
 

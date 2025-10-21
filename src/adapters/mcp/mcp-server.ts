@@ -7,6 +7,7 @@
 
 import express, { Application, Request, Response, NextFunction } from 'express';
 import { MCPAdapter } from './mcp-adapter';
+import { Channel } from '../../types';
 import { logger } from '../../utils/logger';
 import type { MCPServerConfig } from './types';
 
@@ -135,12 +136,12 @@ export class MCPServer {
      */
     this.app.get('/mcp/tools', async (req: Request, res: Response) => {
       try {
-        const channel = req.query.channel as 'call' | 'sms' | 'email' | undefined;
+        const channel = req.query.channel as Channel | undefined;
 
-        if (channel && !['call', 'sms', 'email'].includes(channel)) {
+        if (channel && !['call', 'sms', 'email', 'text'].includes(channel)) {
           return res.status(400).json({
             error: 'Invalid channel parameter',
-            message: 'Channel must be one of: call, sms, email'
+            message: 'Channel must be one of: call, sms, email, text'
           });
         }
 
