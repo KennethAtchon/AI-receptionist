@@ -1,14 +1,14 @@
 /**
- * Google Calendar Credential Validator
- * Validates Google Calendar API credentials using Strategy Pattern
+ * Google Credential Validator
+ * Validates Google API credentials using Strategy Pattern
  */
 
-import type { IProvider, GoogleCalendarConfig } from '../types';
+import type { IProvider, GoogleConfig } from '../types';
 import type { ICredentialValidator, ValidationResult } from './credential-validator.interface';
 import { logger } from '../utils/logger';
 
 /**
- * Validator for Google Calendar provider credentials
+ * Validator for Google provider credentials
  * Implements ICredentialValidator strategy
  *
  * Validates:
@@ -18,7 +18,7 @@ import { logger } from '../utils/logger';
  *
  * @example
  * ```typescript
- * const validator = new GoogleCalendarValidator();
+    * const validator = new GoogleValidator();
  *
  * // Format validation
  * const formatResult = validator.validateFormat(config);
@@ -27,22 +27,22 @@ import { logger } from '../utils/logger';
  * }
  *
  * // Connection validation
- * const provider = new GoogleCalendarProvider(config);
+ * const provider = new GoogleProvider(config);
  * await provider.initialize();
  * const connResult = await validator.validateConnection(provider);
  * ```
  */
-export class GoogleCalendarValidator implements ICredentialValidator {
+export class GoogleValidator implements ICredentialValidator {
   /**
    * Validate Google Calendar credential format
    * Checks structure without making API calls
    */
-  validateFormat(config: GoogleCalendarConfig): ValidationResult {
+  validateFormat(config: GoogleConfig): ValidationResult {
     // Check that at least one authentication method is provided
     if (!config.apiKey && !config.credentials) {
       return {
         valid: false,
-        error: 'Missing Google Calendar credentials (apiKey or credentials required)',
+        error: 'Missing Google credentials (apiKey or credentials required)',
         details: {
           hasApiKey: !!config.apiKey,
           hasCredentials: !!config.credentials
@@ -54,7 +54,7 @@ export class GoogleCalendarValidator implements ICredentialValidator {
     if (!config.calendarId) {
       return {
         valid: false,
-        error: 'Missing Google Calendar ID',
+        error: 'Missing Google ID',
         details: {
           hasApiKey: !!config.apiKey,
           hasCredentials: !!config.credentials
@@ -66,7 +66,7 @@ export class GoogleCalendarValidator implements ICredentialValidator {
     if (config.calendarId !== 'primary' && !this.isValidCalendarId(config.calendarId)) {
       return {
         valid: false,
-        error: 'Invalid Google Calendar ID format (should be email-like format or "primary")',
+        error: 'Invalid Google ID format (should be email-like format or "primary")',
         details: { calendarId: config.calendarId }
       };
     }
@@ -87,7 +87,7 @@ export class GoogleCalendarValidator implements ICredentialValidator {
       }
     }
 
-    logger.info('[GoogleCalendarValidator] Format validation passed');
+    logger.info('[GoogleValidator] Format validation passed');
     return { valid: true };
   }
 
@@ -161,7 +161,7 @@ export class GoogleCalendarValidator implements ICredentialValidator {
 
     // Google API keys typically start with 'AIza'
     if (!apiKey.startsWith('AIza')) {
-      logger.warn('[GoogleCalendarValidator] API key does not start with "AIza" - may be invalid');
+      logger.warn('[GoogleValidator] API key does not start with "AIza" - may be invalid');
     }
 
     return { valid: true };
@@ -173,7 +173,7 @@ export class GoogleCalendarValidator implements ICredentialValidator {
    */
   async validateConnection(provider: IProvider): Promise<ValidationResult> {
     try {
-      logger.info('[GoogleCalendarValidator] Testing Google Calendar API connection');
+      logger.info('[GoogleValidator] Testing Google API connection');
 
       // Use provider's health check to verify credentials
       const isHealthy = await provider.healthCheck();
@@ -181,7 +181,7 @@ export class GoogleCalendarValidator implements ICredentialValidator {
       if (!isHealthy) {
         return {
           valid: false,
-          error: 'Google Calendar credentials are invalid or calendar is not accessible. Please verify your API key or service account credentials.',
+          error: 'Google credentials are invalid or calendar is not accessible. Please verify your API key or service account credentials.',
           details: {
             providerName: provider.name,
             healthCheckFailed: true
@@ -189,14 +189,14 @@ export class GoogleCalendarValidator implements ICredentialValidator {
         };
       }
 
-      logger.info('[GoogleCalendarValidator] Connection validation passed');
+      logger.info('[GoogleValidator] Connection validation passed');
       return { valid: true };
     } catch (error) {
-      logger.error('[GoogleCalendarValidator] Connection validation failed:', error);
+      logger.error('[GoogleValidator] Connection validation failed:', error as Error);
 
       return {
         valid: false,
-        error: this.parseErrorMessage(error),
+        error: this.parseErrorMessage(error as Error),
         details: {
           originalError: error instanceof Error ? error.message : String(error),
           errorType: error instanceof Error ? error.constructor.name : typeof error
@@ -214,45 +214,45 @@ export class GoogleCalendarValidator implements ICredentialValidator {
 
       // Authentication errors
       if (message.includes('unauthorized') || message.includes('401')) {
-        return 'Google Calendar authentication failed. Please verify your API key or service account credentials.';
+        return 'Google authentication failed. Please verify your API key or service account credentials.';
       }
 
       if (message.includes('invalid credentials')) {
-        return 'Invalid Google Calendar credentials. Please check your API key or service account configuration.';
+        return 'Invalid Google credentials. Please check your API key or service account configuration.';
       }
 
       // Permission errors
       if (message.includes('forbidden') || message.includes('403')) {
-        return 'Insufficient permissions to access Google Calendar. Please ensure the calendar is shared with the service account or API key has correct permissions.';
+        return 'Insufficient permissions to access Google. Please ensure the calendar is shared with the service account or API key has correct permissions.';
       }
 
       // Not found errors
       if (message.includes('not found') || message.includes('404')) {
-        return 'Google Calendar not found. Please verify the calendar ID is correct.';
+        return 'Google not found. Please verify the calendar ID is correct.';
       }
 
       // Quota errors
       if (message.includes('quota') || message.includes('rate limit')) {
-        return 'Google Calendar API quota exceeded. Please try again later or increase your quota.';
+        return 'Google API quota exceeded. Please try again later or increase your quota.';
       }
 
       // API not enabled
       if (message.includes('api not enabled')) {
-        return 'Google Calendar API is not enabled for this project. Please enable it in Google Cloud Console.';
+        return 'Google API is not enabled for this project. Please enable it in Google Cloud Console.';
       }
 
       // Network errors
       if (message.includes('network') || message.includes('enotfound')) {
-        return 'Network error connecting to Google Calendar API. Please check your internet connection.';
+        return 'Network error connecting to Google API. Please check your internet connection.';
       }
 
       if (message.includes('timeout')) {
-        return 'Google Calendar API request timed out. Please try again.';
+        return 'Google API request timed out. Please try again.';
       }
 
       return error.message;
     }
 
-    return 'Unknown error validating Google Calendar credentials';
+    return 'Unknown error validating Google credentials';
   }
 }

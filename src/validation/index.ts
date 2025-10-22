@@ -6,4 +6,4 @@
 export { ICredentialValidator, ValidationResult } from './credential-validator.interface';
 export { TwilioValidator } from './twilio-validator';
 export { OpenAIValidator } from './openai-validator';
-export { GoogleCalendarValidator } from './google-calendar-validator';
+export { GoogleCalendarValidator } from './google-validator';

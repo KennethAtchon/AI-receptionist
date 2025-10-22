@@ -186,7 +186,7 @@ export class MessagingService {
 ### Breaking Changes (No Backward Compatibility)
 - Rename provider file and class:
   - `src/providers/calendar/google-calendar.provider.ts` → `src/providers/calendar/google.provider.ts`
-  - `GoogleCalendarProvider` → `GoogleProvider`
+  - `GoogleProvider` → `GoogleProvider`
 - Change registry key from `'google-calendar'` to `'google'`.
 - Remove `getAvailableSlots` from the provider entirely.
 - Update exports:

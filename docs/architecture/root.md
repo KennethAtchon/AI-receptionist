@@ -330,7 +330,7 @@ class CallService {
 │  │  Calendar Providers                                                       │    │
 │  │                                                                            │    │
 │  │  ┌────────────────────────────┐                                          │    │
-│  │  │  GoogleCalendarProvider    │                                          │    │
+│  │  │  GoogleProvider    │                                          │    │
 │  │  │                            │                                          │    │
 │  │  │ - listEvents()             │                                          │    │
 │  │  │ - createEvent()            │                                          │    │
@@ -633,7 +633,7 @@ export class CallsResource {
 **Components**:
 - Communication: `TwilioProvider`
 - AI: `OpenAIProvider`, `OpenRouterProvider`
-- Calendar: `GoogleCalendarProvider`
+- Calendar: `GoogleProvider`
 
 **Interface**:
 ```typescript

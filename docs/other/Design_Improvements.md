@@ -101,7 +101,7 @@ AIAgent (Primary Entity)
   └─ Providers (External API Bridges)
       ├─ TwilioProvider
       ├─ OpenAIProvider
-      ├─ GoogleCalendarProvider
+      ├─ GoogleProvider
       └─ Custom Providers
 ```
 

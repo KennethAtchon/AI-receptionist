@@ -49,7 +49,7 @@ export { Tools } from './tools';
 export { TwilioProvider } from './providers/core/twilio.provider';
 export { OpenAIProvider } from './providers/ai/openai.provider';
 export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
-export { GoogleCalendarProvider } from './providers/core/google-calendar.provider';
+export { GoogleProvider } from './providers/core/google.provider';
 
 // ============================================================================
 // Services (Business Logic Layer)
@@ -204,7 +204,7 @@ export type {
   TwilioConfig,
   SendGridConfig,
   AIModelConfig,
-  GoogleCalendarConfig,
+  GoogleConfig,
   ProviderConfig,
 
   // Resources

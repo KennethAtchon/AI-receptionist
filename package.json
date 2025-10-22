@@ -63,7 +63,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src --ext .ts", 
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "format": "prettier --write \"src/**/*.ts\"",
     "prepublishOnly": "npm run build && npm test",
     "clean": "rm -rf node_modules dist"

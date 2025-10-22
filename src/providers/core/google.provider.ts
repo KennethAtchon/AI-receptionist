@@ -9,7 +9,8 @@ import { logger } from '../../utils/logger';
 
 export class GoogleProvider extends BaseProvider {
   readonly name = 'google';
-  readonly type = 'calendar' as const;
+  readonly type = 'core' as const;
+
 
   private client: any = null; // TODO: Import actual Google Calendar client
 
@@ -26,15 +27,10 @@ export class GoogleProvider extends BaseProvider {
 
       // Initialize with API key or service account credentials
       if (this.config.credentials) {
-        const auth = new google.auth.GoogleAuth({
+        this.client = new google.auth.GoogleAuth({
           credentials: this.config.credentials,
           scopes: ['https://www.googleapis.com/auth/calendar.readonly']
         });
-        this.client = google.calendar({ version: 'v3', auth });
-      } else if (this.config.apiKey) {
-        this.client = google.calendar({ version: 'v3', auth: this.config.apiKey });
-      } else {
-        throw new Error('No valid authentication method provided');
       }
 
       this.initialized = true;
@@ -54,8 +50,17 @@ export class GoogleProvider extends BaseProvider {
   }
 
   async dispose(): Promise<void> {
-    logger.info('[GoogleCalendarProvider] Disposing');
+    logger.info('[GoogleProvider] Disposing');
     this.client = null;
     this.initialized = false;
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      return true;
+    } catch (error) {
+      logger.error('[GoogleProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
   }
 }

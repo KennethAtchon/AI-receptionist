@@ -8,7 +8,7 @@
 
 export interface IProvider {
   readonly name: string;
-  readonly type: 'communication' | 'ai' | 'calendar' | 'crm' | 'storage' | 'custom';
+  readonly type: 'communication' | 'ai' | 'core' | 'crm' | 'storage' | 'custom';
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   healthCheck(): Promise<boolean>;
@@ -252,7 +252,7 @@ export interface IAIProvider extends IProvider {
 // Calendar Provider Types
 // ============================================================================
 
-export interface GoogleCalendarConfig {
+export interface GoogleConfig {
   apiKey: string;
   calendarId: string;
   credentials?: any;
@@ -346,7 +346,7 @@ export interface ProviderConfig {
     sendgrid?: SendGridConfig;
   };
   calendar?: {
-    google?: GoogleCalendarConfig;
+    google?: GoogleConfig;
   };
   custom?: IProvider[];
 }

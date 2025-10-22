@@ -16,13 +16,13 @@ import { MCPAdapter } from './adapters/mcp/mcp-adapter';
 import { ProviderRegistry } from './core/provider-registry';
 import { TwilioValidator } from './validation/twilio-validator';
 import { OpenAIValidator } from './validation/openai-validator';
-import { GoogleCalendarValidator } from './validation/google-calendar-validator';
+import { GoogleValidator } from './validation/google-validator';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider } from './providers/core/twilio.provider';
 import type { OpenAIProvider } from './providers/ai/openai.provider';
 import type { OpenRouterProvider } from './providers/ai/openrouter.provider';
-import type { GoogleCalendarProvider } from './providers/core/google-calendar.provider';
+import type { GoogleProvider } from './providers/core/google.provider';
 import type { CallService } from './services/call.service';
 import type { CallsResource } from './resources/calls.resource';
 import type { SMSResource } from './resources/sms.resource';
@@ -206,12 +206,12 @@ export class AIReceptionist {
     // 9. Register Google Calendar provider ONLY if credentials configured (lazy loaded)
     if (this.config.providers.calendar?.google) {
       this.providerRegistry.registerIfConfigured(
-        'google-calendar',
+        'google',
         async () => {
-          const { GoogleCalendarProvider } = await import('./providers/core/google-calendar.provider');
-          return new GoogleCalendarProvider(this.config.providers.calendar!.google!);
+          const { GoogleProvider } = await import('./providers/core/google.provider');
+          return new GoogleProvider(this.config.providers.calendar!.google!);
         },
-        new GoogleCalendarValidator(),
+        new GoogleValidator(),
         this.config.providers.calendar.google
       );
     }
