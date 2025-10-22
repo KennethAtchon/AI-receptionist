@@ -8,7 +8,7 @@
 
 export interface IProvider {
   readonly name: string;
-  readonly type: 'communication' | 'ai' | 'core' | 'crm' | 'storage' | 'custom';
+  readonly type: 'communication' | 'ai' | 'core' | 'calendar' | 'crm' | 'storage' | 'custom';
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   healthCheck(): Promise<boolean>;
@@ -207,11 +207,14 @@ export interface SendGridConfig {
 export interface CallOptions {
   webhookUrl: string;
   statusCallback?: string;
+  from?: string; // Override default number
+  timeout?: number;
   aiConfig?: any;
 }
 
 export interface SMSOptions {
   statusCallback?: string;
+  from?: string; // Override default number
 }
 
 // ============================================================================
@@ -452,3 +455,19 @@ export interface TextResponse {
     [key: string]: any;
   };
 }
+
+// ============================================================================
+// Processor Types
+// ============================================================================
+
+export type {
+  IProcessor,
+  ProcessorResponse,
+  AIConsultationParams,
+  BookingResult,
+  MessagingResult,
+  ProcessUserSpeechParams,
+  InitiateCallParams,
+  FindAndBookParams,
+  SendMessageParams
+} from './processors';

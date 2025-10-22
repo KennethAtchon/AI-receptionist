@@ -1,58 +1,75 @@
 /**
- * Twilio Communication Provider
- * Handles phone calls and SMS via Twilio API
+ * Twilio Provider - ULTRA-PURE API Wrapper
+ * Just wraps the Twilio SDK and returns it
+ * Processor handles all initialization and logic
  */
 
 import { BaseProvider } from '../base.provider';
-import { TwilioConfig } from '../../types';
+import type { TwilioConfig } from '../../types';
 import { logger } from '../../utils/logger';
 
+/**
+ * Twilio Provider
+ * ULTRA-PURE - just wraps Twilio SDK, no initialization or logic
+ */
 export class TwilioProvider extends BaseProvider {
   readonly name = 'twilio';
-  readonly type = 'communication' as const;
+  readonly type = 'core' as const;
 
-  private client: any = null; // TODO: Import actual Twilio client type
+  private twilioSdk: any = null;
 
   constructor(private config: TwilioConfig) {
     super();
   }
 
   async initialize(): Promise<void> {
-    logger.info('[TwilioProvider] Initializing with account', { accountSid: this.config.accountSid });
+    logger.info('[TwilioProvider] Initializing (loading SDK)');
 
     try {
-      // Dynamically import Twilio SDK (lazy loading)
-      const twilio = (await import('twilio')).default;
-      this.client = twilio(this.config.accountSid, this.config.authToken);
-
+      // Just lazy-load the SDK, don't create client
+      this.twilioSdk = (await import('twilio')).default;
       this.initialized = true;
-      logger.info('[TwilioProvider] Initialized successfully');
+      logger.info('[TwilioProvider] SDK loaded');
     } catch (error) {
-      logger.error('[TwilioProvider] Initialization failed:', error);
-      throw new Error(`Failed to initialize Twilio provider: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('[TwilioProvider] Failed to load SDK:', error instanceof Error ? error : new Error(String(error)));
+      throw error;
     }
   }
 
-  async healthCheck(): Promise<boolean> {
-    if (!this.initialized || !this.client) {
-      return false;
-    }
+  /**
+   * Get the raw Twilio SDK constructor
+   * Processor will create client with credentials
+   */
+  getSdk(): any {
+    this.ensureInitialized();
+    return this.twilioSdk;
+  }
 
-    try {
-      // Lightweight API call to verify credentials
-      // Fetches account details - minimal cost, verifies authentication
-      await this.client.api.v2010.accounts(this.config.accountSid).fetch();
-      logger.info('[TwilioProvider] Health check passed');
-      return true;
-    } catch (error) {
-      logger.error('[TwilioProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
-      return false;
-    }
+  /**
+   * Get config (credentials, etc.)
+   * Processor will use this to create client
+   */
+  getConfig(): TwilioConfig {
+    return this.config;
+  }
+
+  /**
+   * Create and return a Twilio client instance
+   * Processor can call this to get a configured client
+   */
+  createClient(): any {
+    this.ensureInitialized();
+    return this.twilioSdk(this.config.accountSid, this.config.authToken);
   }
 
   async dispose(): Promise<void> {
     logger.info('[TwilioProvider] Disposing');
-    this.client = null;
+    this.twilioSdk = null;
     this.initialized = false;
   }
+
+  async healthCheck(): Promise<boolean> {
+    return this.initialized && this.twilioSdk !== null;
+  }
 }
+

@@ -1,66 +1,65 @@
 /**
- * Google Provider
- * Handles all operations involving Google APIs
+ * Google Provider - ULTRA-PURE API Wrapper
+ * Just wraps the Google APIs SDK and returns it
+ * Processor handles all initialization and logic
  */
 
 import { BaseProvider } from '../base.provider';
-import { GoogleConfig } from '../../types';
+import type { GoogleConfig } from '../../types';
 import { logger } from '../../utils/logger';
 
+/**
+ * Google Provider
+ * ULTRA-PURE - just wraps googleapis SDK, no initialization or logic
+ */
 export class GoogleProvider extends BaseProvider {
   readonly name = 'google';
   readonly type = 'core' as const;
 
-
-  private client: any = null; // TODO: Import actual Google Calendar client
+  private googleApis: any = null;
 
   constructor(private config: GoogleConfig) {
     super();
   }
 
   async initialize(): Promise<void> {
-    logger.info('[GoogleProvider] Initializing');
-
+    logger.info('[GoogleProvider] Initializing (loading SDK)');
+    
     try {
-      // Dynamically import Google APIs SDK (lazy loading)
-      const { google } = await import('googleapis');
-
-      // Initialize with API key or service account credentials
-      if (this.config.credentials) {
-        this.client = new google.auth.GoogleAuth({
-          credentials: this.config.credentials,
-          scopes: ['https://www.googleapis.com/auth/calendar.readonly']
-        });
-      }
-
+      // Just lazy-load the SDK, don't configure anything
+      this.googleApis = await import('googleapis');
       this.initialized = true;
-        logger.info('[GoogleProvider] Initialized successfully');
+      logger.info('[GoogleProvider] SDK loaded');
     } catch (error) {
-      logger.error('[GoogleProvider] Initialization failed:', error instanceof Error ? error : new Error(String(error)));
-      throw new Error(`Failed to initialize Google Calendar provider: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error('[GoogleProvider] Failed to load SDK:', error instanceof Error ? error : new Error(String(error)));
+      throw error;
     }
   }
 
-
-  async createEvent(event: GoogleEvent): Promise<string> {
+  /**
+   * Get the raw Google APIs SDK
+   * Processor will handle auth, calendar client creation, etc.
+   */
+  getApi(): any {
     this.ensureInitialized();
-    // TOODO
-    return '123';
+    return this.googleApis.google;
+  }
 
+  /**
+   * Get config (credentials, etc.)
+   * Processor will use this to set up auth
+   */
+  getConfig(): GoogleConfig {
+    return this.config;
   }
 
   async dispose(): Promise<void> {
     logger.info('[GoogleProvider] Disposing');
-    this.client = null;
+    this.googleApis = null;
     this.initialized = false;
   }
 
   async healthCheck(): Promise<boolean> {
-    try {
-      return true;
-    } catch (error) {
-      logger.error('[GoogleProvider] Health check failed:', error instanceof Error ? error : new Error(String(error)));
-      return false;
-    }
+    return this.initialized && this.googleApis !== null;
   }
 }

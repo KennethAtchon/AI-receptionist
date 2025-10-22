@@ -1,22 +1,21 @@
 /**
- * Call Service
- * Business logic for managing voice calls
+ * Call Service  
+ * High-level voice call operations using CallProcessor
  */
 
-import { TwilioProvider } from '../providers/core/twilio.provider';
+import type { CallProcessor } from '../processors/call.processor';
 import { ConversationService } from './conversation.service';
-import { ToolExecutionService } from './tool-execution.service';
-import { MakeCallOptions, CallSession, IAIProvider } from '../types';
+import type { MakeCallOptions, CallSession } from '../types';
 import { logger } from '../utils/logger';
 
+/**
+ * CallService
+ * Delegates to CallProcessor for AI-driven call orchestration
+ */
 export class CallService {
   constructor(
-    private twilioProvider: TwilioProvider,
-    private aiProvider: IAIProvider,
     private conversationService: ConversationService,
-    private toolExecutor: ToolExecutionService,
-    private agentId: string,
-    private webhookBaseUrl: string = 'http://localhost:3000'
+    private callProcessor: CallProcessor
   ) {}
 
   /**
@@ -31,34 +30,17 @@ export class CallService {
       metadata: options.metadata
     });
 
-    // 2. Get available tools for this channel
-    const availableTools = this.toolExecutor.getToolsForChannel('call');
-    logger.info(`[CallService] Available tools: ${availableTools.map(t => t.name).join(', ')}`);
-
-    // 3. Make the call via Twilio provider
-    const webhookUrl = `${this.webhookBaseUrl}/webhooks/calls/${conversation.id}`;
-    const statusCallback = `${this.webhookBaseUrl}/webhooks/call-status/${conversation.id}`;
-
-    const callSid = await this.twilioProvider.makeCall(options.to, {
-      webhookUrl,
-      statusCallback,
-      aiConfig: {
-        tools: availableTools.map(t => ({
-          name: t.name,
-          description: t.description,
-          parameters: t.parameters
-        }))
-      }
+    // 2. Delegate to processor to make the call
+    const result = await this.callProcessor.initiateCall({
+      to: options.to,
+      conversationId: conversation.id,
+      greeting: 'Hello! How can I help you today?'
     });
 
-    // 4. Update conversation with callSid
-    await this.conversationService.get(conversation.id);
-    // TODO: Update conversation with callSid via store
-
-    logger.info(`[CallService] Call initiated: ${callSid}`);
+    logger.info(`[CallService] Call initiated: ${result.callSid}`);
 
     return {
-      id: callSid,
+      id: result.callSid,
       conversationId: conversation.id,
       to: options.to,
       status: 'initiated',
@@ -70,9 +52,9 @@ export class CallService {
    * Handle incoming voice from user during call
    */
   async handleUserSpeech(callSid: string, userSpeech: string): Promise<string> {
-    logger.info(`[CallService] Handling speech for call ${callSid}: "${userSpeech}"`);
+    logger.info(`[CallService] Handling speech for call ${callSid}`);
 
-    // 1. Get conversation
+    // 1. Get conversation context
     const conversation = await this.conversationService.getByCallId(callSid);
     if (!conversation) {
       throw new Error(`Conversation not found for call ${callSid}`);
@@ -84,79 +66,31 @@ export class CallService {
       content: userSpeech
     });
 
-    // 3. Get AI response
+    // 3. Get conversation history
     const history = await this.conversationService.getMessages(conversation.id);
-    const agentHistory = history.map(m => ({
-      role: m.role as any,
-      content: m.content,
-      timestamp: m.timestamp,
-      toolCall: m.toolCall as any,
-      toolResult: m.toolResult as any
-    }));
 
-    const aiResponse = await this.aiProvider.chat({
-      conversationId: conversation.id,
-      userMessage: userSpeech,
-      conversationHistory: agentHistory,
-      availableTools: this.toolExecutor.getToolsForChannel('call')
+    // 4. Delegate to processor - handles all orchestration using AI
+    const response = await this.callProcessor.processUserSpeech({
+      callSid,
+      userSpeech,
+      conversationHistory: history,
+      availableTools: [] // TODO: Get from tool registry
     });
 
-    // 4. If AI wants to use tools, execute them
-    if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0) {
-      logger.info(`[CallService] AI requested ${aiResponse.toolCalls.length} tool calls`);
-
-      for (const toolCall of aiResponse.toolCalls) {
-        const toolResult = await this.toolExecutor.execute(
-          toolCall.name,
-          toolCall.parameters,
-          {
-            channel: 'call',
-            conversationId: conversation.id,
-            callSid,
-            agentId: this.agentId
-          }
-        );
-
-        // Add tool result to conversation
-        await this.conversationService.addMessage(conversation.id, {
-          role: 'tool',
-          content: JSON.stringify(toolResult),
-          toolResult
-        });
-      }
-
-      // Get final AI response after tool execution
-      const finalHistory = await this.conversationService.getMessages(conversation.id);
-      const finalAgentHistory = finalHistory.map(m => ({
-        role: m.role as any,
-        content: m.content,
-        timestamp: m.timestamp,
-        toolCall: m.toolCall as any,
-        toolResult: m.toolResult as any
-      }));
-
-      const finalResponse = await this.aiProvider.chat({
-        conversationId: conversation.id,
-        userMessage: '',
-        conversationHistory: finalAgentHistory
-      });
-
-      // Add assistant response
-      await this.conversationService.addMessage(conversation.id, {
-        role: 'assistant',
-        content: finalResponse.content
-      });
-
-      return finalResponse.content;
-    }
-
-    // No tool calls, just return AI response
+    // 5. Add assistant response to conversation
     await this.conversationService.addMessage(conversation.id, {
       role: 'assistant',
-      content: aiResponse.content
+      content: response.content
     });
 
-    return aiResponse.content;
+    // 6. Handle special actions
+    if (response.action === 'end_call') {
+      await this.endCall(callSid);
+    }
+
+    logger.info(`[CallService] Response generated for call ${callSid}`);
+
+    return response.content;
   }
 
   /**
@@ -169,5 +103,8 @@ export class CallService {
     if (conversation) {
       await this.conversationService.complete(conversation.id);
     }
+
+    // Delegate to processor to end call via provider
+    await this.callProcessor.endCall(callSid);
   }
 }

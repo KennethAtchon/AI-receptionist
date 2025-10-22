@@ -19,15 +19,17 @@ import { OpenAIValidator } from './validation/openai-validator';
 import { GoogleValidator } from './validation/google-validator';
 
 // Type-only imports for tree-shaking
-import type { TwilioProvider } from './providers/core/twilio.provider';
-import type { OpenAIProvider } from './providers/ai/openai.provider';
-import type { OpenRouterProvider } from './providers/ai/openrouter.provider';
-import type { GoogleProvider } from './providers/core/google.provider';
+import type { TwilioProvider, GoogleProvider, OpenAIProvider, OpenRouterProvider } from './providers';
 import type { CallService } from './services/call.service';
+import type { CalendarService } from './services/calendar.service';
+import type { MessagingService } from './services/messaging.service';
 import type { CallsResource } from './resources/calls.resource';
 import type { SMSResource } from './resources/sms.resource';
 import type { EmailResource } from './resources/email.resource';
 import type { TextResource } from './resources/text.resource';
+import type { CallProcessor } from './processors/call.processor';
+import type { CalendarProcessor } from './processors/calendar.processor';
+import type { MessagingProcessor } from './processors/messaging.processor';
 
 /**
  * AIReceptionist - Agent-centric AI SDK
@@ -100,7 +102,17 @@ export class AIReceptionist {
   private toolExecutor!: ToolExecutionService;
   private toolRegistry!: ToolRegistry;
   private toolStore!: ToolStore;
+  
+  // Processors (AI-driven orchestration)
+  private callProcessor?: CallProcessor;
+  private calendarProcessor?: CalendarProcessor;
+  private messagingProcessor?: MessagingProcessor;
+  
+  // Services
   private callService?: CallService;
+  private calendarService?: CalendarService;
+  private messagingService?: MessagingService;
+  
   private mcpAdapter?: MCPAdapter;
   private initialized = false;
 
@@ -195,7 +207,7 @@ export class AIReceptionist {
       this.providerRegistry.registerIfConfigured(
         'twilio',
         async () => {
-          const { TwilioProvider } = await import('./providers/core/twilio.provider');
+          const { TwilioProvider } = await import('./providers');
           return new TwilioProvider(this.config.providers.communication!.twilio!);
         },
         new TwilioValidator(),
@@ -208,7 +220,7 @@ export class AIReceptionist {
       this.providerRegistry.registerIfConfigured(
         'google',
         async () => {
-          const { GoogleProvider } = await import('./providers/core/google.provider');
+          const { GoogleProvider } = await import('./providers');
           return new GoogleProvider(this.config.providers.calendar!.google!);
         },
         new GoogleValidator(),
@@ -256,34 +268,70 @@ export class AIReceptionist {
     }
 
 
-    // 14. Initialize communication resources if Twilio is configured
-    // Resources use lazy provider access - providers load on first use
+    // 14. Initialize processors and services if providers are configured
     if (this.providerRegistry.has('twilio')) {
+      // Create processors
+      const { CallProcessor } = await import('./processors/call.processor');
+      const { MessagingProcessor } = await import('./processors/messaging.processor');
+      
+      const twilioProvider = await this.providerRegistry.get<TwilioProvider>('twilio');
+      
+      this.callProcessor = new CallProcessor(
+        aiProvider,
+        twilioProvider,
+        this.toolExecutor
+      );
+      
+      this.messagingProcessor = new MessagingProcessor(
+        aiProvider,
+        twilioProvider
+      );
+      
+      // Create services using processors
       const { CallService } = await import('./services/call.service');
+      const { MessagingService } = await import('./services/messaging.service');
+      
+      this.callService = new CallService(
+        this.conversationService,
+        this.callProcessor
+      );
+      
+      this.messagingService = new MessagingService(
+        this.messagingProcessor
+      );
+      
+      // Initialize resources
       const { CallsResource } = await import('./resources/calls.resource');
       const { SMSResource } = await import('./resources/sms.resource');
-
-      const agentId = `agent-${this.config.agent.identity.name.toLowerCase().replace(/\s+/g, '-')}`;
-
-      // CallService also uses lazy provider access
-      this.callService = new CallService(
-        await this.providerRegistry.get<TwilioProvider>('twilio'),
-        aiProvider,
-        this.conversationService,
-        this.toolExecutor,
-        agentId
-      );
-
-      // Pass lazy getter functions to resources
+      
       (this as any).calls = new CallsResource(this.callService);
-      (this as any).sms = new SMSResource(() => this.providerRegistry.get<TwilioProvider>('twilio'));
+      (this as any).sms = new SMSResource(() => Promise.resolve(twilioProvider));
+    }
+    
+    // 15. Initialize calendar processor and service if Google Calendar is configured
+    if (this.providerRegistry.has('google')) {
+      const { CalendarProcessor } = await import('./processors/calendar.processor');
+      const { CalendarService } = await import('./services/calendar.service');
+      
+      const googleProvider = await this.providerRegistry.get<GoogleProvider>('google');
+      
+      this.calendarProcessor = new CalendarProcessor(
+        aiProvider,
+        googleProvider
+      );
+      
+      this.calendarService = new CalendarService(
+        this.calendarProcessor
+      );
+      
+      logger.info('[AIReceptionist] Calendar service initialized');
     }
 
-    // 15. Initialize email resource (basic for now, lazy loaded)
+    // 16. Initialize email resource (basic for now, lazy loaded)
     const { EmailResource } = await import('./resources/email.resource');
     (this as any).email = new EmailResource();
 
-    // 16. Initialize text resource (always available - for testing agent independently)
+    // 17. Initialize text resource (always available - for testing agent independently)
     const { TextResource } = await import('./resources/text.resource');
     (this as any).text = new TextResource(this.agent);
 
