@@ -4,7 +4,7 @@
  * No AI consultation - just provider operations for services.
  */
 
-import type { GoogleProvider } from '../providers/core/google.provider';
+import type { GoogleProvider } from '../providers/api/google.provider';
 import { logger } from '../utils/logger';
 
 export interface FindAndBookParams {

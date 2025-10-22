@@ -14,7 +14,7 @@ import { logger } from '../../utils/logger';
  */
 export class TwilioProvider extends BaseProvider {
   readonly name = 'twilio';
-  readonly type = 'core' as const;
+  readonly type = 'api' as const;
 
   private twilioSdk: any = null;
 

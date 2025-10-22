@@ -4,7 +4,7 @@
  * No AI consultation - just provider operations for services.
  */
 
-import type { TwilioProvider } from '../providers/core/twilio.provider';
+import type { TwilioProvider } from '../providers/api/twilio.provider';
 import { logger } from '../utils/logger';
 
 export interface SendMessageParams {

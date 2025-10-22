@@ -46,10 +46,10 @@ export { Tools } from './tools';
 // Providers (External API Adapters)
 // ============================================================================
 
-export { TwilioProvider } from './providers/core/twilio.provider';
+export { TwilioProvider } from './providers/api/twilio.provider';
 export { OpenAIProvider } from './providers/ai/openai.provider';
 export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
-export { GoogleProvider } from './providers/core/google.provider';
+export { GoogleProvider } from './providers/api/google.provider';
 
 // ============================================================================
 // Services (Business Logic Layer)

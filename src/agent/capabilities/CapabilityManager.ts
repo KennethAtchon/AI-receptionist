@@ -9,7 +9,7 @@
  */
 
 import type { CapabilityManager as ICapabilityManager, Capability, Skill, Channel } from '../types';
-import { CapabilityNotFoundError, SkillNotFoundError } from '../errors/CapabilityErrors';
+import { CapabilityNotFoundError, SkillNotFoundError } from './CapabilityErrors';
 
 export class CapabilityManagerImpl implements ICapabilityManager {
   private skills: Map<string, Skill> = new Map();

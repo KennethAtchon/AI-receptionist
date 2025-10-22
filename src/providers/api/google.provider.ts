@@ -14,7 +14,7 @@ import { logger } from '../../utils/logger';
  */
 export class GoogleProvider extends BaseProvider {
   readonly name = 'google';
-  readonly type = 'core' as const;
+  readonly type = 'api' as const;
 
   private googleApis: any = null;
 

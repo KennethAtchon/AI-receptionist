@@ -3,7 +3,7 @@
  */
 
 import { SMSResource } from '../sms.resource';
-import { TwilioProvider } from '../../providers/core/twilio.provider';
+import { TwilioProvider } from '../../providers/api/twilio.provider';
 import { SendSMSOptions, SMSSession } from '../../types';
 
 // Create mock TwilioProvider

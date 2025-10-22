@@ -6,7 +6,7 @@ import { CapabilityManagerImpl } from '../CapabilityManager';
 import { Capability } from '../Capability';
 import { Skill } from '../Skill';
 import type { Channel } from '../../types';
-import { CapabilityNotFoundError, SkillNotFoundError } from '../../errors/CapabilityErrors';
+import { CapabilityNotFoundError, SkillNotFoundError } from '../CapabilityErrors';
 
 describe('CapabilityManager', () => {
   let manager: CapabilityManagerImpl;

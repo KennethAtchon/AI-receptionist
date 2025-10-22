@@ -5,8 +5,8 @@
 export { BaseProvider } from './base.provider';
 
 // Core Providers (Communication, Calendar, etc.)
-export { TwilioProvider } from './core/twilio.provider';
-export { GoogleProvider } from './core/google.provider';
+export { TwilioProvider } from './api/twilio.provider';
+export { GoogleProvider } from './api/google.provider';
 
 // AI Providers
 export { OpenAIProvider } from './ai/openai.provider';
