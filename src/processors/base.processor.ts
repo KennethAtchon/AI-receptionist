@@ -1,6 +1,9 @@
 /**
  * Base Processor
- * Abstract base class for all processors
+ * DEPRECATED: Processors no longer perform AI orchestration.
+ * AI orchestration is now centralized in the Agent with Tools.
+ * 
+ * This base class remains for backward compatibility.
  */
 
 import type { IAIProvider, AIResponse } from '../types';

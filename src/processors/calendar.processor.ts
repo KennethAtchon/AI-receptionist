@@ -1,6 +1,8 @@
 /**
  * Calendar Processor
- * AI-driven orchestration for calendar operations using Google Calendar
+ * DEPRECATED: AI orchestration now handled by Agent + Tools.
+ * This processor remains for backward compatibility but no longer performs AI orchestration.
+ * Use calendar-tools.ts instead.
  */
 
 import { BaseProcessor } from './base.processor';

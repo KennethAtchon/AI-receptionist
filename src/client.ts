@@ -268,36 +268,29 @@ export class AIReceptionist {
     }
 
 
-    // 14. Initialize processors and services if providers are configured
+    // 14. Register call and messaging tools if Twilio is configured
     if (this.providerRegistry.has('twilio')) {
-      // Create processors
-      const { CallProcessor } = await import('./processors/call.processor');
-      const { MessagingProcessor } = await import('./processors/messaging.processor');
-      
       const twilioProvider = await this.providerRegistry.get<TwilioProvider>('twilio');
       
-      this.callProcessor = new CallProcessor(
-        aiProvider,
-        twilioProvider,
-        this.toolExecutor
-      );
+      // Register call tools
+      const { setupCallTools } = await import('./tools/standard/call-tools');
+      await setupCallTools(this.toolRegistry, { twilioProvider });
       
-      this.messagingProcessor = new MessagingProcessor(
-        aiProvider,
-        twilioProvider
-      );
+      // Register messaging tools
+      const { setupMessagingTools } = await import('./tools/standard/messaging-tools');
+      await setupMessagingTools(this.toolRegistry, { twilioProvider });
       
-      // Create services using processors
+      // Create services using Agent (no processors for orchestration)
       const { CallService } = await import('./services/call.service');
       const { MessagingService } = await import('./services/messaging.service');
       
       this.callService = new CallService(
         this.conversationService,
-        this.callProcessor
+        this.agent
       );
       
       this.messagingService = new MessagingService(
-        this.messagingProcessor
+        this.agent
       );
       
       // Initialize resources
@@ -308,21 +301,17 @@ export class AIReceptionist {
       (this as any).sms = new SMSResource(this.messagingService);
     }
     
-    // 15. Initialize calendar processor and service if Google Calendar is configured
+    // 15. Register calendar tools and service if Google Calendar is configured
     if (this.providerRegistry.has('google')) {
-      const { CalendarProcessor } = await import('./processors/calendar.processor');
-      const { CalendarService } = await import('./services/calendar.service');
-      
       const googleProvider = await this.providerRegistry.get<GoogleProvider>('google');
       
-      this.calendarProcessor = new CalendarProcessor(
-        aiProvider,
-        googleProvider
-      );
+      // Register calendar tools
+      const { setupCalendarTools } = await import('./tools/standard/calendar-tools');
+      await setupCalendarTools(this.toolRegistry, { googleProvider });
       
-      this.calendarService = new CalendarService(
-        this.calendarProcessor
-      );
+      // Create service using Agent
+      const { CalendarService } = await import('./services/calendar.service');
+      this.calendarService = new CalendarService(this.agent);
       
       logger.info('[AIReceptionist] Calendar service initialized');
     }

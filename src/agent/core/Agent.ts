@@ -262,13 +262,23 @@ export class Agent {
     toolResults: any[],
     channel: string
   ): Promise<AgentResponse> {
-    // This would integrate tool results back into the conversation
-    // For now, return a basic response
+    // Ask AI again with tool results to generate final user-facing response
+    const toolSummary = toolResults.map(tr => 
+      `Tool: ${tr.toolName}\nResult: ${JSON.stringify(tr.result.data || tr.result.response)}`
+    ).join('\n\n');
+
+    const finalAIResponse = await this.aiProvider.chat({
+      conversationId: `synthesis-${Date.now()}`,
+      userMessage: `Based on these tool results, provide a natural response to the user:\n\n${toolSummary}`,
+      systemPrompt: 'You are synthesizing tool results into a conversational response. Be natural and helpful.'
+    });
+
     return {
-      content: aiResponse.content || 'Task completed.',
+      content: finalAIResponse.content || aiResponse.content || 'Task completed.',
       channel: channel as any,
       metadata: {
-        toolsUsed: toolResults.map(t => t.toolName)
+        toolsUsed: toolResults.map(t => t.toolName),
+        toolResults: toolResults.map(t => t.result)
       }
     };
   }

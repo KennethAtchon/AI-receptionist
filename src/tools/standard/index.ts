@@ -8,9 +8,18 @@ import { ToolBuilder } from '../builder';
 import { ToolConfig, ProviderConfig } from '../../types';
 import { logger } from '../../utils/logger';
 
-// Re-export database tools for external use
+// Re-export all standard tool modules
 export { setupDatabaseTools } from './database-tools';
 export type { DatabaseToolsConfig } from './database-tools';
+
+export { setupCallTools } from './call-tools';
+export type { CallToolsConfig } from './call-tools';
+
+export { setupMessagingTools } from './messaging-tools';
+export type { MessagingToolsConfig } from './messaging-tools';
+
+export { setupCalendarTools } from './calendar-tools';
+export type { CalendarToolsConfig } from './calendar-tools';
 
 /**
  * Setup standard tools based on configuration

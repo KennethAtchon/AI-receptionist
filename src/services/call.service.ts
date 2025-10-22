@@ -1,21 +1,21 @@
 /**
  * Call Service  
- * High-level voice call operations using CallProcessor
+ * High-level voice call operations using Agent
  */
 
-import type { CallProcessor } from '../processors/call.processor';
+import type { Agent } from '../agent/core/Agent';
 import { ConversationService } from './conversation.service';
-import type { MakeCallOptions, CallSession } from '../types';
+import type { MakeCallOptions, CallSession, AgentRequest } from '../types';
 import { logger } from '../utils/logger';
 
 /**
  * CallService
- * Delegates to CallProcessor for AI-driven call orchestration
+ * Delegates to Agent for AI-driven call orchestration
  */
 export class CallService {
   constructor(
     private conversationService: ConversationService,
-    private callProcessor: CallProcessor
+    private agent: Agent
   ) {}
 
   /**
@@ -30,17 +30,27 @@ export class CallService {
       metadata: options.metadata
     });
 
-    // 2. Delegate to processor to make the call
-    const result = await this.callProcessor.initiateCall({
-      to: options.to,
-      conversationId: conversation.id,
-      greeting: 'Hello! How can I help you today?'
-    });
+    // 2. Delegate to Agent to orchestrate the call initiation
+    const agentRequest: AgentRequest = {
+      id: `call-init-${Date.now()}`,
+      input: `Initiate a call to ${options.to}. Say: "Hello! How can I help you today?"`,
+      channel: 'call',
+      context: {
+        channel: 'call',
+        conversationId: conversation.id,
+        metadata: { ...options.metadata, action: 'initiate_call', to: options.to }
+      }
+    };
 
-    logger.info(`[CallService] Call initiated: ${result.callSid}`);
+    const agentResponse = await this.agent.process(agentRequest);
+    
+    // Extract callSid from metadata (set by initiate_call tool)
+    const callSid = agentResponse.metadata?.toolResults?.[0]?.data?.callSid || `CALL_${Date.now()}`;
+
+    logger.info(`[CallService] Call initiated: ${callSid}`);
 
     return {
-      id: result.callSid,
+      id: callSid,
       conversationId: conversation.id,
       to: options.to,
       status: 'initiated',
@@ -66,31 +76,36 @@ export class CallService {
       content: userSpeech
     });
 
-    // 3. Get conversation history
-    const history = await this.conversationService.getMessages(conversation.id);
+    // 3. Delegate to Agent - it handles all orchestration and tool calling
+    const agentRequest: AgentRequest = {
+      id: `call-speech-${Date.now()}`,
+      input: userSpeech,
+      channel: 'call',
+      context: {
+        channel: 'call',
+        conversationId: conversation.id,
+        callSid,
+        metadata: { callSid }
+      }
+    };
 
-    // 4. Delegate to processor - handles all orchestration using AI
-    const response = await this.callProcessor.processUserSpeech({
-      callSid,
-      userSpeech,
-      conversationHistory: history,
-      availableTools: [] // TODO: Get from tool registry
-    });
+    const agentResponse = await this.agent.process(agentRequest);
 
-    // 5. Add assistant response to conversation
+    // 4. Add assistant response to conversation
     await this.conversationService.addMessage(conversation.id, {
       role: 'assistant',
-      content: response.content
+      content: agentResponse.content
     });
 
-    // 6. Handle special actions
-    if (response.action === 'end_call') {
+    // 5. Check if agent used end_call tool
+    const usedEndCall = agentResponse.metadata?.toolsUsed?.includes('end_call');
+    if (usedEndCall) {
       await this.endCall(callSid);
     }
 
     logger.info(`[CallService] Response generated for call ${callSid}`);
 
-    return response.content;
+    return agentResponse.content;
   }
 
   /**
@@ -104,7 +119,7 @@ export class CallService {
       await this.conversationService.complete(conversation.id);
     }
 
-    // Delegate to processor to end call via provider
-    await this.callProcessor.endCall(callSid);
+    // Agent handles end_call via the end_call tool
+    logger.info(`[CallService] Call ${callSid} marked as ended`);
   }
 }

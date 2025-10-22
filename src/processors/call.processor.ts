@@ -1,6 +1,8 @@
 /**
  * Call Processor
- * AI-driven orchestration for voice calls using Twilio
+ * DEPRECATED: AI orchestration now handled by Agent + Tools.
+ * This processor remains for backward compatibility but no longer performs AI orchestration.
+ * Use call-tools.ts instead.
  */
 
 import { BaseProcessor } from './base.processor';

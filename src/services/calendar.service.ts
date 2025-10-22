@@ -1,9 +1,10 @@
 /**
  * Calendar Service
- * High-level calendar operations using CalendarProcessor
+ * High-level calendar operations using Agent
  */
 
-import type { CalendarProcessor } from '../processors/calendar.processor';
+import type { Agent } from '../agent/core/Agent';
+import type { AgentRequest } from '../types';
 import { logger } from '../utils/logger';
 
 export interface AvailabilityRule {
@@ -28,13 +29,13 @@ export interface BookingRequest {
 
 /**
  * CalendarService
- * Delegates to CalendarProcessor for AI-driven calendar operations
+ * Delegates to Agent for AI-driven calendar operations
  */
 export class CalendarService {
-  constructor(private readonly calendarProcessor: CalendarProcessor) {}
+  constructor(private readonly agent: Agent) {}
 
   /**
-   * Find available slots using AI-driven processor
+   * Find available slots using AI-driven agent
    */
   async findAvailableSlots(params: {
     calendarId: string;
@@ -56,23 +57,30 @@ export class CalendarService {
       dateCount: params.preferredDates.length
     });
 
-    // Delegate to processor
-    const result = await this.calendarProcessor.findAndBook({
-      ...params,
-      attendees: [] // No booking yet, just finding slots
-    });
+    // Delegate to Agent - it will use calendar tool
+    const datesStr = params.preferredDates.map(d => d.toISOString().split('T')[0]).join(', ');
+    const agentRequest: AgentRequest = {
+      id: `calendar-check-${Date.now()}`,
+      input: `Check calendar availability for ${params.duration} minutes on dates: ${datesStr}. ${params.userPreferences || ''}`,
+      channel: 'text',
+      context: {
+        channel: 'text',
+        conversationId: `calendar-${Date.now()}`,
+        metadata: { action: 'check_availability', calendarId: params.calendarId, duration: params.duration }
+      }
+    };
 
-    // Extract slots from result
-    if (result.success && result.slot) {
-      return [result.slot.start];
-    }
+    const agentResponse = await this.agent.process(agentRequest);
 
-    logger.warn('[CalendarService] No slots found', { error: result.error });
-    return [];
+    // Extract slots from tool results
+    const slots = agentResponse.metadata?.toolResults?.[0]?.data?.slots || [];
+    
+    logger.info('[CalendarService] Found slots', { count: slots.length });
+    return slots;
   }
 
   /**
-   * Book appointment using AI-driven processor
+   * Book appointment using AI-driven agent
    */
   async bookAppointment(params: {
     calendarId: string;
@@ -95,21 +103,33 @@ export class CalendarService {
     // Calculate duration
     const duration = (params.end.getTime() - params.start.getTime()) / (60 * 1000);
 
-    // Delegate to processor
-    const result = await this.calendarProcessor.findAndBook({
-      calendarId: params.calendarId,
-      preferredDates: [params.start],
-      duration,
-      attendees: params.attendees
-    });
+    // Delegate to Agent - it will use calendar tool with 'book' action
+    const dateStr = params.start.toISOString().split('T')[0];
+    const timeStr = params.start.toISOString().split('T')[1].substring(0, 5);
+    const agentRequest: AgentRequest = {
+      id: `calendar-book-${Date.now()}`,
+      input: `Book appointment "${params.title}" on ${dateStr} at ${timeStr} for ${duration} minutes.`,
+      channel: 'text',
+      context: {
+        channel: 'text',
+        conversationId: `calendar-${Date.now()}`,
+        metadata: { 
+          action: 'book', 
+          calendarId: params.calendarId, 
+          title: params.title,
+          attendees: params.attendees,
+          description: params.description
+        }
+      }
+    };
 
-    if (!result.success) {
-      throw new Error(result.error || 'Booking failed');
-    }
+    const agentResponse = await this.agent.process(agentRequest);
 
-    logger.info('[CalendarService] Appointment booked', { eventId: result.eventId });
+    const bookingId = agentResponse.metadata?.toolResults?.[0]?.data?.bookingId || `BOOKING_${Date.now()}`;
 
-    return { id: result.eventId! };
+    logger.info('[CalendarService] Appointment booked', { eventId: bookingId });
+
+    return { id: bookingId };
   }
 
   /**

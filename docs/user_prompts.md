@@ -12,4 +12,11 @@ Path = Resource = Calls/Email/Sms
 
 
 
+The way I understand the system is,
+The processor just does like stuff that the service wants it to do, with AIs
+This is completely different from tools, which uses the AI to decide what happens independently.
+Tools don't talk to processors, right?
+The AI can choose to use a tool whenever it wants, and our system has to accept it, and then do a another api call to AI to get the text
+Why does the processor consult with the AI? Is there any value there?
+
 

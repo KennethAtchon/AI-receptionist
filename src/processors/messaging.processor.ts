@@ -1,6 +1,8 @@
 /**
  * Messaging Processor
- * AI-driven orchestration for SMS/email messaging using Twilio
+ * DEPRECATED: AI orchestration now handled by Agent + Tools.
+ * This processor remains for backward compatibility but no longer performs AI orchestration.
+ * Use messaging-tools.ts instead.
  */
 
 import { BaseProcessor } from './base.processor';

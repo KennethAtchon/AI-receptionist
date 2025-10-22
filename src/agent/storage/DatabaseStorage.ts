@@ -7,10 +7,15 @@
 
 import type { Memory, IStorage, MemorySearchQuery } from '../types';
 import { eq, and, gte, lte, inArray, desc, asc, sql, or } from 'drizzle-orm';
-import type { PgDatabase } from 'drizzle-orm/pg-core';
+// Removed strict PgDatabase import to avoid cross-package type coupling
+// import type { PgDatabase } from 'drizzle-orm/pg-core';
 import { memory } from './schema';
 
-type SupportedDatabase = PgDatabase<any>;
+// Relaxed DB typing to avoid version/copy mismatches of drizzle types across packages
+// and to support different drizzle drivers (node-postgres, http, etc.)
+// Must expose select/insert/update/delete and execute for raw SQL
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ type SupportedDatabase = any;
 
 export interface DatabaseStorageConfig {
   db: SupportedDatabase;
@@ -39,15 +44,70 @@ export class DatabaseStorage implements IStorage {
    * Run database migrations
    */
   async migrate(): Promise<void> {
-    // This would typically use drizzle-kit or custom migration logic
-    // For now, we'll create the table if it doesn't exist
+    // Create required tables and indexes if they don't exist
+    // Use raw SQL to avoid requiring drizzle-kit at runtime
     try {
-      // Check if table exists by attempting a simple query
-      await this.db.select().from(this.table).limit(1);
+      // ai_receptionist_memory
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS ai_receptionist_memory (
+          id UUID PRIMARY KEY,
+          content TEXT NOT NULL,
+          timestamp TIMESTAMP NOT NULL,
+          type TEXT NOT NULL,
+          importance INTEGER,
+          channel TEXT,
+          session_metadata JSONB,
+          role TEXT,
+          tool_call JSONB,
+          tool_result JSONB,
+          metadata JSONB,
+          goal_achieved BOOLEAN,
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL
+        )
+      `);
+
+      // Indexes for memory
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_conversation_id_idx ON ai_receptionist_memory USING GIN (session_metadata)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_channel_idx ON ai_receptionist_memory (channel)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_type_idx ON ai_receptionist_memory (type)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_timestamp_idx ON ai_receptionist_memory (timestamp)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_importance_idx ON ai_receptionist_memory (importance)`);
+
+      // ai_receptionist_leads
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS ai_receptionist_leads (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name TEXT,
+          email TEXT,
+          phone TEXT,
+          source TEXT,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL
+        )
+      `);
+
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS leads_source_idx ON ai_receptionist_leads (source)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS leads_created_at_idx ON ai_receptionist_leads (created_at)`);
+
+      // ai_receptionist_call_logs
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS ai_receptionist_call_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          conversation_id UUID,
+          phone_number TEXT,
+          duration INTEGER,
+          outcome TEXT,
+          summary TEXT,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT NOW() NOT NULL
+        )
+      `);
+
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_conversation_id_idx ON ai_receptionist_call_logs (conversation_id)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_outcome_idx ON ai_receptionist_call_logs (outcome)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_created_at_idx ON ai_receptionist_call_logs (created_at)`);
     } catch (error) {
-      console.warn('Memory table might not exist. Please run migrations manually.');
-      // In production, you'd use drizzle-kit migrations:
-      // npx drizzle-kit push:pg
+      console.warn('Auto-migration failed; ensure database role has CREATE privileges. Error:', error);
     }
   }
 

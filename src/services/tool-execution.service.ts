@@ -78,6 +78,24 @@ export class ToolExecutionService {
   }
 
   /**
+   * Execute multiple tools in sequence (for AI tool calling loop)
+   */
+  async executeAll(
+    toolCalls: Array<{ id: string; name: string; parameters: any }>,
+    context: ExecutionContext
+  ): Promise<Array<{ toolName: string; result: ToolResult }>> {
+    const results: Array<{ toolName: string; result: ToolResult }> = [];
+
+    for (const toolCall of toolCalls) {
+      logger.info(`[ToolExecutionService] Executing tool '${toolCall.name}' from AI call`);
+      const result = await this.execute(toolCall.name, toolCall.parameters, context);
+      results.push({ toolName: toolCall.name, result });
+    }
+
+    return results;
+  }
+
+  /**
    * Get the underlying tool registry
    */
   getRegistry(): ToolRegistry {
