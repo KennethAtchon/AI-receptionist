@@ -3,11 +3,11 @@
  * Centralized management of provider instances with lazy loading
  */
 
-import type { IProvider } from '../types';
+import type { IProvider } from '../../types';
 import type { ICredentialValidator } from '../validation/credential-validator.interface';
 import { ProviderProxy } from './provider-proxy';
 import { ProviderNotConfiguredError } from './provider.errors';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 /**
  * Service Locator for managing provider instances

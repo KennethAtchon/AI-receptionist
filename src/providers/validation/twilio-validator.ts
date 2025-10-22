@@ -3,9 +3,9 @@
  * Validates Twilio API credentials using Strategy Pattern
  */
 
-import type { IProvider, TwilioConfig } from '../types';
+import type { IProvider, TwilioConfig } from '../../types';
 import type { ICredentialValidator, ValidationResult } from './credential-validator.interface';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 /**
  * Validator for Twilio communication provider credentials

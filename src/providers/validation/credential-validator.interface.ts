@@ -3,7 +3,7 @@
  * Defines contract for validating provider credentials
  */
 
-import type { IProvider } from '../types';
+import type { IProvider } from '../../types';
 
 /**
  * Result of credential validation

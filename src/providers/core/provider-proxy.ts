@@ -3,10 +3,10 @@
  * Defers provider initialization until first access
  */
 
-import type { IProvider } from '../types';
+import type { IProvider } from '../../types';
 import type { ICredentialValidator } from '../validation/credential-validator.interface';
 import { CredentialValidationError, ProviderInitializationError } from './provider.errors';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 /**
  * Proxy wrapper for lazy provider initialization

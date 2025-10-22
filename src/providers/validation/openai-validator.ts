@@ -3,9 +3,9 @@
  * Validates OpenAI and OpenRouter API credentials using Strategy Pattern
  */
 
-import type { IProvider, AIModelConfig } from '../types';
+import type { IProvider, AIModelConfig } from '../../types';
 import type { ICredentialValidator, ValidationResult } from './credential-validator.interface';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 /**
  * Validator for OpenAI and OpenRouter AI provider credentials

@@ -13,10 +13,10 @@ import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
 import { MCPAdapter } from './adapters/mcp/mcp-adapter';
-import { ProviderRegistry } from './core/provider-registry';
-import { TwilioValidator } from './validation/twilio-validator';
-import { OpenAIValidator } from './validation/openai-validator';
-import { GoogleValidator } from './validation/google-validator';
+import { ProviderRegistry } from './providers/core/provider-registry';
+import { TwilioValidator } from './providers/validation/twilio-validator';
+import { OpenAIValidator } from './providers/validation/openai-validator';
+import { GoogleValidator } from './providers/validation/google-validator';
 
 // Type-only imports for tree-shaking
 import type { TwilioProvider, GoogleProvider, OpenAIProvider, OpenRouterProvider } from './providers';

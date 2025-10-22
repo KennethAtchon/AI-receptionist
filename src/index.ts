@@ -98,15 +98,15 @@ export type {
 // Core Infrastructure (Provider Management & Validation)
 // ============================================================================
 
-export { ProviderRegistry, ProviderProxy } from './core';
-export type { ICredentialValidator, ValidationResult } from './validation';
-export { TwilioValidator, OpenAIValidator, GoogleValidator } from './validation';
+export { ProviderRegistry, ProviderProxy } from './providers/core';
+export type { ICredentialValidator, ValidationResult } from './providers/validation';
+export { TwilioValidator, OpenAIValidator, GoogleValidator } from './providers/validation';
 export {
   ProviderError,
   CredentialValidationError,
   ProviderNotConfiguredError,
   ProviderInitializationError
-} from './core/provider.errors';
+} from './providers/core/provider.errors';
 
 // ============================================================================
 // Utilities

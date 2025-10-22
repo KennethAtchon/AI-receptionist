@@ -8,7 +8,7 @@
 
 export interface IProvider {
   readonly name: string;
-  readonly type: 'communication' | 'ai' | 'core' | 'calendar' | 'crm' | 'storage' | 'custom';
+  readonly type: 'communication' | 'ai' | 'api' | 'calendar' | 'crm' | 'storage' | 'custom';
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   healthCheck(): Promise<boolean>;

@@ -3,9 +3,9 @@
  * Validates Google API credentials using Strategy Pattern
  */
 
-import type { IProvider, GoogleConfig } from '../types';
+import type { IProvider, GoogleConfig } from '../../types';
 import type { ICredentialValidator, ValidationResult } from './credential-validator.interface';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 /**
  * Validator for Google provider credentials

@@ -85,7 +85,7 @@ describe('EmailResource', () => {
       });
 
       const afterTime = Date.now();
-      const sentTime = result.sentAt.getTime();
+      const sentTime = result.sentAt?.getTime();
 
       expect(sentTime).toBeGreaterThanOrEqual(beforeTime);
       expect(sentTime).toBeLessThanOrEqual(afterTime);
