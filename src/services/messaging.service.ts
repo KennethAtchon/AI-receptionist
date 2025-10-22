@@ -1,18 +1,22 @@
 /**
  * Messaging Service
- * High-level messaging operations using Agent
+ * High-level messaging operations using Agent + Processor
  */
 
 import type { Agent } from '../agent/core/Agent';
+import type { MessagingProcessor } from '../processors/messaging.processor';
 import type { SMSSession, AgentRequest } from '../types';
 import { logger } from '../utils/logger';
 
 /**
  * MessagingService
- * Delegates to Agent for AI-driven messaging
+ * Uses Agent for AI decisions, Processor for admin operations
  */
 export class MessagingService {
-  constructor(private readonly agent: Agent) {}
+  constructor(
+    private readonly agent: Agent,
+    private readonly messagingProcessor: MessagingProcessor
+  ) {}
 
   /**
    * Send templated SMS message
@@ -75,7 +79,7 @@ export class MessagingService {
     logger.info('[MessagingService] Sending SMS', { to: params.to });
 
     // Validate
-    if (!this.isValidPhoneNumber(params.to)) {
+    if (!this.messagingProcessor.isValidPhoneNumber(params.to)) {
       throw new Error('Invalid phone number format');
     }
 
@@ -83,27 +87,20 @@ export class MessagingService {
       throw new Error('Message cannot be empty');
     }
 
-    // Delegate to Agent - it will call send_sms tool
-    const agentRequest: AgentRequest = {
-      id: `sms-${Date.now()}`,
-      input: `Send SMS to ${params.to}: "${params.context}"`,
-      channel: params.channel,
-      context: {
-        channel: params.channel,
-        conversationId: params.conversationId || `sms-conv-${Date.now()}`,
-        metadata: { to: params.to, action: 'send_sms' }
-      }
-    };
+    // Use processor for administrative SMS sending
+    const result = await this.messagingProcessor.sendSMS({
+      to: params.to,
+      body: params.context
+    });
 
-    const agentResponse = await this.agent.process(agentRequest);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send SMS');
+    }
 
-    // Extract messageSid from tool results
-    const messageSid = agentResponse.metadata?.toolResults?.[0]?.data?.messageSid || `SMS_${Date.now()}`;
-
-    logger.info('[MessagingService] SMS sent', { messageId: messageSid });
+    logger.info('[MessagingService] SMS sent', { messageId: result.messageId });
 
     return {
-      id: messageSid,
+      id: result.messageId!,
       conversationId: params.conversationId || 'unknown',
       to: params.to,
       body: params.context,
@@ -128,25 +125,21 @@ export class MessagingService {
       throw new Error('Invalid email address format');
     }
 
-    // Delegate to Agent - it will call send_email tool
-    const agentRequest: AgentRequest = {
-      id: `email-${Date.now()}`,
-      input: `Send email to ${params.to} with subject "${params.subject}" and body: "${params.body}"`,
-      channel: 'email',
-      context: {
-        channel: 'email',
-        conversationId: `email-conv-${Date.now()}`,
-        metadata: { to: params.to, subject: params.subject, action: 'send_email' }
-      }
-    };
+    // Use processor for administrative email sending
+    const result = await this.messagingProcessor.sendEmail({
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      html: params.html
+    });
 
-    const agentResponse = await this.agent.process(agentRequest);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send email');
+    }
 
-    const emailId = agentResponse.metadata?.toolResults?.[0]?.data?.emailId || `EMAIL_${Date.now()}`;
+    logger.info('[MessagingService] Email sent', { messageId: result.messageId });
 
-    logger.info('[MessagingService] Email sent', { messageId: emailId });
-
-    return { id: emailId };
+    return { id: result.messageId! };
   }
 
   /**

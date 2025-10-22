@@ -1,22 +1,22 @@
 /**
  * Messaging Tools (Standard)
- * Tools for SMS and email operations
+ * Tools for SMS and email operations - uses MessagingProcessor
  */
 
 import { ToolBuilder } from '../builder';
 import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
-import type { TwilioProvider } from '../../providers/core/twilio.provider';
+import type { MessagingProcessor } from '../../processors/messaging.processor';
 
 export interface MessagingToolsConfig {
-  twilioProvider: TwilioProvider;
+  messagingProcessor?: MessagingProcessor;
 }
 
 /**
  * Tool: Send SMS
  */
-export function buildSendSMSTool(config: MessagingToolsConfig): ITool {
+export function buildSendSMSTool(config?: MessagingToolsConfig): ITool {
   return new ToolBuilder()
     .withName('send_sms')
     .withDescription('Send an SMS message to a phone number')
@@ -31,18 +31,33 @@ export function buildSendSMSTool(config: MessagingToolsConfig): ITool {
     .default(async (params, ctx) => {
       logger.info('[SendSMSTool] Sending SMS', { to: params.to, length: params.message.length });
 
+      if (!config?.messagingProcessor) {
+        logger.warn('[SendSMSTool] No messaging processor configured, returning mock data');
+        return {
+          success: true,
+          data: { messageSid: 'MOCK_SMS_123', status: 'sent' },
+          response: { text: `SMS sent to ${params.to} (mock).` }
+        };
+      }
+
       try {
-        const twilio = await (config.twilioProvider as any).getClient();
-        const sms = await twilio.messages.create({
+        const result = await config.messagingProcessor.sendSMS({
           to: params.to,
-          from: (config.twilioProvider as any).config.phoneNumber,
           body: params.message
         });
 
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'SMS sending failed',
+            response: { text: 'Failed to send SMS.' }
+          };
+        }
+
         return {
           success: true,
-          data: { messageSid: sms.sid, status: sms.status },
-          response: { text: `SMS sent to ${params.to}. Message SID: ${sms.sid}` }
+          data: { messageSid: result.messageId, status: 'sent' },
+          response: { text: `SMS sent to ${params.to}. Message SID: ${result.messageId}` }
         };
       } catch (error) {
         logger.error('[SendSMSTool] Failed', error as Error);
@@ -59,7 +74,7 @@ export function buildSendSMSTool(config: MessagingToolsConfig): ITool {
 /**
  * Tool: Send Email
  */
-export function buildSendEmailTool(): ITool {
+export function buildSendEmailTool(config?: MessagingToolsConfig): ITool {
   return new ToolBuilder()
     .withName('send_email')
     .withDescription('Send an email message')
@@ -76,12 +91,44 @@ export function buildSendEmailTool(): ITool {
     .default(async (params, ctx) => {
       logger.info('[SendEmailTool] Sending email', { to: params.to, subject: params.subject });
 
-      // TODO: Integrate with SendGrid or other email provider
-      return {
-        success: true,
-        data: { emailId: `EMAIL_${Date.now()}` },
-        response: { text: `Email would be sent to ${params.to} with subject "${params.subject}"` }
-      };
+      if (!config?.messagingProcessor) {
+        logger.warn('[SendEmailTool] No messaging processor configured, returning mock data');
+        return {
+          success: true,
+          data: { emailId: 'MOCK_EMAIL_123' },
+          response: { text: `Email would be sent to ${params.to} with subject "${params.subject}" (mock)` }
+        };
+      }
+
+      try {
+        const result = await config.messagingProcessor.sendEmail({
+          to: params.to,
+          subject: params.subject,
+          body: params.body,
+          html: params.html
+        });
+
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error || 'Email sending failed',
+            response: { text: 'Failed to send email.' }
+          };
+        }
+
+        return {
+          success: true,
+          data: { emailId: result.messageId },
+          response: { text: `Email sent to ${params.to} with subject "${params.subject}"` }
+        };
+      } catch (error) {
+        logger.error('[SendEmailTool] Failed', error as Error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          response: { text: 'Failed to send email.' }
+        };
+      }
     })
     .build();
 }
@@ -89,9 +136,8 @@ export function buildSendEmailTool(): ITool {
 /**
  * Register all messaging tools
  */
-export async function setupMessagingTools(registry: ToolRegistry, config: MessagingToolsConfig): Promise<void> {
+export async function setupMessagingTools(registry: ToolRegistry, config?: MessagingToolsConfig): Promise<void> {
   registry.register(buildSendSMSTool(config));
-  registry.register(buildSendEmailTool());
-  logger.info('[MessagingTools] Registered messaging tools');
+  registry.register(buildSendEmailTool(config));
+  logger.info('[MessagingTools] Registered messaging tools with processor');
 }
-

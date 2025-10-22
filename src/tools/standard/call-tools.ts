@@ -1,22 +1,22 @@
 /**
  * Call Tools (Standard)
- * Tools for voice call operations - wraps Twilio provider
+ * Tools for voice call operations - uses CallProcessor
  */
 
 import { ToolBuilder } from '../builder';
 import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
-import type { TwilioProvider } from '../../providers/core/twilio.provider';
+import type { CallProcessor } from '../../processors/call.processor';
 
 export interface CallToolsConfig {
-  twilioProvider: TwilioProvider;
+  callProcessor?: CallProcessor;
 }
 
 /**
  * Tool: Initiate outbound call
  */
-export function buildInitiateCallTool(config: CallToolsConfig): ITool {
+export function buildInitiateCallTool(config?: CallToolsConfig): ITool {
   return new ToolBuilder()
     .withName('initiate_call')
     .withDescription('Initiate an outbound voice call to a phone number')
@@ -31,19 +31,26 @@ export function buildInitiateCallTool(config: CallToolsConfig): ITool {
     .default(async (params, ctx) => {
       logger.info('[InitiateCallTool] Starting call', { to: params.to });
 
+      if (!config?.callProcessor) {
+        logger.warn('[InitiateCallTool] No call processor configured, returning mock data');
+        return {
+          success: true,
+          data: { callSid: 'MOCK_CALL_123', status: 'initiated' },
+          response: { text: `Call initiated to ${params.to} (mock).` }
+        };
+      }
+
       try {
-        const twilio = await (config.twilioProvider as any).getClient();
-        const call = await twilio.calls.create({
+        const result = await config.callProcessor.initiateCall({
           to: params.to,
-          from: (config.twilioProvider as any).config.phoneNumber,
-          url: 'http://demo.twilio.com/docs/voice.xml', // TODO: Replace with actual webhook
-          statusCallback: 'http://demo.twilio.com/docs/voice.xml'
+          conversationId: ctx.conversationId || `call-${Date.now()}`,
+          greeting: params.greeting
         });
 
         return {
           success: true,
-          data: { callSid: call.sid, status: call.status },
-          response: { text: `Call initiated to ${params.to}. Call SID: ${call.sid}` }
+          data: { callSid: result.callSid, status: 'initiated' },
+          response: { text: `Call initiated to ${params.to}. Call SID: ${result.callSid}` }
         };
       } catch (error) {
         logger.error('[InitiateCallTool] Failed', error as Error);
@@ -60,7 +67,7 @@ export function buildInitiateCallTool(config: CallToolsConfig): ITool {
 /**
  * Tool: End an active call
  */
-export function buildEndCallTool(config: CallToolsConfig): ITool {
+export function buildEndCallTool(config?: CallToolsConfig): ITool {
   return new ToolBuilder()
     .withName('end_call')
     .withDescription('End an active voice call')
@@ -74,9 +81,17 @@ export function buildEndCallTool(config: CallToolsConfig): ITool {
     .default(async (params, ctx) => {
       logger.info('[EndCallTool] Ending call', { callSid: params.callSid });
 
+      if (!config?.callProcessor) {
+        logger.warn('[EndCallTool] No call processor configured, returning mock data');
+        return {
+          success: true,
+          data: { callSid: params.callSid },
+          response: { text: `Call ${params.callSid} ended (mock).` }
+        };
+      }
+
       try {
-        const twilio = await (config.twilioProvider as any).getClient();
-        await twilio.calls(params.callSid).update({ status: 'completed' });
+        await config.callProcessor.endCall({ callSid: params.callSid });
 
         return {
           success: true,
@@ -98,9 +113,8 @@ export function buildEndCallTool(config: CallToolsConfig): ITool {
 /**
  * Register all call tools
  */
-export async function setupCallTools(registry: ToolRegistry, config: CallToolsConfig): Promise<void> {
+export async function setupCallTools(registry: ToolRegistry, config?: CallToolsConfig): Promise<void> {
   registry.register(buildInitiateCallTool(config));
   registry.register(buildEndCallTool(config));
-  logger.info('[CallTools] Registered call tools');
+  logger.info('[CallTools] Registered call tools with processor');
 }
-

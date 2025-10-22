@@ -1,9 +1,10 @@
 /**
  * Calendar Service
- * High-level calendar operations using Agent
+ * High-level calendar operations using Agent + Processor
  */
 
 import type { Agent } from '../agent/core/Agent';
+import type { CalendarProcessor } from '../processors/calendar.processor';
 import type { AgentRequest } from '../types';
 import { logger } from '../utils/logger';
 
@@ -29,13 +30,16 @@ export interface BookingRequest {
 
 /**
  * CalendarService
- * Delegates to Agent for AI-driven calendar operations
+ * Uses Agent for AI decisions, Processor for admin operations
  */
 export class CalendarService {
-  constructor(private readonly agent: Agent) {}
+  constructor(
+    private readonly agent: Agent,
+    private readonly calendarProcessor: CalendarProcessor
+  ) {}
 
   /**
-   * Find available slots using AI-driven agent
+   * Find available slots using processor
    */
   async findAvailableSlots(params: {
     calendarId: string;
@@ -57,30 +61,44 @@ export class CalendarService {
       dateCount: params.preferredDates.length
     });
 
-    // Delegate to Agent - it will use calendar tool
-    const datesStr = params.preferredDates.map(d => d.toISOString().split('T')[0]).join(', ');
-    const agentRequest: AgentRequest = {
-      id: `calendar-check-${Date.now()}`,
-      input: `Check calendar availability for ${params.duration} minutes on dates: ${datesStr}. ${params.userPreferences || ''}`,
-      channel: 'text',
-      context: {
-        channel: 'text',
-        conversationId: `calendar-${Date.now()}`,
-        metadata: { action: 'check_availability', calendarId: params.calendarId, duration: params.duration }
+    // Use processor for administrative free/busy query
+    const startDate = params.preferredDates[0];
+    const endDate = new Date(params.preferredDates[params.preferredDates.length - 1]);
+    endDate.setDate(endDate.getDate() + 1); // Add one day to include the last date
+
+    const busySlots = await this.calendarProcessor.getFreeBusy(
+      params.calendarId,
+      startDate,
+      endDate
+    );
+
+    // Simple algorithm to find available slots
+    const availableSlots: Date[] = [];
+    for (const date of params.preferredDates) {
+      // Check each hour from 9 AM to 5 PM
+      for (let hour = 9; hour <= 17; hour++) {
+        const slotStart = new Date(date);
+        slotStart.setHours(hour, 0, 0, 0);
+        const slotEnd = new Date(slotStart);
+        slotEnd.setMinutes(slotEnd.getMinutes() + params.duration);
+
+        // Check if this slot conflicts with busy times
+        const hasConflict = busySlots.some(busy => 
+          (slotStart < busy.end && slotEnd > busy.start)
+        );
+
+        if (!hasConflict) {
+          availableSlots.push(slotStart);
+        }
       }
-    };
-
-    const agentResponse = await this.agent.process(agentRequest);
-
-    // Extract slots from tool results
-    const slots = agentResponse.metadata?.toolResults?.[0]?.data?.slots || [];
+    }
     
-    logger.info('[CalendarService] Found slots', { count: slots.length });
-    return slots;
+    logger.info('[CalendarService] Found slots', { count: availableSlots.length });
+    return availableSlots;
   }
 
   /**
-   * Book appointment using AI-driven agent
+   * Book appointment using processor
    */
   async bookAppointment(params: {
     calendarId: string;
@@ -100,36 +118,23 @@ export class CalendarService {
       start: params.start.toISOString()
     });
 
-    // Calculate duration
-    const duration = (params.end.getTime() - params.start.getTime()) / (60 * 1000);
+    // Use processor for administrative event creation
+    const result = await this.calendarProcessor.createEvent({
+      calendarId: params.calendarId,
+      title: params.title,
+      start: params.start,
+      end: params.end,
+      description: params.description,
+      attendees: params.attendees
+    });
 
-    // Delegate to Agent - it will use calendar tool with 'book' action
-    const dateStr = params.start.toISOString().split('T')[0];
-    const timeStr = params.start.toISOString().split('T')[1].substring(0, 5);
-    const agentRequest: AgentRequest = {
-      id: `calendar-book-${Date.now()}`,
-      input: `Book appointment "${params.title}" on ${dateStr} at ${timeStr} for ${duration} minutes.`,
-      channel: 'text',
-      context: {
-        channel: 'text',
-        conversationId: `calendar-${Date.now()}`,
-        metadata: { 
-          action: 'book', 
-          calendarId: params.calendarId, 
-          title: params.title,
-          attendees: params.attendees,
-          description: params.description
-        }
-      }
-    };
+    if (!result.success) {
+      throw new Error(result.error || 'Booking failed');
+    }
 
-    const agentResponse = await this.agent.process(agentRequest);
+    logger.info('[CalendarService] Appointment booked', { eventId: result.eventId });
 
-    const bookingId = agentResponse.metadata?.toolResults?.[0]?.data?.bookingId || `BOOKING_${Date.now()}`;
-
-    logger.info('[CalendarService] Appointment booked', { eventId: bookingId });
-
-    return { id: bookingId };
+    return { id: result.eventId! };
   }
 
   /**

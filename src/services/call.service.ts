@@ -1,21 +1,23 @@
 /**
  * Call Service  
- * High-level voice call operations using Agent
+ * High-level voice call operations using Agent + Processor
  */
 
 import type { Agent } from '../agent/core/Agent';
+import type { CallProcessor } from '../processors/call.processor';
 import { ConversationService } from './conversation.service';
 import type { MakeCallOptions, CallSession, AgentRequest } from '../types';
 import { logger } from '../utils/logger';
 
 /**
  * CallService
- * Delegates to Agent for AI-driven call orchestration
+ * Uses Agent for AI decisions, Processor for admin operations
  */
 export class CallService {
   constructor(
     private conversationService: ConversationService,
-    private agent: Agent
+    private agent: Agent,
+    private callProcessor: CallProcessor
   ) {}
 
   /**
@@ -30,27 +32,17 @@ export class CallService {
       metadata: options.metadata
     });
 
-    // 2. Delegate to Agent to orchestrate the call initiation
-    const agentRequest: AgentRequest = {
-      id: `call-init-${Date.now()}`,
-      input: `Initiate a call to ${options.to}. Say: "Hello! How can I help you today?"`,
-      channel: 'call',
-      context: {
-        channel: 'call',
-        conversationId: conversation.id,
-        metadata: { ...options.metadata, action: 'initiate_call', to: options.to }
-      }
-    };
+    // 2. Use processor for administrative call initiation
+    const result = await this.callProcessor.initiateCall({
+      to: options.to,
+      conversationId: conversation.id,
+      greeting: 'Hello! How can I help you today?'
+    });
 
-    const agentResponse = await this.agent.process(agentRequest);
-    
-    // Extract callSid from metadata (set by initiate_call tool)
-    const callSid = agentResponse.metadata?.toolResults?.[0]?.data?.callSid || `CALL_${Date.now()}`;
-
-    logger.info(`[CallService] Call initiated: ${callSid}`);
+    logger.info(`[CallService] Call initiated: ${result.callSid}`);
 
     return {
-      id: callSid,
+      id: result.callSid,
       conversationId: conversation.id,
       to: options.to,
       status: 'initiated',
@@ -119,7 +111,7 @@ export class CallService {
       await this.conversationService.complete(conversation.id);
     }
 
-    // Agent handles end_call via the end_call tool
-    logger.info(`[CallService] Call ${callSid} marked as ended`);
+    // Use processor for administrative call ending
+    await this.callProcessor.endCall({ callSid });
   }
 }

@@ -272,25 +272,34 @@ export class AIReceptionist {
     if (this.providerRegistry.has('twilio')) {
       const twilioProvider = await this.providerRegistry.get<TwilioProvider>('twilio');
       
-      // Register call tools
+      // Create processors for administrative operations
+      const { CallProcessor } = await import('./processors/call.processor');
+      const { MessagingProcessor } = await import('./processors/messaging.processor');
+      
+      this.callProcessor = new CallProcessor(twilioProvider);
+      this.messagingProcessor = new MessagingProcessor(twilioProvider);
+      
+      // Register call tools with processor
       const { setupCallTools } = await import('./tools/standard/call-tools');
-      await setupCallTools(this.toolRegistry, { twilioProvider });
-      
-      // Register messaging tools
+      await setupCallTools(this.toolRegistry, { callProcessor: this.callProcessor });
+
+      // Register messaging tools with processor
       const { setupMessagingTools } = await import('./tools/standard/messaging-tools');
-      await setupMessagingTools(this.toolRegistry, { twilioProvider });
+      await setupMessagingTools(this.toolRegistry, { messagingProcessor: this.messagingProcessor });
       
-      // Create services using Agent (no processors for orchestration)
+      // Create services using Agent + Processors
       const { CallService } = await import('./services/call.service');
       const { MessagingService } = await import('./services/messaging.service');
       
       this.callService = new CallService(
         this.conversationService,
-        this.agent
+        this.agent,
+        this.callProcessor
       );
       
       this.messagingService = new MessagingService(
-        this.agent
+        this.agent,
+        this.messagingProcessor
       );
       
       // Initialize resources
@@ -305,13 +314,17 @@ export class AIReceptionist {
     if (this.providerRegistry.has('google')) {
       const googleProvider = await this.providerRegistry.get<GoogleProvider>('google');
       
-      // Register calendar tools
-      const { setupCalendarTools } = await import('./tools/standard/calendar-tools');
-      await setupCalendarTools(this.toolRegistry, { googleProvider });
+      // Create processor for administrative operations
+      const { CalendarProcessor } = await import('./processors/calendar.processor');
+      this.calendarProcessor = new CalendarProcessor(googleProvider);
       
-      // Create service using Agent
+      // Register calendar tools with processor
+      const { setupCalendarTools } = await import('./tools/standard/calendar-tools');
+      await setupCalendarTools(this.toolRegistry, { calendarProcessor: this.calendarProcessor });
+      
+      // Create service using Agent + Processor
       const { CalendarService } = await import('./services/calendar.service');
-      this.calendarService = new CalendarService(this.agent);
+      this.calendarService = new CalendarService(this.agent, this.calendarProcessor);
       
       logger.info('[AIReceptionist] Calendar service initialized');
     }
