@@ -164,7 +164,7 @@ export class OpenAIValidator implements ICredentialValidator {
       logger.info(`[OpenAIValidator] Connection validation passed for ${provider.name}`);
       return { valid: true };
     } catch (error) {
-      logger.error(`[OpenAIValidator] Connection validation failed for ${provider.name}:`, error);
+      logger.error(`[OpenAIValidator] Connection validation failed for ${provider.name}:`, error instanceof Error ? error : new Error(String(error)));
 
       return {
         valid: false,

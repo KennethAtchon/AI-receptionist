@@ -305,7 +305,7 @@ export class AIReceptionist {
       const { SMSResource } = await import('./resources/sms.resource');
       
       (this as any).calls = new CallsResource(this.callService);
-      (this as any).sms = new SMSResource(() => Promise.resolve(twilioProvider));
+      (this as any).sms = new SMSResource(this.messagingService);
     }
     
     // 15. Initialize calendar processor and service if Google Calendar is configured

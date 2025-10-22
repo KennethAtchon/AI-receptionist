@@ -6,7 +6,7 @@
 import { BaseProcessor } from './base.processor';
 import type { GoogleProvider } from '../providers/core/google.provider';
 import type { IAIProvider } from '../types';
-import type { BookingResult, FindAndBookParams } from '../types/processors';
+import type { BookingResult, FindAndBookParams } from './processor.types';
 import { logger } from '../utils/logger';
 
 /**

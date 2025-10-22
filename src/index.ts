@@ -100,7 +100,7 @@ export type {
 
 export { ProviderRegistry, ProviderProxy } from './core';
 export type { ICredentialValidator, ValidationResult } from './validation';
-export { TwilioValidator, OpenAIValidator, GoogleCalendarValidator } from './validation';
+export { TwilioValidator, OpenAIValidator, GoogleValidator } from './validation';
 export {
   ProviderError,
   CredentialValidationError,

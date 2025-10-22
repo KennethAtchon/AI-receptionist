@@ -403,6 +403,7 @@ export interface MakeCallOptions {
 export interface SendSMSOptions {
   to: string;
   body: string;
+  conversationId?: string;
   metadata?: Record<string, any>;
 }
 
@@ -470,4 +471,4 @@ export type {
   InitiateCallParams,
   FindAndBookParams,
   SendMessageParams
-} from './processors';
+} from '../processors';

@@ -3,12 +3,12 @@
  * User-facing API for SMS operations
  */
 
-import { TwilioProvider } from '../providers/core/twilio.provider';
+import type { MessagingService } from '../services/messaging.service';
 import { SendSMSOptions, SMSSession } from '../types';
 import { logger } from '../utils/logger';
 
 export class SMSResource {
-  constructor(private getTwilioProvider: () => Promise<TwilioProvider>) {}
+  constructor(private messagingService: MessagingService) {}
 
   /**
    * Send an SMS message
@@ -25,18 +25,13 @@ export class SMSResource {
   async send(options: SendSMSOptions): Promise<SMSSession> {
     logger.info(`[SMSResource] Sending SMS to ${options.to}`);
 
-    // Lazy load Twilio provider on first use
-    const twilioProvider = await this.getTwilioProvider();
-    const messageSid = await twilioProvider.sendSMS(options.to, options.body);
-
-    return {
-      id: messageSid,
-      conversationId: '', // TODO: Create conversation for SMS
+    // Use messaging service which delegates to the processor
+    return await this.messagingService.sendSMS({
       to: options.to,
-      body: options.body,
-      status: 'sent',
-      sentAt: new Date()
-    };
+      context: options.body,
+      conversationId: options.conversationId,
+      channel: 'sms'
+    });
   }
 
   /**

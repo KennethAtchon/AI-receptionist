@@ -4,6 +4,7 @@
  */
 
 import type { MessagingProcessor } from '../processors/messaging.processor';
+import type { SMSSession } from '../types';
 import { logger } from '../utils/logger';
 
 /**
@@ -60,8 +61,10 @@ export class MessagingService {
    */
   async sendSMS(params: {
     to: string;
-    message: string;
-  }): Promise<{ id: string }> {
+    context: string;
+    conversationId?: string;
+    channel: 'sms' | 'email';
+  }): Promise<SMSSession> {
     logger.info('[MessagingService] Sending SMS', { to: params.to });
 
     // Validate
@@ -69,15 +72,15 @@ export class MessagingService {
       throw new Error('Invalid phone number format');
     }
 
-    if (!params.message || params.message.length === 0) {
+    if (!params.context || params.context.length === 0) {
       throw new Error('Message cannot be empty');
     }
 
     // Delegate to processor
     const result = await this.messagingProcessor.sendMessage({
       to: params.to,
-      context: params.message,
-      channel: 'sms'
+      context: params.context,
+      channel: params.channel
     });
 
     if (!result.success) {
@@ -86,7 +89,14 @@ export class MessagingService {
 
     logger.info('[MessagingService] SMS sent', { messageId: result.messageId });
 
-    return { id: result.messageId! };
+    return {
+      id: result.messageId!,
+      conversationId: params.conversationId || 'unknown',
+      to: params.to,
+      body: result.content!,
+      status: 'sent',
+      sentAt: new Date()
+    };
   }
 
   /**

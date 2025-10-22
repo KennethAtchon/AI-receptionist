@@ -113,7 +113,7 @@ export class ProviderProxy<T extends IProvider> {
         throw error;
       }
 
-      logger.error(`[ProviderProxy] Validation failed for ${this.name}:`, error);
+      logger.error(`[ProviderProxy] Validation failed for ${this.name}:`, error instanceof Error ? error : new Error(String(error)));
       throw new CredentialValidationError(
         this.name,
         error instanceof Error ? error.message : 'Unknown validation error',
@@ -141,7 +141,7 @@ export class ProviderProxy<T extends IProvider> {
 
       return instance;
     } catch (error) {
-      logger.error(`[ProviderProxy] Failed to initialize ${this.name}:`, error);
+      logger.error(`[ProviderProxy] Failed to initialize ${this.name}:`, error instanceof Error ? error : new Error(String(error)));
 
       // Clear failed initialization state
       this.instance = undefined;

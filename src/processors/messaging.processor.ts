@@ -6,7 +6,7 @@
 import { BaseProcessor } from './base.processor';
 import type { TwilioProvider } from '../providers/core/twilio.provider';
 import type { IAIProvider } from '../types';
-import type { MessagingResult, SendMessageParams } from '../types/processors';
+import type { MessagingResult, SendMessageParams } from './processor.types';
 import { logger } from '../utils/logger';
 
 /**

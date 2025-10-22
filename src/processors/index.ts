@@ -10,3 +10,16 @@ export { CallProcessor } from './call.processor';
 export { CalendarProcessor } from './calendar.processor';
 export { MessagingProcessor } from './messaging.processor';
 
+// Processor types
+export type {
+  IProcessor,
+  ProcessorResponse,
+  AIConsultationParams,
+  BookingResult,
+  MessagingResult,
+  ProcessUserSpeechParams,
+  InitiateCallParams,
+  FindAndBookParams,
+  SendMessageParams
+} from './processor.types';
+

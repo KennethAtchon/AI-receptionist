@@ -110,7 +110,7 @@ export class TwilioValidator implements ICredentialValidator {
       logger.info('[TwilioValidator] Connection validation passed');
       return { valid: true };
     } catch (error) {
-      logger.error('[TwilioValidator] Connection validation failed:', error);
+      logger.error('[TwilioValidator] Connection validation failed:', error instanceof Error ? error : new Error(String(error)));
 
       return {
         valid: false,

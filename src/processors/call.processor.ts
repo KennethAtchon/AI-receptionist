@@ -11,7 +11,7 @@ import type {
   ProcessorResponse, 
   ProcessUserSpeechParams,
   InitiateCallParams 
-} from '../types/processors';
+} from './processor.types';
 import { logger } from '../utils/logger';
 
 /**

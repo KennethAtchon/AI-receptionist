@@ -3,9 +3,9 @@
  * Processors orchestrate API calls using AI guidance
  */
 
-import type { IAIProvider } from '../index';
-import type { Message } from '../../agent/types';
-import type { ITool } from '../index';
+import type { IAIProvider } from '../types';
+import type { Message } from '../agent/types';
+import type { ITool } from '../types';
 
 /**
  * Base processor interface

@@ -4,7 +4,7 @@
  */
 
 import type { IAIProvider, AIResponse } from '../types';
-import type { IProcessor, AIConsultationParams } from '../types/processors';
+import type { IProcessor, AIConsultationParams } from './processor.types';
 import { logger } from '../utils/logger';
 
 /**
