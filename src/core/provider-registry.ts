@@ -6,7 +6,7 @@
 import type { IProvider } from '../types';
 import type { ICredentialValidator } from '../validation/credential-validator.interface';
 import { ProviderProxy } from './provider-proxy';
-import { ProviderNotConfiguredError } from '../errors/provider.errors';
+import { ProviderNotConfiguredError } from './provider.errors';
 import { logger } from '../utils/logger';
 
 /**

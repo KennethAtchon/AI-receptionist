@@ -5,7 +5,7 @@
 
 import type { IProvider } from '../types';
 import type { ICredentialValidator } from '../validation/credential-validator.interface';
-import { CredentialValidationError, ProviderInitializationError } from '../errors/provider.errors';
+import { CredentialValidationError, ProviderInitializationError } from './provider.errors';
 import { logger } from '../utils/logger';
 
 /**

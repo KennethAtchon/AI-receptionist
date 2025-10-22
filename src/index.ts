@@ -106,7 +106,7 @@ export {
   CredentialValidationError,
   ProviderNotConfiguredError,
   ProviderInitializationError
-} from './errors/provider.errors';
+} from './core/provider.errors';
 
 // ============================================================================
 // Utilities
