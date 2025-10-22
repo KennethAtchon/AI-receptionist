@@ -333,9 +333,9 @@ export class AIReceptionist {
     const { EmailResource } = await import('./resources/email.resource');
     (this as any).email = new EmailResource();
 
-    // 17. Initialize text resource (always available - for testing agent independently)
+    // 17. Initialize text resource with conversation service (always available - for testing agent independently)
     const { TextResource } = await import('./resources/text.resource');
-    (this as any).text = new TextResource(this.agent);
+    (this as any).text = new TextResource(this.agent, this.conversationService);
 
     this.initialized = true;
 

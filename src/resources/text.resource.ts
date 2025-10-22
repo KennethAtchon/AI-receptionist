@@ -1,24 +1,29 @@
 /**
  * Text Resource
- * Simple text generation API for testing AI Agent capabilities
+ * Enhanced text generation API with conversation management and tool usage
  *
- * This resource provides a minimal interface for testing the AI agent
- * independently without the complexity of multi-channel communication.
+ * This resource provides a comprehensive interface for testing the AI agent
+ * with conversation continuity and tool execution capabilities.
  */
 
 import { Agent } from '../agent/core/Agent';
+import { ConversationService } from '../services/conversation.service';
 import { GenerateTextOptions, TextResponse } from '../types';
 import { logger } from '../utils/logger';
 
 export class TextResource {
-  constructor(private agent: Agent) {}
+  constructor(
+    private agent: Agent,
+    private conversationService?: ConversationService
+  ) {}
 
   /**
-   * Generate text using the AI agent
+   * Generate text using the AI agent with conversation management and tool usage
    *
-   * This is a simple, direct interface to the AI agent for testing purposes.
-   * It bypasses communication channels and tool execution, focusing purely
-   * on the agent's ability to process text and generate responses.
+   * This enhanced interface provides:
+   * - Conversation continuity through ConversationService
+   * - Tool execution capabilities
+   * - Rich metadata and context
    *
    * @example
    * ```typescript
@@ -30,10 +35,10 @@ export class TextResource {
    *
    * @example
    * ```typescript
-   * // With metadata
+   * // With conversation continuity
    * const response = await client.text.generate({
-   *   prompt: 'Summarize the benefits of TypeScript',
-   *   metadata: { context: 'documentation', audience: 'beginners' }
+   *   prompt: 'Book a meeting for tomorrow at 2 PM',
+   *   conversationId: 'user-123-conversation'
    * });
    * console.log(response.text);
    * ```
@@ -42,35 +47,71 @@ export class TextResource {
     logger.info(`[TextResource] Generating text for prompt: "${options.prompt.substring(0, 50)}..."`);
 
     try {
-      // Create a simple request for the agent
+      // Get or create conversation if conversation service is available
+      let conversationId = options.conversationId;
+      if (this.conversationService && !conversationId) {
+        const conversation = await this.conversationService.create({
+          channel: 'text',
+          metadata: options.metadata
+        });
+        conversationId = conversation.id;
+        logger.info(`[TextResource] Created new conversation: ${conversationId}`);
+      } else if (this.conversationService && conversationId) {
+        // Add user message to existing conversation
+        await this.conversationService.addMessage(conversationId, {
+          role: 'user',
+          content: options.prompt
+        });
+        logger.info(`[TextResource] Added user message to conversation: ${conversationId}`);
+      }
+
+      // Create agent request with enhanced context
       const agentResponse = await this.agent.process({
         id: `text-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         input: options.prompt,
-        channel: 'text' as any, // Using 'text' as a simple channel
+        channel: 'text' as any,
         context: {
-          conversationId: options.conversationId || `text-conv-${Date.now()}`,
+          conversationId: conversationId || `text-conv-${Date.now()}`,
           channel: 'text' as any,
-          metadata: options.metadata
+          metadata: {
+            ...options.metadata,
+            source: 'text-resource',
+            timestamp: new Date().toISOString()
+          }
         }
       });
+
+      // Add assistant response to conversation if conversation service is available
+      if (this.conversationService && conversationId) {
+        await this.conversationService.addMessage(conversationId, {
+          role: 'assistant',
+          content: agentResponse.content
+        });
+        logger.info(`[TextResource] Added assistant response to conversation: ${conversationId}`);
+      }
 
       const response: TextResponse = {
         text: agentResponse.content,
         metadata: {
           ...agentResponse.metadata,
           timestamp: new Date(),
-          conversationId: options.conversationId || `text-conv-${Date.now()}`
+          conversationId: conversationId || `text-conv-${Date.now()}`,
+          toolsUsed: agentResponse.metadata?.toolsUsed || [],
+          toolResults: agentResponse.metadata?.toolResults || []
         }
       };
 
-      logger.info(`[TextResource] Text generated successfully`);
+      logger.info(`[TextResource] Text generated successfully`, {
+        conversationId,
+        toolsUsed: response.metadata?.toolsUsed?.length || 0
+      });
       return response;
 
     } catch (err) {
       logger.error(
         `[TextResource] Failed to generate text`,
         err instanceof Error ? err : new Error(String(err)),
-        { prompt: options.prompt }
+        { prompt: options.prompt, conversationId: options.conversationId }
       );
       throw err;
     }

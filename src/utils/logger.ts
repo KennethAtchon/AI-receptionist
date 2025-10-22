@@ -43,6 +43,8 @@ export class Logger implements ILogger {
   private _enableTimestamps: boolean;
   private _enableColors: boolean;
   private _prefix: string;
+  private _logQueue: Array<() => void> = [];
+  private _isProcessing: boolean = false;
 
   constructor(config: LoggerConfig = {}) {
     this._level = config.level ?? this.getDefaultLogLevel();
@@ -125,11 +127,32 @@ export class Logger implements ILogger {
 
     const logMessage = parts.join(' ');
 
-    if (context && Object.keys(context).length > 0) {
-      console.log(logMessage, context);
-    } else {
-      console.log(logMessage);
+    // Queue the log operation to prevent race conditions
+    this._logQueue.push(() => {
+      if (context && Object.keys(context).length > 0) {
+        console.log(logMessage, context);
+      } else {
+        console.log(logMessage);
+      }
+    });
+
+    // Process the queue if not already processing
+    if (!this._isProcessing) {
+      this._processLogQueue();
     }
+  }
+
+  private _processLogQueue(): void {
+    this._isProcessing = true;
+    
+    while (this._logQueue.length > 0) {
+      const logOperation = this._logQueue.shift();
+      if (logOperation) {
+        logOperation();
+      }
+    }
+    
+    this._isProcessing = false;
   }
 
   private getColor(level: string): string {
