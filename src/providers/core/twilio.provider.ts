@@ -4,7 +4,7 @@
  */
 
 import { BaseProvider } from '../base.provider';
-import { TwilioConfig, CallOptions, SMSOptions } from '../../types';
+import { TwilioConfig } from '../../types';
 import { logger } from '../../utils/logger';
 
 export class TwilioProvider extends BaseProvider {
@@ -31,44 +31,6 @@ export class TwilioProvider extends BaseProvider {
       logger.error('[TwilioProvider] Initialization failed:', error);
       throw new Error(`Failed to initialize Twilio provider: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  async makeCall(to: string, options: CallOptions): Promise<string> {
-    this.ensureInitialized();
-
-    logger.info(`[TwilioProvider] Making call to ${to}`);
-    logger.info(`[TwilioProvider] Webhook URL: ${options.webhookUrl}`);
-
-    // TODO: Actual Twilio call creation
-    // const call = await this.client.calls.create({
-    //   to,
-    //   from: this.config.phoneNumber,
-    //   url: options.webhookUrl,
-    //   statusCallback: options.statusCallback,
-    //   statusCallbackMethod: 'POST'
-    // });
-    // return call.sid;
-
-    // Placeholder
-    return `CALL_${Date.now()}`;
-  }
-
-  async sendSMS(to: string, body: string, options?: SMSOptions): Promise<string> {
-    this.ensureInitialized();
-
-    logger.info(`[TwilioProvider] Sending SMS to ${to}: ${body}`);
-
-    // TODO: Actual Twilio SMS
-    // const message = await this.client.messages.create({
-    //   to,
-    //   from: this.config.phoneNumber,
-    //   body,
-    //   statusCallback: options?.statusCallback
-    // });
-    // return message.sid;
-
-    // Placeholder
-    return `SMS_${Date.now()}`;
   }
 
   async healthCheck(): Promise<boolean> {

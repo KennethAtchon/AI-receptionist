@@ -18,7 +18,6 @@ export { AIReceptionist } from './client';
 
 export { Agent } from './agent/core/Agent';
 export { AgentBuilder } from './agent/core/AgentBuilder';
-export { PillarManager } from './agent/core/PillarManager';
 export { Capability } from './agent/capabilities/Capability';
 export { Skill } from './agent/capabilities/Skill';
 export { SystemPromptBuilder } from './agent/prompt/SystemPromptBuilder';
@@ -47,10 +46,10 @@ export { Tools } from './tools';
 // Providers (External API Adapters)
 // ============================================================================
 
-export { TwilioProvider } from './providers/communication/twilio.provider';
+export { TwilioProvider } from './providers/core/twilio.provider';
 export { OpenAIProvider } from './providers/ai/openai.provider';
 export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
-export { GoogleCalendarProvider } from './providers/calendar/google-calendar.provider';
+export { GoogleCalendarProvider } from './providers/core/google-calendar.provider';
 
 // ============================================================================
 // Services (Business Logic Layer)

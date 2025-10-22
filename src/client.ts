@@ -13,17 +13,16 @@ import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
 import { MCPAdapter } from './adapters/mcp/mcp-adapter';
-import { PillarManager } from './agent/core/PillarManager';
 import { ProviderRegistry } from './core/provider-registry';
 import { TwilioValidator } from './validation/twilio-validator';
 import { OpenAIValidator } from './validation/openai-validator';
 import { GoogleCalendarValidator } from './validation/google-calendar-validator';
 
 // Type-only imports for tree-shaking
-import type { TwilioProvider } from './providers/communication/twilio.provider';
+import type { TwilioProvider } from './providers/core/twilio.provider';
 import type { OpenAIProvider } from './providers/ai/openai.provider';
 import type { OpenRouterProvider } from './providers/ai/openrouter.provider';
-import type { GoogleCalendarProvider } from './providers/calendar/google-calendar.provider';
+import type { GoogleCalendarProvider } from './providers/core/google-calendar.provider';
 import type { CallService } from './services/call.service';
 import type { CallsResource } from './resources/calls.resource';
 import type { SMSResource } from './resources/sms.resource';
@@ -96,7 +95,6 @@ export class AIReceptionist {
   // Internal components
   private config: AIReceptionistConfig;
   private agent!: Agent; // The six-pillar agent instance
-  private pillarManager!: PillarManager; // Manages runtime pillar updates
   private providerRegistry!: ProviderRegistry; // Centralized provider management
   private conversationService!: ConversationService;
   private toolExecutor!: ToolExecutionService;
@@ -197,7 +195,7 @@ export class AIReceptionist {
       this.providerRegistry.registerIfConfigured(
         'twilio',
         async () => {
-          const { TwilioProvider } = await import('./providers/communication/twilio.provider');
+          const { TwilioProvider } = await import('./providers/core/twilio.provider');
           return new TwilioProvider(this.config.providers.communication!.twilio!);
         },
         new TwilioValidator(),
@@ -210,7 +208,7 @@ export class AIReceptionist {
       this.providerRegistry.registerIfConfigured(
         'google-calendar',
         async () => {
-          const { GoogleCalendarProvider } = await import('./providers/calendar/google-calendar.provider');
+          const { GoogleCalendarProvider } = await import('./providers/core/google-calendar.provider');
           return new GoogleCalendarProvider(this.config.providers.calendar!.google!);
         },
         new GoogleCalendarValidator(),
@@ -257,8 +255,6 @@ export class AIReceptionist {
       });
     }
 
-    // 13. Initialize pillar manager for runtime updates
-    this.pillarManager = new PillarManager(this.agent);
 
     // 14. Initialize communication resources if Twilio is configured
     // Resources use lazy provider access - providers load on first use
@@ -441,37 +437,6 @@ export class AIReceptionist {
     }
 
     return this.mcpAdapter;
-  }
-
-  /**
-   * Get pillar manager for runtime agent configuration updates
-   *
-   * Use this to update the agent's six pillars at runtime:
-   * - Identity: Who the agent is
-   * - Personality: How the agent behaves
-   * - Knowledge: What the agent knows
-   * - Capabilities: What the agent can do
-   * - Memory: What the agent remembers
-   * - Goals: What the agent aims to achieve
-   *
-   * All updates automatically propagate to all channels (text, email, calls, etc.)
-   *
-   * @example
-   * ```typescript
-   * // Update personality
-   * await client.pillars.addPersonalityTrait('enthusiastic');
-   * await client.pillars.setFormalityLevel(7);
-   *
-   * // Update multiple settings at once
-   * await client.pillars.updatePersonality({
-   *   traits: ['professional', 'helpful'],
-   *   communicationStyle: { primary: 'consultative', formalityLevel: 7 }
-   * });
-   * ```
-   */
-  get pillars(): PillarManager {
-    this.ensureInitialized();
-    return this.pillarManager;
   }
 
   /**

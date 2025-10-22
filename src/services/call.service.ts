@@ -3,7 +3,7 @@
  * Business logic for managing voice calls
  */
 
-import { TwilioProvider } from '../providers/communication/twilio.provider';
+import { TwilioProvider } from '../providers/core/twilio.provider';
 import { ConversationService } from './conversation.service';
 import { ToolExecutionService } from './tool-execution.service';
 import { MakeCallOptions, CallSession, IAIProvider } from '../types';

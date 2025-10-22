@@ -40,7 +40,7 @@ export class ProviderProxy<T extends IProvider> {
 
   constructor(
     private readonly name: string,
-    private readonly factory: () => T | Promise<T>,
+    private readonly factory: () => T | Promise<T>, // this is a factory function that creates a new instance of the provider
     private readonly validator: ICredentialValidator,
     private readonly config?: any
   ) {}

@@ -3,6 +3,6 @@
  */
 
 export { BaseProvider } from './base.provider';
-export { TwilioProvider } from './communication/twilio.provider';
+export { TwilioProvider } from './core/twilio.provider';
 export { OpenAIProvider } from './ai/openai.provider';
-export { GoogleCalendarProvider } from './calendar/google-calendar.provider';
+export { GoogleCalendarProvider } from './core/google-calendar.provider';

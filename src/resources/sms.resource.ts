@@ -3,7 +3,7 @@
  * User-facing API for SMS operations
  */
 
-import { TwilioProvider } from '../providers/communication/twilio.provider';
+import { TwilioProvider } from '../providers/core/twilio.provider';
 import { SendSMSOptions, SMSSession } from '../types';
 import { logger } from '../utils/logger';
 
