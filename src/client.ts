@@ -434,6 +434,21 @@ export class AIReceptionist {
   }
 
   /**
+   * Get the provider registry for runtime provider management
+   *
+   * @example
+   * ```typescript
+   * const registry = client.getProviderRegistry();
+   * const openrouter = await registry.get<OpenRouterProvider>('ai');
+   * openrouter.setModel('anthropic/claude-3-opus');
+   * ```
+   */
+  public getProviderRegistry(): ProviderRegistry {
+    this.ensureInitialized();
+    return this.providerRegistry;
+  }
+
+  /**
    * Get MCP adapter
    *
    * Enables Model Context Protocol access to tools.

@@ -5,7 +5,8 @@
 
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
-import { BaseProvider } from '../base.provider';
+import { BaseConfigurableProvider } from '../configurable.provider';
+import { IAIProvider } from './ai-provider.interface';
 import { AIModelConfig, ChatOptions, AIResponse, ITool } from '../../types';
 import { logger } from '../../utils/logger';
 
@@ -18,23 +19,21 @@ import { logger } from '../../utils/logger';
  * - Streaming support (future)
  * - Automatic retry with exponential backoff
  */
-export class OpenAIProvider extends BaseProvider {
+export class OpenAIProvider extends BaseConfigurableProvider implements IAIProvider {
   readonly name = 'openai';
   readonly type = 'ai' as const;
 
   private client: OpenAI | null = null;
 
-  constructor(
-    private readonly config: AIModelConfig
-  ) {
-    super();
+  constructor(config: AIModelConfig) {
+    super(config);
   }
 
   async initialize(): Promise<void> {
-    logger.info('[OpenAIProvider] Initializing with model', { model: this.config.model });
+    logger.info('[OpenAIProvider] Initializing with model', { model: this.currentConfig.model });
 
     this.client = new OpenAI({
-      apiKey: this.config.apiKey,
+      apiKey: this.currentConfig.apiKey,
       maxRetries: 3,
       timeout: 60000, // 60 seconds
     });
@@ -59,11 +58,11 @@ export class OpenAIProvider extends BaseProvider {
     try {
       // Use OpenAI SDK with proper types
       const response = await this.client.chat.completions.create({
-        model: this.config.model,
+        model: this.currentConfig.model,
         messages,
         tools: tools && tools.length > 0 ? tools : undefined,
-        temperature: this.config.temperature ?? 0.7,
-        max_tokens: this.config.maxTokens,
+        temperature: this.currentConfig.temperature ?? 0.7,
+        max_tokens: this.currentConfig.maxTokens,
       });
 
       return this.parseResponse(response);
@@ -186,5 +185,136 @@ export class OpenAIProvider extends BaseProvider {
     logger.info('[OpenAIProvider] Disposing');
     this.client = null;
     this.initialized = false;
+  }
+
+  /**
+   * Validate OpenAI configuration
+   */
+  async validateConfig(config: any): Promise<{ valid: boolean; error?: string }> {
+    try {
+      // Check required fields
+      if (!config.apiKey) {
+        return { valid: false, error: 'Missing API key' };
+      }
+
+      if (!config.model) {
+        return { valid: false, error: 'Missing model name' };
+      }
+
+      // Validate API key format
+      if (!config.apiKey.startsWith('sk-')) {
+        return { valid: false, error: 'Invalid OpenAI API key format (should start with "sk-")' };
+      }
+
+      // Validate model name
+      if (typeof config.model !== 'string' || config.model.trim().length === 0) {
+        return { valid: false, error: 'Model name must be a non-empty string' };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return { 
+        valid: false, 
+        error: error instanceof Error ? error.message : 'Unknown validation error' 
+      };
+    }
+  }
+
+  /**
+   * Get default OpenAI configuration
+   */
+  protected getDefaultConfig(): any {
+    return {
+      provider: 'openai',
+      apiKey: '',
+      model: 'gpt-3.5-turbo',
+      temperature: 0.7,
+      maxTokens: 2000
+    };
+  }
+
+  /**
+   * Update model at runtime
+   */
+  async setModel(model: string): Promise<void> {
+    if (!model || typeof model !== 'string') {
+      throw new Error('Model name must be a non-empty string');
+    }
+
+    const newConfig = { ...this.currentConfig, model };
+    await this.updateConfig(newConfig);
+    
+    logger.info(`[OpenAIProvider] Model updated to: ${model}`);
+  }
+
+  /**
+   * Update API key at runtime
+   */
+  async setApiKey(apiKey: string): Promise<void> {
+    if (!apiKey || typeof apiKey !== 'string') {
+      throw new Error('API key must be a non-empty string');
+    }
+
+    const newConfig = { ...this.currentConfig, apiKey };
+    await this.updateConfig(newConfig);
+    
+    logger.info('[OpenAIProvider] API key updated');
+  }
+
+  /**
+   * Get the current model
+   */
+  getCurrentModel(): string {
+    return this.currentConfig.model;
+  }
+
+  /**
+   * Validate if a model is available (OpenAI models)
+   */
+  async validateModel(model: string): Promise<boolean> {
+    // OpenAI has a limited set of models, check against known models
+    const validModels = [
+      'gpt-4',
+      'gpt-4-turbo',
+      'gpt-4-turbo-preview',
+      'gpt-3.5-turbo',
+      'gpt-3.5-turbo-16k',
+      'gpt-4-1106-preview',
+      'gpt-4-0125-preview'
+    ];
+    
+    return validModels.includes(model);
+  }
+
+  /**
+   * List available OpenAI models
+   */
+  async listAvailableModels(): Promise<Array<{ id: string; name: string; provider: string }>> {
+    return [
+      { id: 'gpt-4', name: 'GPT-4', provider: 'openai' },
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'openai' },
+      { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo Preview', provider: 'openai' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'openai' },
+      { id: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo 16K', provider: 'openai' },
+      { id: 'gpt-4-1106-preview', name: 'GPT-4 1106 Preview', provider: 'openai' },
+      { id: 'gpt-4-0125-preview', name: 'GPT-4 0125 Preview', provider: 'openai' }
+    ];
+  }
+
+  /**
+   * Get model information
+   */
+  async getModelInfo(model: string): Promise<{ id: string; name: string; provider: string; capabilities?: string[] } | null> {
+    const models = await this.listAvailableModels();
+    const modelInfo = models.find(m => m.id === model);
+    
+    if (!modelInfo) {
+      return {
+        ...modelInfo,
+        capabilities: ['chat', 'function_calling', 'json_mode']
+      };
+    }
+    
+    return null;
   }
 }

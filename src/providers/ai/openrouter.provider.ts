@@ -16,7 +16,8 @@
 
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
-import { BaseProvider } from '../base.provider';
+import { BaseConfigurableProvider } from '../configurable.provider';
+import { IAIProvider } from './ai-provider.interface';
 import { AIModelConfig, ChatOptions, AIResponse, ITool } from '../../types';
 import { logger } from '../../utils/logger';
 
@@ -60,7 +61,7 @@ export const OPENROUTER_MODELS = {
   },
 } as const;
 
-export class OpenRouterProvider extends BaseProvider {
+export class OpenRouterProvider extends BaseConfigurableProvider implements IAIProvider {
   readonly name = 'openrouter';
   readonly type = 'ai' as const;
 
@@ -71,19 +72,17 @@ export class OpenRouterProvider extends BaseProvider {
   private client: OpenAI | null = null;
   private currentModel: string;
 
-  constructor(
-    private readonly config: AIModelConfig
-  ) {
-    super();
+  constructor(config: AIModelConfig) {
+    super(config);
     this.currentModel = config.model;
   }
 
   async initialize(): Promise<void> {
-    logger.info('[OpenRouterProvider] Initializing with model', { model: this.config.model });
+    logger.info('[OpenRouterProvider] Initializing with model', { model: this.currentConfig.model });
 
     // OpenRouter uses OpenAI-compatible API with custom base URL
     this.client = new OpenAI({
-      apiKey: this.config.apiKey,
+      apiKey: this.currentConfig.apiKey,
       baseURL: OpenRouterProvider.BASE_URL,
       defaultHeaders: {
         'HTTP-Referer': process.env.APP_URL || OpenRouterProvider.DEFAULT_REFERER,
@@ -184,8 +183,8 @@ export class OpenRouterProvider extends BaseProvider {
         model: this.currentModel,
         messages,
         tools: tools && tools.length > 0 ? tools : undefined,
-        temperature: this.config.temperature ?? 0.7,
-        max_tokens: this.config.maxTokens,
+        temperature: this.currentConfig.temperature ?? 0.7,
+        max_tokens: this.currentConfig.maxTokens,
       });
 
       return this.parseResponse(response);
@@ -308,5 +307,85 @@ export class OpenRouterProvider extends BaseProvider {
     logger.info('[OpenRouterProvider] Disposing');
     this.client = null;
     this.initialized = false;
+  }
+
+  /**
+   * Validate OpenRouter configuration
+   */
+  async validateConfig(config: any): Promise<{ valid: boolean; error?: string }> {
+    try {
+      // Check required fields
+      if (!config.apiKey) {
+        return { valid: false, error: 'Missing API key' };
+      }
+
+      if (!config.model) {
+        return { valid: false, error: 'Missing model name' };
+      }
+
+      // Validate API key format
+      if (!config.apiKey.startsWith('sk-or-')) {
+        return { valid: false, error: 'Invalid OpenRouter API key format (should start with "sk-or-")' };
+      }
+
+      // Validate model format
+      if (!config.model.includes('/')) {
+        return { 
+          valid: false, 
+          error: 'Invalid model format. Expected format: "provider/model-name" (e.g., "anthropic/claude-3-opus")' 
+        };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return { 
+        valid: false, 
+        error: error instanceof Error ? error.message : 'Unknown validation error' 
+      };
+    }
+  }
+
+  /**
+   * Get default OpenRouter configuration
+   */
+  protected getDefaultConfig(): any {
+    return {
+      provider: 'openrouter',
+      apiKey: '',
+      model: 'anthropic/claude-3-sonnet',
+      temperature: 0.7,
+      maxTokens: 2000
+    };
+  }
+
+  /**
+   * Update API key at runtime
+   */
+  async setApiKey(apiKey: string): Promise<void> {
+    if (!apiKey || typeof apiKey !== 'string') {
+      throw new Error('API key must be a non-empty string');
+    }
+
+    const newConfig = { ...this.currentConfig, apiKey };
+    await this.updateConfig(newConfig);
+    
+    logger.info('[OpenRouterProvider] API key updated');
+  }
+
+  /**
+   * Get model information
+   */
+  async getModelInfo(model: string): Promise<{ id: string; name: string; provider: string; capabilities?: string[] } | null> {
+    const models = await this.listAvailableModels();
+    const modelInfo = models.find(m => m.id === model);
+    
+    if (modelInfo) {
+      return {
+        ...modelInfo,
+        capabilities: ['chat', 'function_calling', 'json_mode']
+      };
+    }
+    
+    return null;
   }
 }
