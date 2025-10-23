@@ -54,12 +54,6 @@ export type {
   KnowledgeConfig,
   LanguageConfig,
 
-  // Capabilities Pillar
-  Capability,
-  CapabilityConfig,
-  CapabilityManager,
-  Skill,
-  SkillDefinition,
 
   // Memory Pillar
   Memory,

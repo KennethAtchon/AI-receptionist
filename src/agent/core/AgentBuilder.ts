@@ -19,7 +19,6 @@ import type {
   KnowledgeConfig,
   MemoryConfig,
   GoalConfig,
-  CapabilityConfig,
   ObservabilityConfig
 } from '../types';
 
@@ -52,13 +51,6 @@ export class AgentBuilder {
     return this;
   }
 
-  /**
-   * Set the agent's capabilities (OPTIONAL)
-   */
-  public withCapabilities(capabilities: string[] | CapabilityConfig[]): this {
-    this.config.capabilities = capabilities;
-    return this;
-  }
 
   /**
    * Set the agent's memory configuration (OPTIONAL)

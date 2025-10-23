@@ -152,37 +152,6 @@ export interface SkillDefinition {
   prerequisites?: string[];
 }
 
-export interface Skill {
-  name: string;
-  description: string;
-  execute: (params: any) => Promise<any>;
-  prerequisites?: string[];
-}
-
-export interface Capability {
-  name: string;
-  description: string;
-  skills: Skill[];
-  supportedChannels: Channel[];
-  toJSON?(): Record<string, unknown>;
-}
-
-export interface CapabilityConfig {
-  name: string;
-  description: string;
-  skills?: SkillDefinition[];
-  supportedChannels?: Channel[];
-}
-
-export interface CapabilityManager {
-  register(capability: Capability): void;
-  has(capabilityName: string): boolean;
-  list(): string[];
-  count(): number;
-  execute(skillName: string, params: any): Promise<any>;
-  initialize(): Promise<void>;
-  getDescription(): string;
-}
 
 // ==================== MEMORY ====================
 
@@ -420,7 +389,6 @@ export interface AgentConfiguration {
   identity: IdentityConfig;
   personality?: PersonalityConfig;
   knowledge?: KnowledgeConfig;
-  capabilities?: string[] | CapabilityConfig[];
   memory?: MemoryConfig;
   goals?: GoalConfig;
   tools?: any[];
@@ -433,7 +401,6 @@ export interface AgentState {
   identity: Record<string, unknown>;
   currentGoals: Goal[];
   memoryStats: MemoryStats;
-  capabilityCount: number;
   performance?: PerformanceMetrics;
 }
 
@@ -450,7 +417,6 @@ export interface PromptContext {
   personality?: PersonalityEngine;
   knowledge?: KnowledgeBase;
   goals?: Goal[];
-  capabilities?: string[];
   memoryContext?: MemoryContext;
   channel?: Channel;
   maxTokens?: number;

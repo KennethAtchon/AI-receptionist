@@ -13,13 +13,11 @@
 export { AIReceptionist } from './client';
 
 // ============================================================================
-// Agent System (Six-Pillar Architecture)
+// Agent System (Five-Pillar Architecture)
 // ============================================================================
 
 export { Agent } from './agent/core/Agent';
 export { AgentBuilder } from './agent/core/AgentBuilder';
-export { Capability } from './agent/capabilities/Capability';
-export { Skill } from './agent/capabilities/Skill';
 export { SystemPromptBuilder } from './agent/prompt/SystemPromptBuilder';
 export { PromptOptimizer, PromptTooLargeError } from './agent/prompt/PromptOptimizer';
 export { AgentLogger, FileLogger } from './agent/observability/AgentLogger';
@@ -134,12 +132,6 @@ export type {
   KnowledgeConfig,
   LanguageConfig,
 
-  // Capabilities Pillar
-  Capability as ICapability,
-  CapabilityConfig,
-  CapabilityManager,
-  Skill as ISkill,
-  SkillDefinition,
 
   // Memory Pillar
   Memory,

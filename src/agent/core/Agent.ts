@@ -1,13 +1,12 @@
 /**
  * Agent - The core intelligent agent class
  *
- * An Agent is a self-contained, intelligent entity built on the Six Pillars:
+ * An Agent is a self-contained, intelligent entity built on the Five Pillars:
  * 1. Identity: Who they are
  * 2. Personality: How they behave
  * 3. Knowledge: What they know
- * 4. Capabilities: What they can do
- * 5. Memory: What they remember
- * 6. Goals: What they aim to achieve
+ * 4. Memory: What they remember
+ * 5. Goals: What they aim to achieve
  *
  * IMPORTANT: We do NOT include explicit Reasoning or Planning engines.
  * Modern AI providers handle this natively through their training.
@@ -21,7 +20,6 @@ import type {
   Identity,
   PersonalityEngine,
   KnowledgeBase,
-  CapabilityManager,
   MemoryManager,
   GoalSystem,
   MemoryContext,
@@ -33,7 +31,6 @@ import { AgentStatus } from '../types';
 import { IdentityImpl } from '../identity/Identity';
 import { PersonalityEngineImpl } from '../personality/PersonalityEngine';
 import { KnowledgeBaseImpl } from '../knowledge/KnowledgeBase';
-import { CapabilityManagerImpl } from '../capabilities/CapabilityManager';
 import { MemoryManagerImpl } from '../memory/MemoryManager';
 import { GoalSystemImpl } from '../goals/GoalSystem';
 import { SystemPromptBuilder } from '../prompt/SystemPromptBuilder';
@@ -42,11 +39,10 @@ import { InteractionTracer } from '../observability/InteractionTracer';
 import { AgentBuilder } from './AgentBuilder';
 
 export class Agent {
-  // ==================== CORE COMPONENTS (The 6 Pillars) ====================
+  // ==================== CORE COMPONENTS (The 5 Pillars) ====================
   private readonly identity: Identity;
   private readonly personality: PersonalityEngine;
   private readonly knowledge: KnowledgeBase;
-  private readonly capabilities: CapabilityManager;
   private readonly memory: MemoryManager;
   private readonly goals: GoalSystem;
 
@@ -80,8 +76,6 @@ export class Agent {
     // Initialize knowledge base
     this.knowledge = new KnowledgeBaseImpl(config.knowledge || { domain: 'general' });
 
-    // Initialize capabilities
-    this.capabilities = new CapabilityManagerImpl();
 
     // Initialize memory
     this.memory = new MemoryManagerImpl(config.memory || {});
@@ -132,8 +126,6 @@ export class Agent {
       // Load knowledge base
       await this.knowledge.load();
 
-      // Initialize capabilities
-      await this.capabilities.initialize();
 
       // Build initial system prompt
       await this.rebuildSystemPrompt();
@@ -170,7 +162,6 @@ export class Agent {
             personality: this.personality,
             knowledge: this.knowledge,
             goals: this.goals.getCurrent(),
-            capabilities: this.capabilities.list(),
             memoryContext,
             channel: request.channel
           })
@@ -304,8 +295,7 @@ export class Agent {
       identity: this.identity,
       personality: this.personality,
       knowledge: this.knowledge,
-      goals: this.goals.getCurrent(),
-      capabilities: this.capabilities.list()
+      goals: this.goals.getCurrent()
     });
 
     this.logger.debug('System prompt rebuilt', {
@@ -323,7 +313,6 @@ export class Agent {
       identity: this.identity.toJSON(),
       currentGoals: this.goals.getCurrent(),
       memoryStats: this.memory.getStats(),
-      capabilityCount: this.capabilities.count(),
       performance: this.performanceMetrics
     };
   }
@@ -422,7 +411,6 @@ export class Agent {
   public getKnowledge() { return this.knowledge; }
   public getGoals() { return this.goals; }
   public getMemory() { return this.memory; }
-  public getCapabilities() { return this.capabilities; }
 
   /**
    * Dispose of agent resources

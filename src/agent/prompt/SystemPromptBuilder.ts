@@ -1,13 +1,12 @@
 /**
  * SystemPromptBuilder - Creates optimized, hierarchical system prompts
  *
- * This builder constructs system prompts from the six core agent pillars:
+ * This builder constructs system prompts from the five core agent pillars:
  * 1. Identity - Who the agent is
  * 2. Personality - How the agent behaves
  * 3. Knowledge - What the agent knows
- * 4. Capabilities - What the agent can do
- * 5. Memory - What the agent remembers (context)
- * 6. Goals - What the agent aims to achieve
+ * 4. Memory - What the agent remembers (context)
+ * 5. Goals - What the agent aims to achieve
  */
 
 import type {
@@ -49,20 +48,15 @@ export class SystemPromptBuilder {
       sections.push(this.buildGoalsSection(context.goals));
     }
 
-    // 5. CAPABILITIES & TOOLS
-    if (context.capabilities && context.capabilities.length > 0) {
-      sections.push(this.buildCapabilitiesSection(context.capabilities));
-    }
-
-    // 6. MEMORY CONTEXT (retrieved from MemoryManager)
+    // 5. MEMORY CONTEXT (retrieved from MemoryManager)
     if (context.memoryContext) {
       sections.push(this.buildMemoryContextSection(context.memoryContext));
     }
 
-    // 7. DECISION-MAKING PRINCIPLES
+    // 6. DECISION-MAKING PRINCIPLES
     sections.push(this.buildDecisionPrinciplesSection());
 
-    // 8. COMMUNICATION GUIDELINES (channel-specific)
+    // 7. COMMUNICATION GUIDELINES (channel-specific)
     if (context.channel) {
       sections.push(this.buildCommunicationSection(context.channel));
     }
@@ -284,25 +278,6 @@ export class SystemPromptBuilder {
     };
   }
 
-  /**
-   * Build CAPABILITIES section
-   */
-  private buildCapabilitiesSection(capabilities: string[]): PromptSection {
-    let content = '# CAPABILITIES\n\n';
-    content += `You have access to the following capabilities:\n\n`;
-
-    for (const capability of capabilities) {
-      content += `- ${capability}\n`;
-    }
-
-    content += '\nUse these capabilities when appropriate to accomplish your goals.\n';
-
-    return {
-      name: 'CAPABILITIES',
-      priority: 7,
-      content: content.trim()
-    };
-  }
 
   /**
    * Build MEMORY CONTEXT section
