@@ -60,7 +60,6 @@ export class Agent {
 
   // ==================== EXTERNAL DEPENDENCIES ====================
   private aiProvider: any; // IAIProvider
-  private toolExecutor: any; // ToolExecutionService
   private toolRegistry?: any; // ToolRegistry - source of truth for tools
   private conversationService?: any; // ConversationService
 
@@ -101,7 +100,6 @@ export class Agent {
     // Set external dependencies
     this.aiProvider = config.aiProvider;
     this.toolRegistry = (config as any).toolRegistry;
-    this.toolExecutor = (config as any).toolExecutor;
     this.conversationService = (config as any).conversationService;
 
     // Initialize state
@@ -234,12 +232,9 @@ export class Agent {
       systemPrompt: systemPrompt
     });
 
-    // If tool calls needed, execute them
-    if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0 && this.toolExecutor) {
-      const toolResults = await this.toolExecutor.executeAll(
-        aiResponse.toolCalls,
-        request.context
-      );
+    // If tool calls needed, execute them directly with registry
+    if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0 && this.toolRegistry) {
+      const toolResults = await this.executeTools(aiResponse.toolCalls, request.context);
 
       // Get final response after tool execution
       return this.synthesizeResponse(aiResponse, toolResults, request.channel);
@@ -252,6 +247,24 @@ export class Agent {
         confidence: aiResponse.confidence
       }
     };
+  }
+
+  /**
+   * Execute tools directly with registry (no unnecessary service wrapper)
+   */
+  private async executeTools(
+    toolCalls: Array<{ id: string; name: string; parameters: any }>,
+    context: any
+  ): Promise<Array<{ toolName: string; result: any }>> {
+    const results: Array<{ toolName: string; result: any }> = [];
+
+    for (const toolCall of toolCalls) {
+      this.logger.info(`[Agent] Executing tool '${toolCall.name}'`);
+      const result = await this.toolRegistry.execute(toolCall.name, toolCall.parameters, context);
+      results.push({ toolName: toolCall.name, result });
+    }
+
+    return results;
   }
 
   /**
@@ -386,12 +399,6 @@ export class Agent {
     }
   }
 
-  /**
-   * Set tool executor (optional)
-   */
-  public setToolExecutor(executor: any): void {
-    this.toolExecutor = executor;
-  }
 
   /**
    * Set tool registry (optional) - Source of truth for available tools

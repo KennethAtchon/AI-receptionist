@@ -56,7 +56,6 @@ export { GoogleProvider } from './providers/api/google.provider';
 // ============================================================================
 
 export { ConversationService } from './services/conversation.service';
-export { ToolExecutionService } from './services/tool-execution.service';
 export { CallService } from './services/call.service';
 
 // ============================================================================
@@ -82,17 +81,6 @@ export type { MigrationOptions } from './agent/storage';
 // Adapters (Protocol Adapters)
 // ============================================================================
 
-export { MCPAdapter, MCPServer } from './adapters/mcp';
-export type {
-  MCPTool,
-  MCPToolListResponse,
-  MCPToolCallRequest,
-  MCPToolCallResponse,
-  MCPContent,
-  MCPContentType,
-  MCPServerConfig,
-  MCPAdapterOptions
-} from './adapters/mcp';
 
 // ============================================================================
 // Core Infrastructure (Provider Management & Validation)
@@ -217,10 +205,6 @@ export type {
   GenerateTextOptions,
   TextResponse,
 
-  // Events
-  ToolExecutionEvent,
-  ToolErrorEvent,
-  ConversationEvent,
 
   // Other
   CallOptions,

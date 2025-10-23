@@ -5,14 +5,12 @@
 
 import type { AIReceptionistConfig } from './types';
 import { ConversationService } from './services/conversation.service';
-import { ToolExecutionService } from './services/tool-execution.service';
 import { ToolRegistry } from './tools/registry';
 import { ToolStore } from './tools/tool-store';
 import { setupStandardTools } from './tools/standard';
 import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
-import { MCPAdapter } from './adapters/mcp/mcp-adapter';
 import { ProviderRegistry } from './providers/core/provider-registry';
 import { TwilioValidator } from './providers/validation/twilio-validator';
 import { OpenAIValidator } from './providers/validation/openai-validator';
@@ -99,7 +97,6 @@ export class AIReceptionist {
   private agent!: Agent; // The six-pillar agent instance
   private providerRegistry!: ProviderRegistry; // Centralized provider management
   private conversationService!: ConversationService;
-  private toolExecutor!: ToolExecutionService;
   private toolRegistry!: ToolRegistry;
   private toolStore!: ToolStore;
   
@@ -113,7 +110,6 @@ export class AIReceptionist {
   private calendarService?: CalendarService;
   private messagingService?: MessagingService;
   
-  private mcpAdapter?: MCPAdapter;
   private initialized = false;
 
   constructor(config: AIReceptionistConfig) {
@@ -168,12 +164,6 @@ export class AIReceptionist {
       }
     }
 
-    // 5. Initialize tool executor
-    this.toolExecutor = new ToolExecutionService(
-      this.toolRegistry,
-      this.config.onToolExecute,
-      this.config.onToolError
-    );
 
     // 6. Initialize Provider Registry (Service Locator Pattern)
     this.providerRegistry = new ProviderRegistry();
@@ -244,7 +234,6 @@ export class AIReceptionist {
       .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
       .withMemory(this.config.agent.memory || { contextWindow: 20 })
       .withAIProvider(aiProvider)
-      .withToolExecutor(this.toolExecutor)
       .withToolRegistry(this.toolRegistry)  // ToolRegistry is source of truth for tools
       .withConversationService(this.conversationService)
       .build();
@@ -408,11 +397,6 @@ export class AIReceptionist {
       analytics: overrides.analytics || this.config.analytics,
       debug: overrides.debug !== undefined ? overrides.debug : this.config.debug,
 
-      // Event handlers
-      onToolExecute: overrides.onToolExecute || this.config.onToolExecute,
-      onToolError: overrides.onToolError || this.config.onToolError,
-      onConversationStart: overrides.onConversationStart || this.config.onConversationStart,
-      onConversationEnd: overrides.onConversationEnd || this.config.onConversationEnd
     };
 
     return new AIReceptionist(clonedConfig);
@@ -472,22 +456,6 @@ export class AIReceptionist {
    * });
    * ```
    */
-  get mcp(): MCPAdapter {
-    this.ensureInitialized();
-
-    if (!this.mcpAdapter) {
-      this.mcpAdapter = new MCPAdapter(this.toolRegistry, {
-        defaultChannel: 'call',
-        metadata: {
-          sdk: 'ai-receptionist',
-          agentName: this.config.agent.identity.name,
-          agentRole: this.config.agent.identity.role
-        }
-      });
-    }
-
-    return this.mcpAdapter;
-  }
 
   /**
    * Dispose of all resources

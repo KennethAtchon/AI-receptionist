@@ -20,7 +20,6 @@ src/__tests__/
 
 src/services/__tests__/
 ├── conversation.service.test.ts    # Conversation management tests
-└── tool-execution.service.test.ts  # Tool execution tests
 
 src/tools/__tests__/
 └── registry.test.ts               # Tool registry tests

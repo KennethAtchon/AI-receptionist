@@ -99,13 +99,6 @@ export class AgentBuilder {
     return this.withProvider(provider);
   }
 
-  /**
-   * Set the tool executor (OPTIONAL - for integration with existing SDK)
-   */
-  public withToolExecutor(executor: any): this {
-    (this.config as any).toolExecutor = executor;
-    return this;
-  }
 
   /**
    * Set the tool registry (OPTIONAL - source of truth for available tools)

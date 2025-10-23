@@ -310,11 +310,6 @@ export interface AIReceptionistConfig {
   analytics?: AnalyticsConfig;
   debug?: boolean;
 
-  // Event callbacks
-  onToolExecute?: (event: ToolExecutionEvent) => void;
-  onToolError?: (event: ToolErrorEvent) => void;
-  onConversationStart?: (event: ConversationEvent) => void;
-  onConversationEnd?: (event: ConversationEvent) => void;
 }
 
 export interface ToolConfig {
@@ -369,27 +364,7 @@ export interface AnalyticsConfig {
 // Event Types
 // ============================================================================
 
-export interface ToolExecutionEvent {
-  toolName: string;
-  parameters: any;
-  result: ToolResult;
-  duration: number;
-  timestamp: Date;
-}
 
-export interface ToolErrorEvent {
-  toolName: string;
-  parameters: any;
-  error: Error;
-  timestamp: Date;
-}
-
-export interface ConversationEvent {
-  conversationId: string;
-  channel: Channel;
-  timestamp: Date;
-  metadata?: Record<string, any>;
-}
 
 // ============================================================================
 // Resource Types (User-facing API)
