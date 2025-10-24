@@ -6,9 +6,21 @@
 import { CallService } from '../services/call.service';
 import { MakeCallOptions, CallSession } from '../types';
 import { logger } from '../utils/logger';
+import type { ConversationService } from '../services/conversation.service';
+import type { Agent } from '../agent/core/Agent';
+import type { CallProcessor } from '../processors/call.processor';
 
 export class CallsResource {
-  constructor(private callService: CallService) {}
+  private readonly callService: CallService;
+
+  constructor(
+    conversationService: ConversationService,
+    agent: Agent,
+    callProcessor: CallProcessor
+  ) {
+    // Create service internally (Factory Pattern)
+    this.callService = new CallService(conversationService, agent, callProcessor);
+  }
 
   /**
    * Make an outbound call

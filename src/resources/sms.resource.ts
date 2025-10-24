@@ -3,12 +3,19 @@
  * User-facing API for SMS operations
  */
 
-import type { MessagingService } from '../services/messaging.service';
+import { MessagingService } from '../services/messaging.service';
 import { SendSMSOptions, SMSSession } from '../types';
 import { logger } from '../utils/logger';
+import type { Agent } from '../agent/core/Agent';
+import type { MessagingProcessor } from '../processors/messaging.processor';
 
 export class SMSResource {
-  constructor(private messagingService: MessagingService) {}
+  private readonly messagingService: MessagingService;
+
+  constructor(agent: Agent, messagingProcessor: MessagingProcessor) {
+    // Create service internally (Factory Pattern)
+    this.messagingService = new MessagingService(agent, messagingProcessor);
+  }
 
   /**
    * Send an SMS message

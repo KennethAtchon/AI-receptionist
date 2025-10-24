@@ -101,7 +101,7 @@ export class OpenRouterProvider extends BaseConfigurableProvider implements IAIP
    * @param model - The model identifier (e.g., 'anthropic/claude-3-opus', 'google/gemini-pro')
    * @throws Error if model identifier is invalid
    */
-  setModel(model: string): void {
+  async setModel(model: string): Promise<void> {
     if (!model || typeof model !== 'string') {
       throw new Error('Model identifier must be a non-empty string');
     }

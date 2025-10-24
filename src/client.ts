@@ -7,20 +7,19 @@ import type { AIReceptionistConfig } from './types';
 import { ConversationService } from './services/conversation.service';
 import { ToolRegistry } from './tools/registry';
 import { ToolStore } from './tools/tool-store';
-import { setupStandardTools } from './tools/standard';
 import { logger } from './utils/logger';
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
 import { ProviderRegistry } from './providers/core/provider-registry';
-import { TwilioValidator } from './providers/validation/twilio-validator';
-import { OpenAIValidator } from './providers/validation/openai-validator';
-import { GoogleValidator } from './providers/validation/google-validator';
+
+// Initialization modules
+import { initializeProviders, getAIProvider } from './providers/initialization';
+import { createToolInfrastructure, registerAllTools } from './tools/initialization';
+import { initializeProcessors } from './processors/initialization';
+import { initializeResources } from './resources/initialization';
 
 // Type-only imports for tree-shaking
-import type { TwilioProvider, GoogleProvider, OpenAIProvider, OpenRouterProvider } from './providers';
-import type { CallService } from './services/call.service';
-import type { CalendarService } from './services/calendar.service';
-import type { MessagingService } from './services/messaging.service';
+import type { OpenAIProvider, OpenRouterProvider } from './providers';
 import type { CallsResource } from './resources/calls.resource';
 import type { SMSResource } from './resources/sms.resource';
 import type { EmailResource } from './resources/email.resource';
@@ -104,16 +103,15 @@ export class AIReceptionist {
   private callProcessor?: CallProcessor;
   private calendarProcessor?: CalendarProcessor;
   private messagingProcessor?: MessagingProcessor;
-  
-  // Services
-  private callService?: CallService;
-  private calendarService?: CalendarService;
-  private messagingService?: MessagingService;
-  
+
   private initialized = false;
 
   constructor(config: AIReceptionistConfig) {
-    this.config = config;
+    // Ensure providers is an empty object if not provided
+    this.config = {
+      ...config,
+      providers: config.providers || {}
+    };
 
     // Validate required config
     if (!config.agent?.identity) {
@@ -131,6 +129,13 @@ export class AIReceptionist {
   /**
    * Initialize the SDK
    * Call this before using any resources
+   *
+   * This method orchestrates the initialization of all SDK components:
+   * - Providers (AI, communication, calendar)
+   * - Agent (six-pillar architecture)
+   * - Tools (standard, custom, provider-specific)
+   * - Processors (business logic)
+   * - Resources (user-facing APIs)
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -140,92 +145,19 @@ export class AIReceptionist {
 
     logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity.name}`);
 
-    // 1. Initialize conversation management (backed by agent memory)
+    // 1. Initialize conversation service (backed by agent memory)
     this.conversationService = new ConversationService();
 
-    // 2. Initialize tool registry + tool store (for automatic logging)
-    this.toolRegistry = new ToolRegistry();
-    this.toolStore = new ToolStore();
-    this.toolRegistry.setToolStore(this.toolStore);
+    // 2. Initialize provider registry and register all providers
+    this.providerRegistry = await initializeProviders(this.config);
 
-    // 3. Setup standard tools if requested
-    if (this.config.tools?.defaults) {
-      await setupStandardTools(
-        this.toolRegistry,
-        this.config.tools,
-        this.config.providers
-      );
-    }
+    // 3. Create tool infrastructure (registry + store)
+    const { toolRegistry, toolStore } = createToolInfrastructure();
+    this.toolRegistry = toolRegistry;
+    this.toolStore = toolStore;
 
-    // 4. Register custom tools
-    if (this.config.tools?.custom) {
-      for (const tool of this.config.tools.custom) {
-        this.toolRegistry.register(tool);
-      }
-    }
-
-
-    // 6. Initialize Provider Registry (Service Locator Pattern)
-    this.providerRegistry = new ProviderRegistry();
-
-    // 7. Register AI provider (always required, lazy loaded)
-    this.providerRegistry.registerIfConfigured(
-      'ai',
-      async () => {
-        switch (this.config.model.provider) {
-          case 'openai': {
-            const { OpenAIProvider } = await import('./providers/ai/openai.provider');
-            return new OpenAIProvider(this.config.model);
-          }
-          case 'openrouter': {
-            const { OpenRouterProvider } = await import('./providers/ai/openrouter.provider');
-            return new OpenRouterProvider(this.config.model);
-          }
-          case 'anthropic':
-          case 'google':
-            throw new Error(`${this.config.model.provider} provider not yet implemented`);
-          default:
-            throw new Error(`Unknown AI provider: ${this.config.model.provider}`);
-        }
-      },
-      new OpenAIValidator(),
-      this.config.model
-    );
-
-    // 8. Register Twilio provider ONLY if credentials configured (lazy loaded)
-    if (this.config.providers.communication?.twilio) {
-      this.providerRegistry.registerIfConfigured(
-        'twilio',
-        async () => {
-          const { TwilioProvider } = await import('./providers');
-          return new TwilioProvider(this.config.providers.communication!.twilio!);
-        },
-        new TwilioValidator(),
-        this.config.providers.communication.twilio
-      );
-    }
-
-    // 9. Register Google Calendar provider ONLY if credentials configured (lazy loaded)
-    if (this.config.providers.calendar?.google) {
-      this.providerRegistry.registerIfConfigured(
-        'google',
-        async () => {
-          const { GoogleProvider } = await import('./providers');
-          return new GoogleProvider(this.config.providers.calendar!.google!);
-        },
-        new GoogleValidator(),
-        this.config.providers.calendar.google
-      );
-    }
-
-    // 10. Validate ALL registered providers early (fail fast on bad credentials)
-    logger.info('[AIReceptionist] Validating provider credentials...');
-    await this.providerRegistry.validateAll();
-    logger.info('[AIReceptionist] All credentials validated successfully');
-
-    // 11. Create and initialize the Agent instance (Six-Pillar Architecture)
-    // Get AI provider from registry (lazy loads on first access)
-    const aiProvider = await this.providerRegistry.get<OpenAIProvider | OpenRouterProvider>('ai');
+    // 4. Create and initialize the Agent (Six-Pillar Architecture)
+    const aiProvider = await getAIProvider(this.providerRegistry);
 
     this.agent = AgentBuilder.create()
       .withIdentity(this.config.agent.identity)
@@ -234,100 +166,52 @@ export class AIReceptionist {
       .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
       .withMemory(this.config.agent.memory || { contextWindow: 20 })
       .withAIProvider(aiProvider)
-      .withToolRegistry(this.toolRegistry)  // ToolRegistry is source of truth for tools
+      .withToolRegistry(this.toolRegistry)
       .withConversationService(this.conversationService)
       .build();
 
-    // Link conversation service to agent (uses memory-centric architecture)
+    // Link conversation service and tool store to agent
     this.conversationService.setAgent(this.agent);
-
-    // Link tool store to agent (enables memory-backed tool logging)
     this.toolStore.setAgent(this.agent);
 
     await this.agent.initialize();
 
-    // 12. Auto-register database tools if long-term memory storage is enabled
-    if (this.config.agent.memory?.longTermEnabled && this.config.agent.memory?.longTermStorage) {
-      logger.info('[AIReceptionist] Auto-registering database tools (memory storage enabled)');
-      const { setupDatabaseTools } = await import('./tools/standard/database-tools');
-      setupDatabaseTools(this.toolRegistry, {
+    // 5. Initialize processors (business logic layer)
+    const processors = await initializeProcessors(this.providerRegistry);
+    this.callProcessor = processors.callProcessor;
+    this.messagingProcessor = processors.messagingProcessor;
+    this.calendarProcessor = processors.calendarProcessor;
+
+    // 6. Register all tools (standard, custom, provider-specific)
+    await registerAllTools(
+      {
+        config: this.config,
         agent: this.agent,
-        storage: this.config.agent.memory.longTermStorage,
-      });
-    }
+        callProcessor: this.callProcessor,
+        messagingProcessor: this.messagingProcessor,
+        calendarProcessor: this.calendarProcessor
+      },
+      this.toolRegistry
+    );
 
+    // 7. Initialize resources (user-facing APIs)
+    const resources = await initializeResources({
+      agent: this.agent,
+      conversationService: this.conversationService,
+      callProcessor: this.callProcessor,
+      messagingProcessor: this.messagingProcessor,
+      calendarProcessor: this.calendarProcessor
+    });
 
-    // 14. Register call and messaging tools if Twilio is configured
-    if (this.providerRegistry.has('twilio')) {
-      const twilioProvider = await this.providerRegistry.get<TwilioProvider>('twilio');
-      
-      // Create processors for administrative operations
-      const { CallProcessor } = await import('./processors/call.processor');
-      const { MessagingProcessor } = await import('./processors/messaging.processor');
-      
-      this.callProcessor = new CallProcessor(twilioProvider);
-      this.messagingProcessor = new MessagingProcessor(twilioProvider);
-      
-      // Register call tools with processor
-      const { setupCallTools } = await import('./tools/standard/call-tools');
-      await setupCallTools(this.toolRegistry, { callProcessor: this.callProcessor });
-
-      // Register messaging tools with processor
-      const { setupMessagingTools } = await import('./tools/standard/messaging-tools');
-      await setupMessagingTools(this.toolRegistry, { messagingProcessor: this.messagingProcessor });
-      
-      // Create services using Agent + Processors
-      const { CallService } = await import('./services/call.service');
-      const { MessagingService } = await import('./services/messaging.service');
-      
-      this.callService = new CallService(
-        this.conversationService,
-        this.agent,
-        this.callProcessor
-      );
-      
-      this.messagingService = new MessagingService(
-        this.agent,
-        this.messagingProcessor
-      );
-      
-      // Initialize resources
-      const { CallsResource } = await import('./resources/calls.resource');
-      const { SMSResource } = await import('./resources/sms.resource');
-      
-      (this as any).calls = new CallsResource(this.callService);
-      (this as any).sms = new SMSResource(this.messagingService);
-    }
-    
-    // 15. Register calendar tools and service if Google Calendar is configured
-    if (this.providerRegistry.has('google')) {
-      const googleProvider = await this.providerRegistry.get<GoogleProvider>('google');
-      
-      // Create processor for administrative operations
-      const { CalendarProcessor } = await import('./processors/calendar.processor');
-      this.calendarProcessor = new CalendarProcessor(googleProvider);
-      
-      // Register calendar tools with processor
-      const { setupCalendarTools } = await import('./tools/standard/calendar-tools');
-      await setupCalendarTools(this.toolRegistry, { calendarProcessor: this.calendarProcessor });
-      
-      // Create service using Agent + Processor
-      const { CalendarService } = await import('./services/calendar.service');
-      this.calendarService = new CalendarService(this.agent, this.calendarProcessor);
-      
-      logger.info('[AIReceptionist] Calendar service initialized');
-    }
-
-    // 16. Initialize email resource (basic for now, lazy loaded)
-    const { EmailResource } = await import('./resources/email.resource');
-    (this as any).email = new EmailResource();
-
-    // 17. Initialize text resource with conversation service (always available - for testing agent independently)
-    const { TextResource } = await import('./resources/text.resource');
-    (this as any).text = new TextResource(this.agent, this.conversationService);
+    // Assign resources
+    (this as any).calls = resources.calls;
+    (this as any).sms = resources.sms;
+    (this as any).email = resources.email;
+    (this as any).text = resources.text;
 
     this.initialized = true;
 
+    // Log initialization summary
     logger.info(`[AIReceptionist] Initialized successfully`);
     logger.info(`[AIReceptionist] - Registered providers: ${this.providerRegistry.list().join(', ')}`);
     logger.info(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);

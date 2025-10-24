@@ -307,14 +307,14 @@ export class OpenAIProvider extends BaseConfigurableProvider implements IAIProvi
   async getModelInfo(model: string): Promise<{ id: string; name: string; provider: string; capabilities?: string[] } | null> {
     const models = await this.listAvailableModels();
     const modelInfo = models.find(m => m.id === model);
-    
-    if (!modelInfo) {
+
+    if (modelInfo) {
       return {
         ...modelInfo,
         capabilities: ['chat', 'function_calling', 'json_mode']
       };
     }
-    
+
     return null;
   }
 }

@@ -297,7 +297,7 @@ export interface AIReceptionistConfig {
   tools?: ToolConfig;
 
   // Provider configuration
-  providers: ProviderConfig;
+  providers?: ProviderConfig;
 
   // Optional features
   notifications?: NotificationConfig;
