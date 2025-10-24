@@ -7,8 +7,12 @@ import { ProviderRegistry } from './core/provider-registry';
 import { TwilioValidator } from './validation/twilio-validator';
 import { OpenAIValidator } from './validation/openai-validator';
 import { GoogleValidator } from './validation/google-validator';
+import { ResendValidator } from './validation/resend-validator';
+import { SendGridValidator } from './validation/sendgrid-validator';
+import { SMTPValidator } from './validation/smtp-validator';
 import type { AIReceptionistConfig } from '../types';
 import type { OpenAIProvider, OpenRouterProvider, TwilioProvider, GoogleProvider } from './index';
+import type { ResendProvider, SendGridProvider, SMTPProvider } from './index';
 import { logger } from '../utils/logger';
 
 /**
@@ -29,7 +33,10 @@ export async function initializeProviders(
   // 3. Register calendar providers (optional)
   await registerCalendarProviders(registry, config);
 
-  // 4. Validate all registered providers (fail fast)
+  // 4. Register email providers (optional)
+  await registerEmailProviders(registry, config);
+
+  // 5. Validate all registered providers (fail fast)
   logger.info('[ProviderInit] Validating provider credentials...');
   await registry.validateAll();
   logger.info('[ProviderInit] All credentials validated successfully');
@@ -145,4 +152,64 @@ export async function getGoogleProvider(
   return registry.has('google')
     ? registry.get<GoogleProvider>('google')
     : undefined;
+}
+
+/**
+ * Register email providers (Resend, SendGrid, SMTP)
+ */
+async function registerEmailProviders(
+  registry: ProviderRegistry,
+  config: AIReceptionistConfig
+): Promise<void> {
+  const emailConfig = config.providers?.email;
+
+  if (!emailConfig) {
+    logger.info('[ProviderInit] No email providers configured');
+    return;
+  }
+
+  // Register Resend if configured
+  if (emailConfig.resend) {
+    registry.registerIfConfigured(
+      'resend',
+      async () => {
+        const { ResendProvider } = await import('./email/resend.provider');
+        return new ResendProvider(emailConfig.resend!);
+      },
+      new ResendValidator(),
+      emailConfig.resend
+    );
+
+    logger.info('[ProviderInit] Registered email provider: resend');
+  }
+
+  // Register SendGrid if configured
+  if (emailConfig.sendgrid) {
+    registry.registerIfConfigured(
+      'sendgrid',
+      async () => {
+        const { SendGridProvider } = await import('./email/sendgrid.provider');
+        return new SendGridProvider(emailConfig.sendgrid!);
+      },
+      new SendGridValidator(),
+      emailConfig.sendgrid
+    );
+
+    logger.info('[ProviderInit] Registered email provider: sendgrid');
+  }
+
+  // Register SMTP if configured
+  if (emailConfig.smtp) {
+    registry.registerIfConfigured(
+      'smtp',
+      async () => {
+        const { SMTPProvider } = await import('./email/smtp.provider');
+        return new SMTPProvider(emailConfig.smtp!);
+      },
+      new SMTPValidator(),
+      emailConfig.smtp
+    );
+
+    logger.info('[ProviderInit] Registered email provider: smtp');
+  }
 }

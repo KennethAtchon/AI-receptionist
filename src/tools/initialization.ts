@@ -11,6 +11,7 @@ import type { Agent } from '../agent/core/Agent';
 import type { CallProcessor } from '../processors/call.processor';
 import type { MessagingProcessor } from '../processors/messaging.processor';
 import type { CalendarProcessor } from '../processors/calendar.processor';
+import type { EmailProcessor } from '../processors/email.processor';
 import { logger } from '../utils/logger';
 
 export interface ToolInitializationContext {
@@ -19,6 +20,7 @@ export interface ToolInitializationContext {
   callProcessor?: CallProcessor;
   messagingProcessor?: MessagingProcessor;
   calendarProcessor?: CalendarProcessor;
+  emailProcessor?: EmailProcessor;
 }
 
 /**
@@ -152,6 +154,14 @@ async function registerProviderTools(
     }
     await registerCalendarTools(context, toolRegistry);
   }
+
+  // Register email tools (if any email provider configured)
+  if (context.config.providers?.email) {
+    if (!context.emailProcessor) {
+      throw new Error('Email provider configured but processor not initialized');
+    }
+    await registerEmailTools(context, toolRegistry);
+  }
 }
 
 /**
@@ -183,4 +193,17 @@ async function registerCalendarTools(
   await setupCalendarTools(toolRegistry, { calendarProcessor: context.calendarProcessor! });
 
   logger.info('[ToolInit] Calendar tools registered (Google Calendar)');
+}
+
+/**
+ * Register Email tools
+ */
+async function registerEmailTools(
+  context: ToolInitializationContext,
+  toolRegistry: ToolRegistry
+): Promise<void> {
+  const { setupEmailTools } = await import('./standard/email-tools');
+  await setupEmailTools(toolRegistry, { emailProcessor: context.emailProcessor! });
+
+  logger.info('[ToolInit] Email tools registered');
 }

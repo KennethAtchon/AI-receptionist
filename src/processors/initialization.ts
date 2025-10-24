@@ -5,15 +5,18 @@
 
 import type { ProviderRegistry } from '../providers/core/provider-registry';
 import type { TwilioProvider, GoogleProvider } from '../providers';
+import type { IEmailProvider } from '../providers/email/email-provider.interface';
 import type { CallProcessor } from './call.processor';
 import type { MessagingProcessor } from './messaging.processor';
 import type { CalendarProcessor } from './calendar.processor';
+import type { EmailProcessor } from './email.processor';
 import { logger } from '../utils/logger';
 
 export interface InitializedProcessors {
   callProcessor?: CallProcessor;
   messagingProcessor?: MessagingProcessor;
   calendarProcessor?: CalendarProcessor;
+  emailProcessor?: EmailProcessor;
 }
 
 /**
@@ -34,11 +37,17 @@ export async function initializeProcessors(
     await initializeCalendarProcessor(providerRegistry, processors);
   }
 
+  // 3. Initialize Email processor (if any email provider available)
+  if (providerRegistry.has('resend') || providerRegistry.has('sendgrid') || providerRegistry.has('smtp')) {
+    await initializeEmailProcessor(providerRegistry, processors);
+  }
+
   // Log summary
   const availableProcessors = [
     processors.callProcessor ? 'call' : null,
     processors.messagingProcessor ? 'messaging' : null,
-    processors.calendarProcessor ? 'calendar' : null
+    processors.calendarProcessor ? 'calendar' : null,
+    processors.emailProcessor ? 'email' : null
   ]
     .filter(Boolean)
     .join(', ');
@@ -81,4 +90,43 @@ async function initializeCalendarProcessor(
   processors.calendarProcessor = new CalendarProcessor(googleProvider);
 
   logger.info('[ProcessorInit] Calendar processor initialized');
+}
+
+/**
+ * Initialize Email processor with EmailRouter
+ */
+async function initializeEmailProcessor(
+  providerRegistry: ProviderRegistry,
+  processors: InitializedProcessors
+): Promise<void> {
+  const { EmailRouter } = await import('../providers/email/email-router');
+  const { EmailProcessor } = await import('./email.processor');
+
+  const emailRouter = new EmailRouter();
+
+  // Register all available email providers
+  const providers = [
+    { name: 'resend', priority: 1 },
+    { name: 'sendgrid', priority: 2 },
+    { name: 'smtp', priority: 3 }
+  ];
+
+  for (const { name, priority } of providers) {
+    if (providerRegistry.has(name)) {
+      const provider = await providerRegistry.get<IEmailProvider>(name);
+      const config = provider.getConfig();
+
+      emailRouter.register(name, {
+        provider,
+        priority: config.priority || priority,
+        tags: config.tags,
+        domains: config.domains
+      });
+
+      logger.info(`[ProcessorInit] Registered email provider: ${name}`);
+    }
+  }
+
+  processors.emailProcessor = new EmailProcessor(emailRouter);
+  logger.info('[ProcessorInit] Email processor initialized with router');
 }

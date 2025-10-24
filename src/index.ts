@@ -49,6 +49,10 @@ export { OpenAIProvider } from './providers/ai/openai.provider';
 export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
 export { GoogleProvider } from './providers/api/google.provider';
 
+// Email Providers
+export { ResendProvider, SendGridProvider, SMTPProvider, EmailRouter } from './providers';
+export type { IEmailProvider } from './providers';
+
 // ============================================================================
 // Services (Business Logic Layer)
 // ============================================================================
@@ -182,10 +186,16 @@ export type {
   // Providers
   IProvider,
   TwilioConfig,
-  SendGridConfig,
   AIModelConfig,
   GoogleConfig,
   ProviderConfig,
+
+  // Email Providers
+  BaseEmailConfig,
+  ResendConfig,
+  SendGridConfig,
+  SMTPConfig,
+  EmailProviderConfig,
 
   // Resources
   MakeCallOptions,

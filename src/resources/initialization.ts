@@ -8,6 +8,7 @@ import type { ConversationService } from '../services/conversation.service';
 import type { CallProcessor } from '../processors/call.processor';
 import type { MessagingProcessor } from '../processors/messaging.processor';
 import type { CalendarProcessor } from '../processors/calendar.processor';
+import type { EmailProcessor } from '../processors/email.processor';
 import type { CallsResource } from './calls.resource';
 import type { SMSResource } from './sms.resource';
 import type { EmailResource } from './email.resource';
@@ -20,6 +21,7 @@ export interface ResourceInitializationContext {
   callProcessor?: CallProcessor;
   messagingProcessor?: MessagingProcessor;
   calendarProcessor?: CalendarProcessor;
+  emailProcessor?: EmailProcessor;
 }
 
 export interface InitializedResources {
@@ -42,8 +44,8 @@ export async function initializeResources(
     await initializeCommunicationResources(context, resources);
   }
 
-  // 2. Initialize email resource (basic, always available)
-  await initializeEmailResource(resources);
+  // 2. Initialize email resource (with processor if available)
+  await initializeEmailResource(context, resources);
 
   // 3. Initialize text resource (always available for agent testing)
   await initializeTextResource(context, resources);
@@ -88,11 +90,22 @@ async function initializeCommunicationResources(
 /**
  * Initialize email resource
  */
-async function initializeEmailResource(resources: InitializedResources): Promise<void> {
+async function initializeEmailResource(
+  context: ResourceInitializationContext,
+  resources: InitializedResources
+): Promise<void> {
   const { EmailResource } = await import('./email.resource');
-  resources.email = new EmailResource();
+  resources.email = new EmailResource(
+    context.agent,
+    context.conversationService,
+    context.emailProcessor
+  );
 
-  logger.info('[ResourceInit] Email resource initialized');
+  if (context.emailProcessor) {
+    logger.info('[ResourceInit] Email resource initialized with processor');
+  } else {
+    logger.info('[ResourceInit] Email resource initialized (no email provider configured)');
+  }
 }
 
 /**

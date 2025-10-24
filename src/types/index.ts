@@ -8,7 +8,7 @@
 
 export interface IProvider {
   readonly name: string;
-  readonly type: 'communication' | 'ai' | 'api' | 'calendar' | 'crm' | 'storage' | 'custom';
+  readonly type: 'communication' | 'ai' | 'api' | 'calendar' | 'crm' | 'storage' | 'email' | 'custom';
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   healthCheck(): Promise<boolean>;
@@ -192,10 +192,41 @@ export interface TwilioConfig {
   phoneNumber: string;
 }
 
-export interface SendGridConfig {
-  apiKey: string;
+// ============================================================================
+// Email Provider Types
+// ============================================================================
+
+export interface BaseEmailConfig {
   fromEmail: string;
   fromName?: string;
+  replyTo?: string;
+  priority?: number; // Lower = higher priority (1 = primary, 2 = fallback, etc.)
+  tags?: string[]; // Route emails with these tags to this provider
+  domains?: string[]; // Route emails to these domains to this provider
+}
+
+export interface ResendConfig extends BaseEmailConfig {
+  apiKey: string;
+}
+
+export interface SendGridConfig extends BaseEmailConfig {
+  apiKey: string;
+}
+
+export interface SMTPConfig extends BaseEmailConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  username: string;
+  password: string;
+  options?: Record<string, any>;
+}
+
+// Email provider configuration (supports multiple providers)
+export interface EmailProviderConfig {
+  resend?: ResendConfig;
+  sendgrid?: SendGridConfig;
+  smtp?: SMTPConfig;
 }
 
 export interface CallOptions {
@@ -335,8 +366,8 @@ export interface CRMToolConfig {
 export interface ProviderConfig {
   communication?: {
     twilio?: TwilioConfig;
-    sendgrid?: SendGridConfig;
   };
+  email?: EmailProviderConfig;
   calendar?: {
     google?: GoogleConfig;
   };
@@ -382,6 +413,13 @@ export interface SendEmailOptions {
   body: string;
   html?: string;
   metadata?: Record<string, any>;
+  provider?: string; // Force specific provider (e.g., 'resend', 'sendgrid', 'smtp')
+  tags?: string[]; // Tags for provider routing
+  attachments?: Array<{
+    filename: string;
+    content?: string | Buffer;
+    path?: string;
+  }>;
 }
 
 export interface CallSession {
