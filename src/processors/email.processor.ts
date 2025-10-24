@@ -74,11 +74,11 @@ export class EmailProcessor {
       const result = await this.emailRouter.sendEmail(emailParams, params.provider);
 
       if (!result.success) {
-        logger.error('[EmailProcessor] Failed to send email:', result.error);
+        logger.error('[EmailProcessor] Failed to send email:', result?.error as Error);
         return {
           success: false,
-          error: result.error
-        };
+          error: (result.error as Error).message
+        } as EmailProcessorResult;
       }
 
       logger.info('[EmailProcessor] Email sent', { messageId: result.messageId });

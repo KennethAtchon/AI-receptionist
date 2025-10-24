@@ -3,7 +3,8 @@
  */
 
 export { BaseProvider } from './base.provider';
-export { BaseConfigurableProvider, IConfigurableProvider } from './configurable.provider';
+export { BaseConfigurableProvider } from './configurable.provider';
+export type { IConfigurableProvider } from './configurable.provider';
 
 // Core Providers (Communication, Calendar, etc.)
 export { TwilioProvider } from './api/twilio.provider';
@@ -22,6 +23,6 @@ export { SendGridValidator } from './validation/sendgrid-validator';
 export { SMTPValidator } from './validation/smtp-validator';
 
 // AI Providers
-export { IAIProvider } from './ai/ai-provider.interface';
+export type { IAIProvider } from './ai/ai-provider.interface';
 export { OpenAIProvider } from './ai/openai.provider';
 export { OpenRouterProvider } from './ai/openrouter.provider';

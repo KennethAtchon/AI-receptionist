@@ -57,7 +57,7 @@ export interface Attachment {
 export interface EmailResult {
   success: boolean;
   messageId?: string;
-  error?: string;
+  error?: string | Error;
   statusCode?: number;
 }
 

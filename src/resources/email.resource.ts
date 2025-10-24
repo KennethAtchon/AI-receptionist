@@ -3,7 +3,7 @@
  * User-facing API for email operations
  */
 
-import type { SendEmailOptions, EmailSession } from '../types';
+import type { SendEmailOptions, EmailSession, ConversationMessage } from '../types';
 import type { Agent } from '../agent/core/Agent';
 import type { ConversationService } from '../services/conversation.service';
 import type { EmailProcessor } from '../processors/email.processor';
@@ -38,7 +38,7 @@ export class EmailResource {
     }
 
     // Create conversation for email
-    const conversationId = await this.conversationService.create({
+    const conversationObject = await this.conversationService.create({
       channel: 'email',
       metadata: {
         to: options.to,
@@ -46,6 +46,8 @@ export class EmailResource {
         ...options.metadata
       }
     });
+
+    const conversationId = conversationObject.id;
 
     try {
       // Send email via processor
@@ -63,12 +65,14 @@ export class EmailResource {
         throw new Error(result.error || 'Failed to send email');
       }
 
-      // Store message in conversation
-      await this.conversationService.addMessage(conversationId, {
+      const conversationMessage: ConversationMessage = {
         role: 'assistant',
         content: options.body,
         timestamp: new Date()
-      });
+      };
+
+      // Store message in conversation
+      await this.conversationService.addMessage(conversationId, conversationMessage);
 
       const emailSession: EmailSession = {
         id: result.messageId || `EMAIL_${Date.now()}`,
@@ -89,7 +93,7 @@ export class EmailResource {
       logger.error('[EmailResource] Failed to send email:', error as Error);
 
       // Update conversation status
-      await this.conversationService.end(conversationId, 'failed');
+      await this.conversationService.fail(conversationId);
 
       throw error;
     }

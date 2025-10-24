@@ -7,7 +7,7 @@ import { IProvider } from '../types';
 
 export abstract class BaseProvider implements IProvider {
   abstract readonly name: string;
-  abstract readonly type: 'communication' | 'ai' | 'api' | 'calendar' | 'crm' | 'storage' | 'custom';
+  abstract readonly type: 'communication' | 'ai' | 'api' | 'calendar' | 'crm' | 'storage' | 'email' | 'custom';
 
   protected initialized = false;
 
