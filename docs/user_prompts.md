@@ -11,12 +11,15 @@ dont either some configs needed for the path
 Path = Resource = Calls/Email/Sms 
 
 
+My vision for the SDK is like things work like text resource. What text resource is right now, is the thing thats truly for devs, it sets up tools and devs can just plug it into a chat app and it does all the email sending, it takes calls on ur behalf, and sends sms messages and respond on ur behalf
 
-The way I understand the system is,
-The processor just does like stuff that the service wants it to do, with AIs
-This is completely different from tools, which uses the AI to decide what happens independently.
-Tools don't talk to processors, right?
-The AI can choose to use a tool whenever it wants, and our system has to accept it, and then do a another api call to AI to get the text
-Why does the processor consult with the AI? Is there any value there?
+This is what it will do just in the text resource. IT WILL LITERALLY DO THE SAME THINGS FOR THE OTHER RESOURCES BUT ITS JUST A DIFFERENT COMMUNICATION CHANNEL.
 
+When the AI calls or you initiate call, it will keep the call going, while using tools to do all those other things.
+
+Same for email
+
+Same for sms
+
+Thats my goal
 
