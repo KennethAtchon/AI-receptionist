@@ -261,7 +261,7 @@ export class OpenRouterProvider extends BaseConfigurableProvider implements IAIP
         toolCalls: message.tool_calls.map(tc => ({
           id: tc.id,
           name: tc.function.name,
-          parameters: JSON.parse(tc.function.arguments)
+          parameters: tc.function.arguments ? JSON.parse(tc.function.arguments) : {}
         })),
         finishReason: 'tool_calls'
       };

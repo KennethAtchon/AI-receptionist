@@ -73,23 +73,22 @@ export class MemoryManagerImpl implements IMemoryManager {
       );
       memoryContext.shortTerm = this.convertMemoriesToMessages(conversationMemories);
     } else {
-      memoryContext.shortTerm = this.shortTerm.toMessages();
+      // No conversationId provided - start fresh with no memory context
+      // Memory is still stored but not fed into the prompt
+      memoryContext.shortTerm = [];
     }
 
     // Get relevant long-term memories (if available)
-    if (this.longTerm) {
+    if (this.longTerm && context?.conversationId) {
       try {
         const keywords = this.extractKeywords(input);
         const searchQuery: MemorySearchQuery = {
           keywords,
           limit: 5,
-          minImportance: 5 // Only important memories
+          minImportance: 5, // Only important memories
+          conversationId: context.conversationId
         };
 
-        // Add context filters
-        if (context?.conversationId) {
-          searchQuery.conversationId = context.conversationId;
-        }
         if (context?.channel) {
           searchQuery.channel = context.channel;
         }
@@ -97,12 +96,12 @@ export class MemoryManagerImpl implements IMemoryManager {
         const longTermMemories = await this.longTerm.search(searchQuery);
         memoryContext.longTerm = longTermMemories;
       } catch (error) {
-        logger.warn('[MemoryManager] Long-term memory search failed:', error);
+        logger.warn('[MemoryManager] Long-term memory search failed:', { error: error instanceof Error ? error.message : String(error) });
       }
     }
 
     // Get semantically similar interactions (if available)
-    if (this.vector) {
+    if (this.vector && context?.conversationId) {
       try {
         const embedding = await this.generateEmbedding(input);
         const semanticMemories = await this.vector.similaritySearch(embedding, {
@@ -111,7 +110,7 @@ export class MemoryManagerImpl implements IMemoryManager {
         });
         memoryContext.semantic = semanticMemories;
       } catch (error) {
-        logger.warn('[MemoryManager] Vector memory search failed:', error);
+        logger.warn('[MemoryManager] Vector memory search failed:', { error: error instanceof Error ? error.message : String(error) });
       }
     }
 
@@ -135,7 +134,7 @@ export class MemoryManagerImpl implements IMemoryManager {
           const embedding = await this.generateEmbedding(memory.content);
           await this.vector.add(embedding, memory);
         } catch (error) {
-          logger.warn('[MemoryManager] Failed to store vector embedding:', error);
+          logger.warn('[MemoryManager] Failed to store vector embedding:', { error: error instanceof Error ? error.message : String(error) });
         }
       }
     }

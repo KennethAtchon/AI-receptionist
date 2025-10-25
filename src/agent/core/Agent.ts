@@ -151,18 +151,20 @@ export class Agent {
 
     try {
       // 1. Retrieve relevant context from memory
-      const memoryContext = await this.memory.retrieve(request.input);
+      const memoryContext = await this.memory.retrieve(request.input, {
+        conversationId: request.context.conversationId,
+        channel: request.channel
+      });
       this.tracer.log('memory_retrieval', memoryContext);
 
-      // 2. Build context-aware system prompt (with dynamic memory and channel info)
+      // 2. Build context-aware system prompt (with channel info, but not memory)
       // Use cached base prompt + dynamic context
-      const systemPrompt = memoryContext || request.channel
+      const systemPrompt = request.channel
         ? await this.promptBuilder.build({
             identity: this.identity,
             personality: this.personality,
             knowledge: this.knowledge,
             goals: this.goals.getCurrent(),
-            memoryContext,
             channel: request.channel
           })
         : this.cachedSystemPrompt!;

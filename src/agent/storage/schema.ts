@@ -56,12 +56,12 @@ export const memory = pgTable('ai_receptionist_memory', {
   // Timestamps
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
-  // Indexes for fast queries
-  conversationIdIdx: index('memory_conversation_id_idx').on(table.sessionMetadata),
-  channelIdx: index('memory_channel_idx').on(table.channel),
-  typeIdx: index('memory_type_idx').on(table.type),
-  timestampIdx: index('memory_timestamp_idx').on(table.timestamp),
-  importanceIdx: index('memory_importance_idx').on(table.importance),
+  // Indexes for memory table
+  memoryConversationIdIdx: index('memory_conversation_id_idx').on(table.sessionMetadata),
+  memoryChannelIdx: index('memory_channel_idx').on(table.channel),
+  memoryTypeIdx: index('memory_type_idx').on(table.type),
+  memoryTimestampIdx: index('memory_timestamp_idx').on(table.timestamp),
+  memoryImportanceIdx: index('memory_importance_idx').on(table.importance),
 }));
 
 /**
@@ -77,8 +77,9 @@ export const leads = pgTable('ai_receptionist_leads', {
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
-  sourceIdx: index('leads_source_idx').on(table.source),
-  createdAtIdx: index('leads_created_at_idx').on(table.createdAt),
+  // Indexes for leads table
+  leadsSourceIdx: index('leads_source_idx').on(table.source),
+  leadsCreatedAtIdx: index('leads_created_at_idx').on(table.createdAt),
 }));
 
 /**
@@ -95,10 +96,12 @@ export const callLogs = pgTable('ai_receptionist_call_logs', {
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
-  conversationIdIdx: index('call_logs_conversation_id_idx').on(table.conversationId),
-  outcomeIdx: index('call_logs_outcome_idx').on(table.outcome),
-  createdAtIdx: index('call_logs_created_at_idx').on(table.createdAt),
+  // Indexes for call logs table
+  callLogsConversationIdIdx: index('call_logs_conversation_id_idx').on(table.conversationId),
+  callLogsOutcomeIdx: index('call_logs_outcome_idx').on(table.outcome),
+  callLogsCreatedAtIdx: index('call_logs_created_at_idx').on(table.createdAt),
 }));
+
 
 // Type exports for use in code
 export type Memory = typeof memory.$inferSelect;
