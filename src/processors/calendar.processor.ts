@@ -191,4 +191,94 @@ export class CalendarProcessor {
       return [];
     }
   }
+
+  /**
+   * Find available slots using business logic algorithm
+   * Moved from CalendarService to preserve functionality
+   */
+  async findAvailableSlots(params: {
+    calendarId: string;
+    preferredDates: Date[];
+    duration: number;
+    userPreferences?: string;
+  }): Promise<Date[]> {
+    // Validate params
+    if (params.duration < 15 || params.duration > 480) {
+      throw new Error('Duration must be between 15 and 480 minutes');
+    }
+
+    if (params.preferredDates.length === 0) {
+      throw new Error('At least one preferred date is required');
+    }
+
+    logger.info('[CalendarProcessor] Finding available slots', {
+      duration: params.duration,
+      dateCount: params.preferredDates.length
+    });
+
+    // Use processor for administrative free/busy query
+    const startDate = params.preferredDates[0];
+    const endDate = new Date(params.preferredDates[params.preferredDates.length - 1]);
+    endDate.setDate(endDate.getDate() + 1); // Add one day to include the last date
+
+    const busySlots = await this.getFreeBusy(
+      params.calendarId,
+      startDate,
+      endDate
+    );
+
+    // Simple algorithm to find available slots
+    const availableSlots: Date[] = [];
+    for (const date of params.preferredDates) {
+      // Check each hour from 9 AM to 5 PM
+      for (let hour = 9; hour <= 17; hour++) {
+        const slotStart = new Date(date);
+        slotStart.setHours(hour, 0, 0, 0);
+        const slotEnd = new Date(slotStart);
+        slotEnd.setMinutes(slotEnd.getMinutes() + params.duration);
+
+        // Check if this slot conflicts with busy times
+        const hasConflict = busySlots.some(busy => 
+          (slotStart < busy.end && slotEnd > busy.start)
+        );
+
+        if (!hasConflict) {
+          availableSlots.push(slotStart);
+        }
+      }
+    }
+    
+    logger.info('[CalendarProcessor] Found slots', { count: availableSlots.length });
+    return availableSlots;
+  }
+
+  /**
+   * Find next available slot
+   * Moved from CalendarService to preserve functionality
+   */
+  async findNextAvailable(params: {
+    calendarId: string;
+    after: Date;
+    duration: number;
+    userPreferences?: string;
+  }): Promise<Date | null> {
+    logger.info('[CalendarProcessor] Finding next available slot');
+
+    // Generate date range (next 7 days)
+    const preferredDates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(params.after);
+      date.setDate(date.getDate() + i);
+      preferredDates.push(date);
+    }
+
+    const slots = await this.findAvailableSlots({
+      calendarId: params.calendarId,
+      preferredDates,
+      duration: params.duration,
+      userPreferences: params.userPreferences
+    });
+
+    return slots.length > 0 ? slots[0] : null;
+  }
 }

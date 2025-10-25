@@ -7,14 +7,12 @@
  */
 
 import { Agent } from '../agent/core/Agent';
-import { ConversationService } from '../services/conversation.service';
 import { GenerateTextOptions, TextResponse } from '../types';
 import { logger } from '../utils/logger';
 
 export class TextResource {
   constructor(
-    private agent: Agent,
-    private conversationService?: ConversationService
+    private agent: Agent
   ) {}
 
   /**
@@ -47,20 +45,26 @@ export class TextResource {
     logger.info(`[TextResource] Generating text for prompt: "${options.prompt.substring(0, 50)}..."`);
 
     try {
-      // Get or create conversation if conversation service is available
+      // Get or create conversation using Agent memory
       let conversationId = options.conversationId;
-      if (this.conversationService && !conversationId) {
-        const conversation = await this.conversationService.create({
+      if (!conversationId) {
+        conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        await this.agent.getMemory().startSession({
+          conversationId,
           channel: 'text',
           metadata: options.metadata
         });
-        conversationId = conversation.id;
         logger.info(`[TextResource] Created new conversation: ${conversationId}`);
-      } else if (this.conversationService && conversationId) {
+      } else {
         // Add user message to existing conversation
-        await this.conversationService.addMessage(conversationId, {
+        await this.agent.getMemory().store({
+          id: `msg-${conversationId}-${Date.now()}`,
+          content: options.prompt,
+          timestamp: new Date(),
+          type: 'conversation',
+          channel: 'text',
           role: 'user',
-          content: options.prompt
+          sessionMetadata: { conversationId }
         });
         logger.info(`[TextResource] Added user message to conversation: ${conversationId}`);
       }
@@ -81,14 +85,17 @@ export class TextResource {
         }
       });
 
-      // Add assistant response to conversation if conversation service is available
-      if (this.conversationService && conversationId) {
-        await this.conversationService.addMessage(conversationId, {
-          role: 'assistant',
-          content: agentResponse.content
-        });
-        logger.info(`[TextResource] Added assistant response to conversation: ${conversationId}`);
-      }
+      // Add assistant response to conversation using Agent memory
+      await this.agent.getMemory().store({
+        id: `msg-${conversationId}-${Date.now()}`,
+        content: agentResponse.content,
+        timestamp: new Date(),
+        type: 'conversation',
+        channel: 'text',
+        role: 'assistant',
+        sessionMetadata: { conversationId }
+      });
+      logger.info(`[TextResource] Added assistant response to conversation: ${conversationId}`);
 
       const response: TextResponse = {
         text: agentResponse.content,
@@ -129,20 +136,19 @@ export class TextResource {
    * ```
    */
   async createConversation(options?: { metadata?: Record<string, any> }): Promise<{ id: string; channel: string; startedAt: Date }> {
-    if (!this.conversationService) {
-      throw new Error('ConversationService not available. Cannot create conversation.');
-    }
-
-    const conversation = await this.conversationService.create({
+    const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    await this.agent.getMemory().startSession({
+      conversationId,
       channel: 'text',
       metadata: options?.metadata
     });
 
-    logger.info(`[TextResource] Created new conversation: ${conversation.id}`);
+    logger.info(`[TextResource] Created new conversation: ${conversationId}`);
     return {
-      id: conversation.id,
-      channel: conversation.channel,
-      startedAt: conversation.startedAt
+      id: conversationId,
+      channel: 'text',
+      startedAt: new Date()
     };
   }
 

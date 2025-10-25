@@ -4,7 +4,6 @@
  */
 
 import type { Agent } from '../agent/core/Agent';
-import type { ConversationService } from '../services/conversation.service';
 import type { CallProcessor } from '../processors/call.processor';
 import type { MessagingProcessor } from '../processors/messaging.processor';
 import type { CalendarProcessor } from '../processors/calendar.processor';
@@ -17,7 +16,6 @@ import { logger } from '../utils/logger';
 
 export interface ResourceInitializationContext {
   agent: Agent;
-  conversationService: ConversationService;
   callProcessor?: CallProcessor;
   messagingProcessor?: MessagingProcessor;
   calendarProcessor?: CalendarProcessor;
@@ -75,7 +73,6 @@ async function initializeCommunicationResources(
   // Initialize calls resource
   const { CallsResource } = await import('./calls.resource');
   resources.calls = new CallsResource(
-    context.conversationService,
     context.agent,
     context.callProcessor!
   );
@@ -97,7 +94,6 @@ async function initializeEmailResource(
   const { EmailResource } = await import('./email.resource');
   resources.email = new EmailResource(
     context.agent,
-    context.conversationService,
     context.emailProcessor
   );
 
@@ -116,7 +112,7 @@ async function initializeTextResource(
   resources: InitializedResources
 ): Promise<void> {
   const { TextResource } = await import('./text.resource');
-  resources.text = new TextResource(context.agent, context.conversationService);
+  resources.text = new TextResource(context.agent);
 
   logger.info('[ResourceInit] Text resource initialized');
 }

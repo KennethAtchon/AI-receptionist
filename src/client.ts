@@ -4,7 +4,6 @@
  */
 
 import type { AIReceptionistConfig } from './types';
-import { ConversationService } from './services/conversation.service';
 import { ToolRegistry } from './tools/registry';
 import { ToolStore } from './tools/tool-store';
 import { logger } from './utils/logger';
@@ -95,7 +94,6 @@ export class AIReceptionist {
   private config: AIReceptionistConfig;
   private agent!: Agent; // The six-pillar agent instance
   private providerRegistry!: ProviderRegistry; // Centralized provider management
-  private conversationService!: ConversationService;
   private toolRegistry!: ToolRegistry;
   private toolStore!: ToolStore;
   
@@ -145,18 +143,15 @@ export class AIReceptionist {
 
     logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity.name}`);
 
-    // 1. Initialize conversation service (backed by agent memory)
-    this.conversationService = new ConversationService();
-
-    // 2. Initialize provider registry and register all providers
+    // 1. Initialize provider registry and register all providers
     this.providerRegistry = await initializeProviders(this.config);
 
-    // 3. Create tool infrastructure (registry + store)
+    // 2. Create tool infrastructure (registry + store)
     const { toolRegistry, toolStore } = createToolInfrastructure();
     this.toolRegistry = toolRegistry;
     this.toolStore = toolStore;
 
-    // 4. Create and initialize the Agent (Six-Pillar Architecture)
+    // 3. Create and initialize the Agent (Six-Pillar Architecture)
     const aiProvider = await getAIProvider(this.providerRegistry);
 
     this.agent = AgentBuilder.create()
@@ -167,11 +162,9 @@ export class AIReceptionist {
       .withMemory(this.config.agent.memory || { contextWindow: 20 })
       .withAIProvider(aiProvider)
       .withToolRegistry(this.toolRegistry)
-      .withConversationService(this.conversationService)
       .build();
 
-    // Link conversation service and tool store to agent
-    this.conversationService.setAgent(this.agent);
+    // Link tool store to agent
     this.toolStore.setAgent(this.agent);
 
     await this.agent.initialize();
@@ -197,7 +190,6 @@ export class AIReceptionist {
     // 7. Initialize resources (user-facing APIs)
     const resources = await initializeResources({
       agent: this.agent,
-      conversationService: this.conversationService,
       callProcessor: this.callProcessor,
       messagingProcessor: this.messagingProcessor,
       calendarProcessor: this.calendarProcessor

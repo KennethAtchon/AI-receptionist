@@ -369,6 +369,70 @@ export class MemoryManagerImpl implements IMemoryManager {
     await this.store(memory);
   }
 
+  /**
+   * Get conversation by call SID
+   * Moved from ConversationService to preserve functionality
+   */
+  public async getConversationByCallId(callSid: string): Promise<Memory | null> {
+    const results = await this.search({
+      keywords: [],
+      limit: 1,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+    
+    const match = results.find(m => m.sessionMetadata?.callSid === callSid);
+    return match || null;
+  }
+
+  /**
+   * Get conversation by message SID
+   * Moved from ConversationService to preserve functionality
+   */
+  public async getConversationByMessageId(messageSid: string): Promise<Memory | null> {
+    const results = await this.search({
+      keywords: [],
+      limit: 1,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+    
+    const match = results.find(m => m.sessionMetadata?.messageSid === messageSid);
+    return match || null;
+  }
+
+  /**
+   * Attach call SID to conversation
+   * Moved from ConversationService to preserve functionality
+   */
+  public async attachCallSid(conversationId: string, callSid: string): Promise<void> {
+    const memory: Memory = {
+      id: `session-call-${conversationId}`,
+      content: 'Attached call SID',
+      timestamp: new Date(),
+      type: 'system',
+      sessionMetadata: { conversationId, callSid }
+    };
+    
+    await this.store(memory);
+  }
+
+  /**
+   * Attach message SID to conversation
+   * Moved from ConversationService to preserve functionality
+   */
+  public async attachMessageSid(conversationId: string, messageSid: string): Promise<void> {
+    const memory: Memory = {
+      id: `session-message-${conversationId}`,
+      content: 'Attached message SID',
+      timestamp: new Date(),
+      type: 'system',
+      sessionMetadata: { conversationId, messageSid }
+    };
+    
+    await this.store(memory);
+  }
+
   // ==================== HELPER METHODS ====================
 
   /**

@@ -334,6 +334,10 @@ export interface MemoryManager {
     metadata?: Record<string, any>;
   }): Promise<void>;
   endSession(conversationId: string, summary?: string): Promise<void>;
+  getConversationByCallId(callSid: string): Promise<Memory | null>;
+  getConversationByMessageId(messageSid: string): Promise<Memory | null>;
+  attachCallSid(conversationId: string, callSid: string): Promise<void>;
+  attachMessageSid(conversationId: string, messageSid: string): Promise<void>;
   clearShortTerm(): void;
   clearLongTerm(): void;
 }

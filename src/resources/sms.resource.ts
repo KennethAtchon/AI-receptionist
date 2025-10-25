@@ -3,19 +3,16 @@
  * User-facing API for SMS operations
  */
 
-import { MessagingService } from '../services/messaging.service';
 import { SendSMSOptions, SMSSession } from '../types';
 import { logger } from '../utils/logger';
 import type { Agent } from '../agent/core/Agent';
 import type { MessagingProcessor } from '../processors/messaging.processor';
 
 export class SMSResource {
-  private readonly messagingService: MessagingService;
-
-  constructor(agent: Agent, messagingProcessor: MessagingProcessor) {
-    // Create service internally (Factory Pattern)
-    this.messagingService = new MessagingService(agent, messagingProcessor);
-  }
+  constructor(
+    private agent: Agent,
+    private messagingProcessor: MessagingProcessor
+  ) {}
 
   /**
    * Send an SMS message
@@ -32,13 +29,35 @@ export class SMSResource {
   async send(options: SendSMSOptions): Promise<SMSSession> {
     logger.info(`[SMSResource] Sending SMS to ${options.to}`);
 
-    // Use messaging service which delegates to the processor
-    return await this.messagingService.sendSMS({
+    // Validate phone number
+    if (!this.messagingProcessor.isValidPhoneNumber(options.to)) {
+      throw new Error('Invalid phone number format');
+    }
+
+    if (!options.body || options.body.length === 0) {
+      throw new Error('Message cannot be empty');
+    }
+
+    // Use processor for administrative SMS sending
+    const result = await this.messagingProcessor.sendSMS({
       to: options.to,
-      context: options.body,
-      conversationId: options.conversationId,
-      channel: 'sms'
+      body: options.body
     });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send SMS');
+    }
+
+    logger.info('[SMSResource] SMS sent', { messageId: result.messageId });
+
+    return {
+      id: result.messageId!,
+      conversationId: options.conversationId || 'unknown',
+      to: options.to,
+      body: options.body,
+      status: 'sent',
+      sentAt: new Date()
+    };
   }
 
   /**

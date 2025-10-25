@@ -5,14 +5,12 @@
 
 import type { SendEmailOptions, EmailSession, ConversationMessage } from '../types';
 import type { Agent } from '../agent/core/Agent';
-import type { ConversationService } from '../services/conversation.service';
 import type { EmailProcessor } from '../processors/email.processor';
 import { logger } from '../utils/logger';
 
 export class EmailResource {
   constructor(
     private agent: Agent,
-    private conversationService: ConversationService,
     private emailProcessor?: EmailProcessor
   ) {}
 
@@ -37,8 +35,10 @@ export class EmailResource {
       throw new Error('Email processor not configured. Please configure an email provider.');
     }
 
-    // Create conversation for email
-    const conversationObject = await this.conversationService.create({
+    // Create conversation for email using Agent memory
+    const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await this.agent.getMemory().startSession({
+      conversationId,
       channel: 'email',
       metadata: {
         to: options.to,
@@ -46,8 +46,6 @@ export class EmailResource {
         ...options.metadata
       }
     });
-
-    const conversationId = conversationObject.id;
 
     try {
       // Send email via processor
@@ -71,8 +69,16 @@ export class EmailResource {
         timestamp: new Date()
       };
 
-      // Store message in conversation
-      await this.conversationService.addMessage(conversationId, conversationMessage);
+      // Store message in conversation using Agent memory
+      await this.agent.getMemory().store({
+        id: `msg-${conversationId}-${Date.now()}`,
+        content: options.body,
+        timestamp: new Date(),
+        type: 'conversation',
+        channel: 'email',
+        role: 'assistant',
+        sessionMetadata: { conversationId }
+      });
 
       const emailSession: EmailSession = {
         id: result.messageId || `EMAIL_${Date.now()}`,
@@ -92,8 +98,15 @@ export class EmailResource {
     } catch (error) {
       logger.error('[EmailResource] Failed to send email:', error as Error);
 
-      // Update conversation status
-      await this.conversationService.fail(conversationId);
+      // Update conversation status using Agent memory
+      await this.agent.getMemory().store({
+        id: `session-failed-${conversationId}`,
+        content: 'Conversation failed',
+        timestamp: new Date(),
+        type: 'system',
+        sessionMetadata: { conversationId, status: 'failed' },
+        importance: 7
+      });
 
       throw error;
     }

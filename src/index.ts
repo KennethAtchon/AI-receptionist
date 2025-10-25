@@ -54,11 +54,8 @@ export { ResendProvider, SendGridProvider, SMTPProvider, EmailRouter } from './p
 export type { IEmailProvider } from './providers';
 
 // ============================================================================
-// Services (Business Logic Layer)
+// Services (Business Logic Layer) - REMOVED
 // ============================================================================
-
-export { ConversationService } from './services/conversation.service';
-export { CallService } from './services/call.service';
 
 // ============================================================================
 // Storage

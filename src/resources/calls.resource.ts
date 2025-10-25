@@ -3,24 +3,16 @@
  * User-facing API for phone call operations
  */
 
-import { CallService } from '../services/call.service';
 import { MakeCallOptions, CallSession } from '../types';
 import { logger } from '../utils/logger';
-import type { ConversationService } from '../services/conversation.service';
 import type { Agent } from '../agent/core/Agent';
 import type { CallProcessor } from '../processors/call.processor';
 
 export class CallsResource {
-  private readonly callService: CallService;
-
   constructor(
-    conversationService: ConversationService,
-    agent: Agent,
-    callProcessor: CallProcessor
-  ) {
-    // Create service internally (Factory Pattern)
-    this.callService = new CallService(conversationService, agent, callProcessor);
-  }
+    private agent: Agent,
+    private callProcessor: CallProcessor
+  ) {}
 
   /**
    * Make an outbound call
@@ -35,7 +27,32 @@ export class CallsResource {
    * ```
    */
   async make(options: MakeCallOptions): Promise<CallSession> {
-    return this.callService.initiateCall(options);
+    logger.info(`[CallsResource] Initiating call to ${options.to}`);
+
+    // 1. Create conversation context using Agent memory
+    const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await this.agent.getMemory().startSession({
+      conversationId,
+      channel: 'call',
+      metadata: options.metadata
+    });
+
+    // 2. Use processor for administrative call initiation
+    const result = await this.callProcessor.initiateCall({
+      to: options.to,
+      conversationId,
+      greeting: 'Hello! How can I help you today?'
+    });
+
+    logger.info(`[CallsResource] Call initiated: ${result.callSid}`);
+
+    return {
+      id: result.callSid,
+      conversationId,
+      to: options.to,
+      status: 'initiated',
+      startedAt: new Date()
+    };
   }
 
   /**
@@ -59,6 +76,15 @@ export class CallsResource {
    * TODO: Implement
    */
   async end(callId: string): Promise<void> {
-    await this.callService.endCall(callId);
+    logger.info(`[CallsResource] Ending call ${callId}`);
+
+    // Get conversation context
+    const conversation = await this.agent.getMemory().getConversationByCallId(callId);
+    if (conversation) {
+      await this.agent.getMemory().endSession(conversation.sessionMetadata!.conversationId!);
+    }
+
+    // Use processor for administrative call ending
+    await this.callProcessor.endCall({ callSid: callId });
   }
 }
