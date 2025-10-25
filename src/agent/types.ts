@@ -209,10 +209,19 @@ export interface Memory {
   goalAchieved?: boolean;
 }
 
-export interface MemoryContext {
-  shortTerm?: Message[];
-  longTerm?: Memory[];
-  semantic?: Memory[];
+export interface ConversationHistory {
+  messages: Message[];
+  contextMessages?: Message[];
+  metadata: ConversationHistoryMetadata;
+}
+
+export interface ConversationHistoryMetadata {
+  conversationId?: string;
+  messageCount: number;
+  oldestMessageTimestamp?: Date;
+  newestMessageTimestamp?: Date;
+  hasLongTermContext: boolean;
+  hasSemanticContext: boolean;
 }
 
 export interface MemorySearchQuery {
@@ -308,13 +317,11 @@ export interface MemoryManager {
   retrieve(input: string, context?: {
     conversationId?: string;
     channel?: Channel;
-  }): Promise<MemoryContext>;
+  }): Promise<ConversationHistory>;
   store(memory: Memory): Promise<void>;
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   getStats(): MemoryStats;
-
-  // New methods for conversation management
   getConversationHistory(conversationId: string): Promise<Memory[]>;
   getChannelHistory(channel: Channel, options?: {
     limit?: number;
@@ -417,7 +424,6 @@ export interface PromptContext {
   personality?: PersonalityEngine;
   knowledge?: KnowledgeBase;
   goals?: Goal[];
-  memoryContext?: MemoryContext;
   channel?: Channel;
   maxTokens?: number;
   policies?: PolicyRule[];

@@ -11,7 +11,8 @@ import type {
   MemoryManager as IMemoryManager,
   MemoryConfig,
   Memory,
-  MemoryContext,
+  ConversationHistory,
+  ConversationHistoryMetadata,
   MemoryStats,
   MemorySearchQuery,
   Message,
@@ -53,39 +54,27 @@ export class MemoryManagerImpl implements IMemoryManager {
     // Future: Load initial context from storage
   }
 
-  /**
-   * Retrieve relevant context for current interaction
-   */
   public async retrieve(input: string, context?: {
     conversationId?: string;
     channel?: Channel;
-  }): Promise<MemoryContext> {
-    const memoryContext: MemoryContext = {
-      shortTerm: [],
-      longTerm: [],
-      semantic: []
-    };
+  }): Promise<ConversationHistory> {
+    const messages: Message[] = [];
+    const contextMessages: Message[] = [];
 
-    // Get recent conversation context from short-term memory
     if (context?.conversationId) {
       const conversationMemories = this.shortTerm.getAll().filter(
         m => m.sessionMetadata?.conversationId === context.conversationId
       );
-      memoryContext.shortTerm = this.convertMemoriesToMessages(conversationMemories);
-    } else {
-      // No conversationId provided - start fresh with no memory context
-      // Memory is still stored but not fed into the prompt
-      memoryContext.shortTerm = [];
+      messages.push(...this.convertMemoriesToMessages(conversationMemories));
     }
 
-    // Get relevant long-term memories (if available)
     if (this.longTerm && context?.conversationId) {
       try {
         const keywords = this.extractKeywords(input);
         const searchQuery: MemorySearchQuery = {
           keywords,
           limit: 5,
-          minImportance: 5, // Only important memories
+          minImportance: 5,
           conversationId: context.conversationId
         };
 
@@ -94,13 +83,19 @@ export class MemoryManagerImpl implements IMemoryManager {
         }
 
         const longTermMemories = await this.longTerm.search(searchQuery);
-        memoryContext.longTerm = longTermMemories;
+
+        if (longTermMemories.length > 0) {
+          contextMessages.push({
+            role: 'system',
+            content: this.formatLongTermContext(longTermMemories),
+            timestamp: new Date()
+          });
+        }
       } catch (error) {
         logger.warn('[MemoryManager] Long-term memory search failed:', { error: error instanceof Error ? error.message : String(error) });
       }
     }
 
-    // Get semantically similar interactions (if available)
     if (this.vector && context?.conversationId) {
       try {
         const embedding = await this.generateEmbedding(input);
@@ -108,13 +103,33 @@ export class MemoryManagerImpl implements IMemoryManager {
           limit: 3,
           threshold: 0.8
         });
-        memoryContext.semantic = semanticMemories;
+
+        if (semanticMemories.length > 0) {
+          contextMessages.push({
+            role: 'system',
+            content: this.formatSemanticContext(semanticMemories),
+            timestamp: new Date()
+          });
+        }
       } catch (error) {
         logger.warn('[MemoryManager] Vector memory search failed:', { error: error instanceof Error ? error.message : String(error) });
       }
     }
 
-    return memoryContext;
+    const metadata: ConversationHistoryMetadata = {
+      conversationId: context?.conversationId,
+      messageCount: messages.length,
+      oldestMessageTimestamp: messages[0]?.timestamp,
+      newestMessageTimestamp: messages[messages.length - 1]?.timestamp,
+      hasLongTermContext: contextMessages.some(m => m.content.includes('Relevant context from past')),
+      hasSemanticContext: contextMessages.some(m => m.content.includes('Similar past interactions'))
+    };
+
+    return {
+      messages,
+      contextMessages,
+      metadata
+    };
   }
 
   /**
@@ -367,5 +382,30 @@ export class MemoryManagerImpl implements IMemoryManager {
       toolCall: memory.toolCall,
       toolResult: memory.toolResult
     }));
+  }
+
+  /**
+   * Format long-term memories as context message content
+   */
+  private formatLongTermContext(memories: Memory[]): string {
+    let context = 'Relevant context from past interactions:\n';
+    for (const memory of memories) {
+      const timestamp = memory.timestamp.toLocaleDateString();
+      context += `- [${timestamp}] ${memory.content}\n`;
+    }
+    return context.trim();
+  }
+
+  /**
+   * Format semantic memories as context message content
+   */
+  private formatSemanticContext(memories: Memory[]): string {
+    let context = 'Similar past interactions that may be relevant:\n';
+    for (const memory of memories) {
+      const summary = (memory.metadata as any)?.summary || memory.content;
+      const timestamp = memory.timestamp.toLocaleDateString();
+      context += `- [${timestamp}] ${summary}\n`;
+    }
+    return context.trim();
   }
 }

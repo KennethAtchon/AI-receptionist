@@ -16,7 +16,6 @@ import type {
   PersonalityEngine,
   KnowledgeBase,
   Goal,
-  MemoryContext,
   Channel,
   PromptExample
 } from '../types';
@@ -48,26 +47,21 @@ export class SystemPromptBuilder {
       sections.push(this.buildGoalsSection(context.goals));
     }
 
-    // 5. MEMORY CONTEXT (retrieved from MemoryManager)
-    if (context.memoryContext) {
-      sections.push(this.buildMemoryContextSection(context.memoryContext));
-    }
-
-    // 6. DECISION-MAKING PRINCIPLES
+    // 5. DECISION-MAKING PRINCIPLES
     sections.push(this.buildDecisionPrinciplesSection());
 
-    // 7. COMMUNICATION GUIDELINES (channel-specific)
+    // 6. COMMUNICATION GUIDELINES (channel-specific)
     if (context.channel) {
       sections.push(this.buildCommunicationSection(context.channel));
     }
 
-    // 9. CONSTRAINTS & BOUNDARIES
+    // 7. CONSTRAINTS & BOUNDARIES
     sections.push(this.buildConstraintsSection(context));
 
-    // 10. ERROR HANDLING
+    // 8. ERROR HANDLING
     sections.push(this.buildErrorHandlingSection());
 
-    // 11. EXAMPLES (few-shot learning)
+    // 9. EXAMPLES (few-shot learning)
     if (context.examples && context.examples.length > 0) {
       sections.push(this.buildExamplesSection(context.examples));
     }
@@ -278,50 +272,6 @@ export class SystemPromptBuilder {
     };
   }
 
-
-  /**
-   * Build MEMORY CONTEXT section
-   */
-  private buildMemoryContextSection(memoryContext: MemoryContext): PromptSection {
-    let content = '# RELEVANT CONTEXT FROM MEMORY\n\n';
-
-    if (memoryContext.shortTerm && memoryContext.shortTerm.length > 0) {
-      content += `## Recent Conversation\n`;
-      const recent = memoryContext.shortTerm.slice(-5);
-      for (const msg of recent) {
-        content += `- ${msg.role}: ${msg.content}\n`;
-      }
-      content += '\n';
-    }
-
-    if (memoryContext.longTerm && memoryContext.longTerm.length > 0) {
-      content += `## Important Facts Recalled\n`;
-      for (const memory of memoryContext.longTerm) {
-        content += `- ${memory.content}\n`;
-      }
-      content += '\n';
-    }
-
-    if (memoryContext.semantic && memoryContext.semantic.length > 0) {
-      content += `## Similar Past Interactions\n`;
-      for (const memory of memoryContext.semantic) {
-        const summary = (memory.metadata as any)?.summary || memory.content;
-        content += `- ${summary}\n`;
-      }
-      content += '\n';
-    }
-
-    // If no context available
-    if (!memoryContext.shortTerm?.length && !memoryContext.longTerm?.length && !memoryContext.semantic?.length) {
-      content += 'No relevant context from memory.\n';
-    }
-
-    return {
-      name: 'MEMORY',
-      priority: 7,
-      content: content.trim()
-    };
-  }
 
   /**
    * Build DECISION PRINCIPLES section
@@ -549,8 +499,6 @@ export class SystemPromptBuilder {
       'PERSONALITY',
       'KNOWLEDGE',
       'GOALS',
-      'CAPABILITIES',
-      'MEMORY',
       'DECISION_PRINCIPLES',
       'COMMUNICATION',
       'CONSTRAINTS',

@@ -140,7 +140,8 @@ export type {
   // Memory Pillar
   Memory,
   MemoryConfig,
-  MemoryContext,
+  ConversationHistory,
+  ConversationHistoryMetadata,
   MemoryManager,
   MemoryStats,
   MemorySearchQuery,

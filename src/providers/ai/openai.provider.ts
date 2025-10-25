@@ -74,29 +74,51 @@ export class OpenAIProvider extends BaseConfigurableProvider implements IAIProvi
 
   /**
    * Build messages array with proper OpenAI SDK types
+   *
+   * OpenAI best practice: Use a single system message at the start,
+   * followed by user/assistant conversation history.
+   * We merge context messages into the main system prompt.
    */
   private buildMessages(options: ChatOptions): ChatCompletionMessageParam[] {
     const messages: ChatCompletionMessageParam[] = [];
 
-    // System message (if provided)
-    if (options.systemPrompt) {
-      messages.push({
-        role: 'system',
-        content: options.systemPrompt
-      });
-    }
+    // Build comprehensive system message
+    let systemContent = options.systemPrompt || '';
 
-    // Conversation history
+    // Extract context from conversation history (system role messages)
+    const contextMessages: string[] = [];
+    const conversationMessages: ChatCompletionMessageParam[] = [];
+
     if (options.conversationHistory) {
       for (const msg of options.conversationHistory) {
-        if (msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system') {
-          messages.push({
+        if (msg.role === 'system') {
+          // Collect system/context messages
+          contextMessages.push(msg.content);
+        } else if (msg.role === 'user' || msg.role === 'assistant') {
+          // Keep user/assistant conversation
+          conversationMessages.push({
             role: msg.role,
             content: msg.content
           });
         }
       }
     }
+
+    // Merge context into system prompt
+    if (contextMessages.length > 0) {
+      systemContent += '\n\n# RELEVANT CONTEXT\n' + contextMessages.join('\n\n');
+    }
+
+    // Add single comprehensive system message
+    if (systemContent) {
+      messages.push({
+        role: 'system',
+        content: systemContent
+      });
+    }
+
+    // Add conversation history (user/assistant only)
+    messages.push(...conversationMessages);
 
     // Current user message
     messages.push({

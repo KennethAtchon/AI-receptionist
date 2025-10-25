@@ -313,22 +313,19 @@ export class MemoryManagerImpl implements IMemoryManager {
   async retrieve(input: string, context?: {
     conversationId?: string;
     channel?: Channel;
-  }): Promise<MemoryContext> {
-    const memoryContext: MemoryContext = {
-      shortTerm: [],
-      longTerm: [],
-      semantic: []
-    };
+  }): Promise<ConversationHistory> {
+    const messages: Message[] = [];
+    const contextMessages: Message[] = [];
 
-    // Get recent conversation context
+    // Get short-term conversation history (user ↔ assistant messages)
     if (context?.conversationId) {
       const conversationMemories = this.shortTerm.getAll().filter(
         m => m.sessionMetadata?.conversationId === context.conversationId
       );
-      memoryContext.shortTerm = this.convertMemoriesToMessages(conversationMemories);
+      messages.push(...this.convertMemoriesToMessages(conversationMemories));
     }
 
-    // Get relevant long-term memories
+    // Get long-term context (injected as system messages)
     if (this.longTerm) {
       const keywords = this.extractKeywords(input);
       const searchQuery: MemorySearchQuery = {
@@ -337,10 +334,26 @@ export class MemoryManagerImpl implements IMemoryManager {
         minImportance: 5
       };
       const longTermMemories = await this.longTerm.search(searchQuery);
-      memoryContext.longTerm = longTermMemories;
+
+      if (longTermMemories.length > 0) {
+        contextMessages.push({
+          role: 'system',
+          content: this.formatLongTermContext(longTermMemories),
+          timestamp: new Date()
+        });
+      }
     }
 
-    return memoryContext;
+    return {
+      messages,
+      contextMessages,
+      metadata: {
+        conversationId: context?.conversationId,
+        messageCount: messages.length,
+        hasLongTermContext: contextMessages.length > 0,
+        hasSemanticContext: false
+      }
+    };
   }
 }
 ```

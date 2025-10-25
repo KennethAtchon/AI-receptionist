@@ -22,7 +22,7 @@ import type {
   KnowledgeBase,
   MemoryManager,
   GoalSystem,
-  MemoryContext,
+  ConversationHistory,
   PerformanceMetrics
 } from '../types';
 
@@ -34,6 +34,7 @@ import { KnowledgeBaseImpl } from '../knowledge/KnowledgeBase';
 import { MemoryManagerImpl } from '../memory/MemoryManager';
 import { GoalSystemImpl } from '../goals/GoalSystem';
 import { SystemPromptBuilder } from '../prompt/SystemPromptBuilder';
+import { PromptOptimizer } from '../prompt/PromptOptimizer';
 import { AgentLogger } from '../observability/AgentLogger';
 import { InteractionTracer } from '../observability/InteractionTracer';
 import { AgentBuilder } from './AgentBuilder';
@@ -48,6 +49,7 @@ export class Agent {
 
   // ==================== SUPPORTING SYSTEMS ====================
   private readonly promptBuilder: SystemPromptBuilder;
+  private readonly promptOptimizer: PromptOptimizer;
   private cachedSystemPrompt: string | null = null;
 
   // ==================== STATE ====================
@@ -83,8 +85,9 @@ export class Agent {
     // Initialize goals
     this.goals = new GoalSystemImpl(config.goals || { primary: 'Assist users effectively' });
 
-    // Initialize prompt builder
+    // Initialize prompt builder and optimizer
     this.promptBuilder = new SystemPromptBuilder();
+    this.promptOptimizer = new PromptOptimizer();
 
     // Initialize observability
     const agentId = `agent-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -150,15 +153,14 @@ export class Agent {
     const startTime = Date.now();
 
     try {
-      // 1. Retrieve relevant context from memory
-      const memoryContext = await this.memory.retrieve(request.input, {
+      // 1. Retrieve conversation history
+      const conversationHistory = await this.memory.retrieve(request.input, {
         conversationId: request.context.conversationId,
         channel: request.channel
       });
-      this.tracer.log('memory_retrieval', memoryContext);
+      this.tracer.log('conversation_history_retrieval', conversationHistory);
 
-      // 2. Build context-aware system prompt (with channel info, but not memory)
-      // Use cached base prompt + dynamic context
+      // 2. Build system prompt (static, no memory)
       const systemPrompt = request.channel
         ? await this.promptBuilder.build({
             identity: this.identity,
@@ -170,7 +172,7 @@ export class Agent {
         : this.cachedSystemPrompt!;
 
       // 3. Execute with AI provider
-      const response = await this.execute(request, systemPrompt, memoryContext);
+      const response = await this.execute(request, systemPrompt, conversationHistory);
       this.tracer.log('response', response);
 
       // 4. Update memory
@@ -209,18 +211,35 @@ export class Agent {
   private async execute(
     request: AgentRequest,
     systemPrompt: string,
-    memoryContext: MemoryContext
+    conversationHistory: ConversationHistory
   ): Promise<AgentResponse> {
-    // Execute with AI provider
-    // Get tools from ToolRegistry (source of truth for runtime tools)
     const availableTools = this.toolRegistry
       ? this.toolRegistry.listAvailable(request.channel)
       : [];
 
+    let messages = conversationHistory.messages;
+
+    if (messages.length > 20) {
+      try {
+        messages = await this.promptOptimizer.compressChatHistory(messages, 4000);
+        this.logger.info('[Agent] Compressed conversation history', {
+          originalCount: conversationHistory.messages.length,
+          compressedCount: messages.length
+        });
+      } catch (error) {
+        this.logger.warn('[Agent] Failed to compress conversation history, using original', { error });
+      }
+    }
+
+    const fullHistory = [
+      ...(conversationHistory.contextMessages || []),
+      ...messages
+    ];
+
     const aiResponse = await this.aiProvider.chat({
       conversationId: request.context.conversationId,
       userMessage: request.input,
-      conversationHistory: memoryContext.shortTerm || [],
+      conversationHistory: fullHistory,
       availableTools: availableTools,
       systemPrompt: systemPrompt
     });
