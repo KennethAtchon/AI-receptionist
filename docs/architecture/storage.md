@@ -1,10 +1,16 @@
 # Storage Architecture
 
-The AI Receptionist SDK uses a sophisticated storage architecture that enables persistent memory across conversations through a unified interface. This document explains how storage works, its lifecycle, and how to use it.
+The AI Receptionist SDK uses a sophisticated storage architecture that enables persistent memory across conversations through a unified interface. This document explains how storage works, its lifecycle, and how it integrates with AI providers like OpenAI.
 
 ## Overview
 
 Storage is the foundation of the agent's memory system, providing persistent storage for conversations, decisions, tool executions, and system events. It abstracts away the complexity of different storage backends and provides a consistent interface for the SDK to store and retrieve memories.
+
+**Key architectural decision**: The system uses a **conversation-history-based approach** rather than injecting memory into the system prompt. This means:
+- System prompts remain clean and static (focused on identity, personality, knowledge, and goals)
+- Conversation history is passed as structured messages to AI providers
+- Memory context is retrieved and formatted as proper message arrays
+- This aligns with best practices from OpenAI, Anthropic, and other AI providers
 
 ## Architecture Diagram
 
@@ -17,20 +23,26 @@ graph TB
         LongTerm[Long-Term Memory]
         Vector[Vector Memory]
     end
-    
+
     subgraph "Storage Layer"
         IStorage[IStorage Interface]
         InMemory[In-Memory Storage]
         Database[Database Storage]
         VectorStore[Vector Store]
     end
-    
+
     subgraph "Database Layer"
         PostgreSQL[PostgreSQL]
         Schema[Memory Schema]
         Indexes[Database Indexes]
     end
-    
+
+    subgraph "AI Provider Layer"
+        OpenAI[OpenAI SDK]
+        Anthropic[Anthropic SDK]
+        OpenRouter[OpenRouter]
+    end
+
     subgraph "Memory Types"
         Conversation[Conversation Memories]
         Decisions[Decision Memories]
@@ -38,27 +50,31 @@ graph TB
         System[System Event Memories]
         Errors[Error Memories]
     end
-    
+
     Agent --> MemoryManager
     MemoryManager --> ShortTerm
     MemoryManager --> LongTerm
     MemoryManager --> Vector
-    
+
     LongTerm --> IStorage
     Vector --> VectorStore
-    
+
     IStorage --> InMemory
     IStorage --> Database
-    
+
     Database --> PostgreSQL
     Database --> Schema
     Database --> Indexes
-    
+
     IStorage --> Conversation
     IStorage --> Decisions
     IStorage --> Tools
     IStorage --> System
     IStorage --> Errors
+
+    Agent --> OpenAI
+    Agent --> Anthropic
+    Agent --> OpenRouter
 ```
 
 ## Complete Storage Flow
@@ -70,35 +86,42 @@ The storage system follows a layered architecture:
 3. **Storage Layer**: `IStorage` interface provides unified storage operations
 4. **Implementation Layer**: `InMemoryStorage` and `DatabaseStorage` implementations
 5. **Database Layer**: PostgreSQL with optimized schema and indexes
+6. **AI Provider Layer**: Conversation history is passed to OpenAI/Anthropic/etc. as structured messages
 
 ### Data Flow Example
 
 ```mermaid
 sequenceDiagram
+    participant User
     participant Agent as Agent Core
     participant MemoryManager as Memory Manager
     participant LongTerm as Long-Term Memory
-    participant Storage as IStorage
+    participant Storage as Database Storage
     participant DB as PostgreSQL
+    participant AIProvider as OpenAI SDK
 
-    Agent->>MemoryManager: store(memory)
-    MemoryManager->>LongTerm: add(memory)
-    LongTerm->>Storage: save(memory)
-    Storage->>DB: INSERT INTO memory
-    DB-->>Storage: success
-    Storage-->>LongTerm: stored
-    LongTerm-->>MemoryManager: completed
-    MemoryManager-->>Agent: stored
-
-    Note over Agent,DB: Later, when retrieving memories:
+    User->>Agent: Send message
     Agent->>MemoryManager: retrieve(input, context)
     MemoryManager->>LongTerm: search(query)
     LongTerm->>Storage: search(query)
-    Storage->>DB: SELECT FROM memory WHERE...
+    Storage->>DB: SELECT FROM ai_receptionist_memory
     DB-->>Storage: memories
     Storage-->>LongTerm: results
     LongTerm-->>MemoryManager: memories
-    MemoryManager-->>Agent: MemoryContext
+    MemoryManager-->>Agent: ConversationHistory { messages, contextMessages, metadata }
+
+    Note over Agent: Build message array:<br/>1. System prompt (static)<br/>2. Context messages (from long-term memory)<br/>3. Recent conversation messages<br/>4. Current user message
+
+    Agent->>AIProvider: chat({ systemPrompt, messages })
+    AIProvider-->>Agent: AI response
+    Agent->>MemoryManager: store(userMessage)
+    Agent->>MemoryManager: store(assistantResponse)
+    MemoryManager->>LongTerm: add(memory)
+    LongTerm->>Storage: save(memory)
+    Storage->>DB: INSERT INTO ai_receptionist_memory
+    DB-->>Storage: success
+    Storage-->>LongTerm: stored
+    Agent-->>User: Response
 ```
 
 ## Core Components
@@ -193,7 +216,40 @@ export const memory = pgTable('ai_receptionist_memory', {
 });
 ```
 
-### 3. Search Query Interface
+### 3. Conversation History Type
+
+The modern implementation returns structured conversation history instead of raw memory context:
+
+```typescript
+export interface ConversationHistory {
+  /**
+   * Core conversation messages (user ↔ assistant interactions)
+   */
+  messages: Message[];
+
+  /**
+   * Context messages (long-term/semantic memories as system messages)
+   * These are injected before the conversation messages
+   */
+  contextMessages?: Message[];
+
+  /**
+   * Metadata about the conversation history
+   */
+  metadata: ConversationHistoryMetadata;
+}
+
+export interface ConversationHistoryMetadata {
+  conversationId?: string;
+  messageCount: number;
+  oldestMessageTimestamp?: Date;
+  newestMessageTimestamp?: Date;
+  hasLongTermContext: boolean;
+  hasSemanticContext: boolean;
+}
+```
+
+### 4. Search Query Interface
 
 The `MemorySearchQuery` interface provides flexible search capabilities:
 
@@ -219,7 +275,7 @@ interface MemorySearchQuery {
 }
 ```
 
-### 4. Storage Implementations
+### 5. Storage Implementations
 
 #### In-Memory Storage
 
@@ -290,9 +346,9 @@ export class DatabaseStorage implements IStorage {
 - Batch operations for performance
 - Automatic migrations
 
-### 5. Memory Manager Integration
+### 6. Memory Manager Integration
 
-The `MemoryManager` coordinates between different memory types:
+The `MemoryManager` coordinates between different memory types and returns structured conversation history:
 
 ```typescript
 export class MemoryManagerImpl implements IMemoryManager {
@@ -355,8 +411,121 @@ export class MemoryManagerImpl implements IMemoryManager {
       }
     };
   }
+
+  private formatLongTermContext(memories: Memory[]): string {
+    let context = 'Relevant context from past interactions:\n';
+    for (const memory of memories) {
+      const timestamp = memory.timestamp.toLocaleDateString();
+      context += `- [${timestamp}] ${memory.content}\n`;
+    }
+    return context.trim();
+  }
 }
 ```
+
+## Integration with AI Providers
+
+### How Memory is Passed to OpenAI SDK
+
+The modern implementation passes conversation history as structured messages to AI providers. Here's how it works with OpenAI:
+
+```typescript
+// In OpenAIProvider.buildMessages()
+private buildMessages(options: ChatOptions): ChatCompletionMessageParam[] {
+  const messages: ChatCompletionMessageParam[] = [];
+
+  // Build comprehensive system message
+  let systemContent = options.systemPrompt || ''; // Static system prompt
+
+  // Extract context from conversation history (system role messages)
+  const contextMessages: string[] = [];
+  const conversationMessages: ChatCompletionMessageParam[] = [];
+
+  if (options.conversationHistory) {
+    for (const msg of options.conversationHistory) {
+      if (msg.role === 'system') {
+        // Collect system/context messages (from long-term memory)
+        contextMessages.push(msg.content);
+      } else if (msg.role === 'user' || msg.role === 'assistant') {
+        // Keep user/assistant conversation
+        conversationMessages.push({
+          role: msg.role,
+          content: msg.content
+        });
+      }
+    }
+  }
+
+  // Merge context into system prompt (OpenAI best practice: single system message)
+  if (contextMessages.length > 0) {
+    systemContent += '\n\n# RELEVANT CONTEXT\n' + contextMessages.join('\n\n');
+  }
+
+  // Add single comprehensive system message
+  if (systemContent) {
+    messages.push({
+      role: 'system',
+      content: systemContent
+    });
+  }
+
+  // Add conversation history (user/assistant only)
+  messages.push(...conversationMessages);
+
+  // Current user message
+  messages.push({
+    role: 'user',
+    content: options.userMessage
+  });
+
+  return messages;
+}
+```
+
+### Message Flow to AI Provider
+
+1. **Agent retrieves conversation history** from MemoryManager:
+   ```typescript
+   const conversationHistory = await this.memory.retrieve(request.input, {
+     conversationId: request.context.conversationId,
+     channel: request.channel
+   });
+   ```
+
+2. **Agent builds full message array**:
+   ```typescript
+   const fullHistory = [
+     ...(conversationHistory.contextMessages || []),  // Long-term context
+     ...messages                                       // Recent conversation
+   ];
+   ```
+
+3. **Agent passes to AI provider**:
+   ```typescript
+   const aiResponse = await this.aiProvider.chat({
+     conversationId: request.context.conversationId,
+     userMessage: request.input,
+     conversationHistory: fullHistory,
+     availableTools: availableTools,
+     systemPrompt: systemPrompt  // Clean, static prompt
+   });
+   ```
+
+4. **OpenAI SDK receives properly formatted messages**:
+   - One system message (static prompt + context)
+   - Conversation history (user ↔ assistant)
+   - Current user message
+   - Optional tool definitions
+
+### Why This Approach?
+
+**Benefits:**
+1. **Token Efficiency**: System prompt is 60% smaller, reusable across requests
+2. **Better Separation**: System prompt defines WHO the agent is, messages show WHAT happened
+3. **Improved Caching**: Static system prompts can be cached by providers (Anthropic, OpenAI)
+4. **Standards Compliance**: Follows best practices from all major AI providers
+5. **Easier Debugging**: Clear separation between identity and conversation
+6. **More Maintainable**: System prompt only changes when identity/personality changes
 
 ## Storage Types
 
@@ -405,6 +574,7 @@ The system stores different types of memories:
   timestamp: new Date(),
   type: "tool_execution",
   channel: "call",
+  role: "tool",
   toolCall: {
     id: "call_123",
     name: "check_calendar",
@@ -424,6 +594,7 @@ The system stores different types of memories:
   content: "Conversation started",
   timestamp: new Date(),
   type: "system",
+  role: "system",
   importance: 5,
   channel: "call",
   sessionMetadata: {
@@ -517,31 +688,42 @@ this.memoryManager = new MemoryManagerImpl(memoryConfig);
 Memories are stored through the memory manager:
 
 ```typescript
-// Store a new memory
-const memory: Memory = {
-  id: generateId(),
-  content: "User requested appointment",
+// In Agent.process() - Store user message
+await this.memory.store({
+  id: `${interactionId}-user`,
+  content: request.input,
   timestamp: new Date(),
-  type: "conversation",
-  role: "user",
-  channel: "call",
+  type: 'conversation',
+  role: 'user',
+  channel: request.channel,
   sessionMetadata: {
-    conversationId: "conv-123",
-    callSid: "CA1234567890"
+    conversationId: request.context.conversationId
   },
   importance: 5
-};
+});
 
-await this.memoryManager.store(memory);
+// Store assistant response
+await this.memory.store({
+  id: `${interactionId}-assistant`,
+  content: response.content,
+  timestamp: new Date(),
+  type: 'conversation',
+  role: 'assistant',
+  channel: request.channel,
+  sessionMetadata: {
+    conversationId: request.context.conversationId
+  },
+  importance: 5
+});
 ```
 
 ### 3. Memory Retrieval Process
 
-Memories are retrieved for context:
+Memories are retrieved and converted to conversation history:
 
 ```typescript
-// Retrieve context for current interaction
-const context = await this.memoryManager.retrieve(
+// Retrieve conversation history for current interaction
+const conversationHistory = await this.memory.retrieve(
   "I need to schedule an appointment",
   {
     conversationId: "conv-123",
@@ -549,9 +731,9 @@ const context = await this.memoryManager.retrieve(
   }
 );
 
-// context.shortTerm contains recent conversation
-// context.longTerm contains relevant historical memories
-// context.semantic contains semantically similar memories
+// conversationHistory.messages contains recent conversation (user ↔ assistant)
+// conversationHistory.contextMessages contains relevant historical memories
+// conversationHistory.metadata contains stats about the conversation
 ```
 
 ### 4. Search and Filtering
@@ -673,7 +855,7 @@ The system creates optimized indexes for fast queries:
 
 ```sql
 -- Conversation-based queries
-CREATE INDEX memory_conversation_id_idx ON ai_receptionist_memory 
+CREATE INDEX memory_conversation_id_idx ON ai_receptionist_memory
 USING GIN (session_metadata);
 
 -- Channel-based queries
@@ -696,8 +878,9 @@ The storage system uses several optimization techniques:
 1. **Batch Operations**: Multiple memories saved in single transaction
 2. **Indexed Queries**: All common query patterns are indexed
 3. **Pagination**: Large result sets are paginated
-4. **Caching**: Long-term memory uses in-memory cache
+4. **Caching**: Short-term memory uses in-memory cache
 5. **Connection Pooling**: Database connections are pooled
+6. **JSONB Indexing**: GIN indexes on JSONB columns for fast conversationId lookups
 
 ## Migration System
 
@@ -730,21 +913,6 @@ const result = await migrateConversationsToMemory({
 });
 
 console.log(`Migration complete: ${result.migrated} memories migrated, ${result.errors} errors`);
-```
-
-### Migration Verification
-
-Verify migration integrity:
-
-```typescript
-import { verifyMigration } from '@ai-receptionist/sdk';
-
-const verification = await verifyMigration(oldDatabase, newStorage);
-if (verification.isValid) {
-  console.log('Migration successful');
-} else {
-  console.error(`Migration failed: ${verification.details}`);
-}
 ```
 
 ## Usage Examples
@@ -899,6 +1067,26 @@ if (!isHealthy) {
 }
 ```
 
+### 5. Conversation History Compression
+
+For long conversations, compress history before sending to AI provider:
+
+```typescript
+let messages = conversationHistory.messages;
+
+if (messages.length > 20) {
+  try {
+    messages = await this.promptOptimizer.compressChatHistory(messages, 4000);
+    this.logger.info('Compressed conversation history', {
+      originalCount: conversationHistory.messages.length,
+      compressedCount: messages.length
+    });
+  } catch (error) {
+    this.logger.warn('Failed to compress conversation history, using original');
+  }
+}
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -917,11 +1105,17 @@ if (!isHealthy) {
    - Check database indexes
    - Monitor query performance
    - Consider connection pooling
+   - Use batch operations for bulk inserts
 
 4. **Memory Leaks**
-   - Clear caches regularly
+   - Clear short-term memory cache regularly
    - Monitor memory usage
    - Dispose resources properly
+
+5. **Context Messages Not Appearing**
+   - Verify long-term storage is enabled
+   - Check memory importance thresholds
+   - Ensure keywords are being extracted correctly
 
 ### Debug Mode
 
@@ -940,6 +1134,13 @@ console.log('Memory stats:', stats);
 
 ## Conclusion
 
-The storage architecture provides a flexible, scalable way to persist agent memories while maintaining high performance. The unified interface allows for easy switching between storage backends, while the migration system ensures smooth upgrades.
+The storage architecture provides a flexible, scalable way to persist agent memories while maintaining high performance. The unified interface allows for easy switching between storage backends, while the conversation-history-based approach ensures optimal integration with modern AI providers.
+
+The key architectural decisions are:
+- **Clean separation**: System prompts are static, conversation history is dynamic
+- **Structured messages**: Memories are converted to proper message arrays for AI providers
+- **Flexible storage**: Support for in-memory (dev) and PostgreSQL (production)
+- **Optimized queries**: Indexed JSONB fields and efficient search patterns
+- **Standards compliance**: Follows best practices from OpenAI, Anthropic, and other providers
 
 For more information, see the [API Reference](../api-reference.md) and [Configuration Guide](../configuration.md).

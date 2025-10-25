@@ -118,6 +118,35 @@ export class TextResource {
   }
 
   /**
+   * Create a new conversation
+   *
+   * @example
+   * ```typescript
+   * const conversation = await client.text.createConversation({
+   *   metadata: { userId: 'user-123' }
+   * });
+   * console.log(conversation.id);
+   * ```
+   */
+  async createConversation(options?: { metadata?: Record<string, any> }): Promise<{ id: string; channel: string; startedAt: Date }> {
+    if (!this.conversationService) {
+      throw new Error('ConversationService not available. Cannot create conversation.');
+    }
+
+    const conversation = await this.conversationService.create({
+      channel: 'text',
+      metadata: options?.metadata
+    });
+
+    logger.info(`[TextResource] Created new conversation: ${conversation.id}`);
+    return {
+      id: conversation.id,
+      channel: conversation.channel,
+      startedAt: conversation.startedAt
+    };
+  }
+
+  /**
    * Generate text in streaming mode (future enhancement)
    * TODO: Implement streaming support
    */

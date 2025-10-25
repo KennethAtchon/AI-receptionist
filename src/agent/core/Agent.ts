@@ -175,13 +175,32 @@ export class Agent {
       const response = await this.execute(request, systemPrompt, conversationHistory);
       this.tracer.log('response', response);
 
-      // 4. Update memory
+      // 4. Update memory - Store user and assistant messages separately
+      // Store user message
       await this.memory.store({
-        id: `${interactionId}-memory`,
-        content: `User: ${request.input}\nAssistant: ${response.content}`,
-        metadata: { request, response },
+        id: `${interactionId}-user`,
+        content: request.input,
         timestamp: new Date(),
         type: 'conversation',
+        role: 'user',
+        channel: request.channel,
+        sessionMetadata: {
+          conversationId: request.context.conversationId
+        },
+        importance: 5
+      });
+
+      // Store assistant response
+      await this.memory.store({
+        id: `${interactionId}-assistant`,
+        content: response.content,
+        timestamp: new Date(),
+        type: 'conversation',
+        role: 'assistant',
+        channel: request.channel,
+        sessionMetadata: {
+          conversationId: request.context.conversationId
+        },
         importance: 5
       });
 
