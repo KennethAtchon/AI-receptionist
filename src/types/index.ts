@@ -423,6 +423,43 @@ export interface SendEmailOptions {
   }>;
 }
 
+// AI-powered email generation options
+export interface GenerateEmailOptions {
+  prompt: string;
+  conversationId?: string;
+  to?: string; // Optional: AI can extract from conversation
+  subject?: string; // Optional: AI can generate
+  tone?: 'professional' | 'friendly' | 'casual' | 'formal';
+  maxLength?: 'short' | 'medium' | 'long';
+  metadata?: Record<string, any>;
+  autoSend?: boolean; // Default: true
+}
+
+// AI email draft (doesn't send)
+export interface DraftEmailOptions {
+  prompt: string;
+  conversationId?: string;
+  to?: string;
+  subject?: string;
+  tone?: 'professional' | 'friendly' | 'casual' | 'formal';
+  maxLength?: 'short' | 'medium' | 'long';
+  includeHistory?: boolean; // Include conversation context
+}
+
+// Email draft result
+export interface EmailDraft {
+  to: string;
+  subject: string;
+  body: string;
+  html?: string;
+  metadata?: {
+    generatedBy: 'ai';
+    conversationId?: string;
+    confidence?: number;
+    reasoning?: string;
+  };
+}
+
 export interface CallSession {
   id: string;
   conversationId: string;
@@ -445,9 +482,14 @@ export interface EmailSession {
   id: string;
   conversationId: string;
   to: string;
+  from?: string;
   subject: string;
   status: 'queued' | 'sent' | 'delivered' | 'failed';
   sentAt?: Date;
+  threadId?: string; // For tracking email threads
+  inReplyTo?: string; // Parent email ID
+  direction?: 'inbound' | 'outbound'; // Track incoming vs outgoing
+  aiGenerated?: boolean; // Was this email AI-generated?
 }
 
 export interface GenerateTextOptions {

@@ -26,6 +26,7 @@ import type { TextResource } from './resources/text.resource';
 import type { CallProcessor } from './processors/call.processor';
 import type { CalendarProcessor } from './processors/calendar.processor';
 import type { MessagingProcessor } from './processors/messaging.processor';
+import type { EmailProcessor } from './processors/email.processor';
 
 /**
  * AIReceptionist - Agent-centric AI SDK
@@ -101,6 +102,7 @@ export class AIReceptionist {
   private callProcessor?: CallProcessor;
   private calendarProcessor?: CalendarProcessor;
   private messagingProcessor?: MessagingProcessor;
+  private emailProcessor?: EmailProcessor;
 
   private initialized = false;
 
@@ -174,6 +176,7 @@ export class AIReceptionist {
     this.callProcessor = processors.callProcessor;
     this.messagingProcessor = processors.messagingProcessor;
     this.calendarProcessor = processors.calendarProcessor;
+    this.emailProcessor = processors.emailProcessor;
 
     // 6. Register all tools (standard, custom, provider-specific)
     await registerAllTools(
@@ -182,7 +185,8 @@ export class AIReceptionist {
         agent: this.agent,
         callProcessor: this.callProcessor,
         messagingProcessor: this.messagingProcessor,
-        calendarProcessor: this.calendarProcessor
+        calendarProcessor: this.calendarProcessor,
+        emailProcessor: this.emailProcessor
       },
       this.toolRegistry
     );
@@ -192,7 +196,8 @@ export class AIReceptionist {
       agent: this.agent,
       callProcessor: this.callProcessor,
       messagingProcessor: this.messagingProcessor,
-      calendarProcessor: this.calendarProcessor
+      calendarProcessor: this.calendarProcessor,
+      emailProcessor: this.emailProcessor
     });
 
     // Assign resources

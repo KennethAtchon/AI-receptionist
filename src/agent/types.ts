@@ -192,6 +192,12 @@ export interface Memory {
     callSid?: string;
     messageSid?: string;
     emailId?: string;
+    threadId?: string; // Email thread tracking
+    inReplyTo?: string; // Parent email ID
+    direction?: 'inbound' | 'outbound'; // Email/message direction
+    to?: string; // Recipient (for emails/SMS)
+    from?: string; // Sender (for emails/SMS)
+    subject?: string; // Email subject
     status?: 'active' | 'completed' | 'failed';
     duration?: number; // For calls
     participants?: string[]; // Phone numbers, emails, etc.
