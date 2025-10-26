@@ -8,19 +8,13 @@ import { ToolStore } from './tool-store';
 import { setupStandardTools } from './standard';
 import type { AIReceptionistConfig, ProviderConfig } from '../types';
 import type { Agent } from '../agent/core/Agent';
-import type { CallProcessor } from '../processors/call.processor';
-import type { MessagingProcessor } from '../processors/messaging.processor';
-import type { CalendarProcessor } from '../processors/calendar.processor';
-import type { EmailProcessor } from '../processors/email.processor';
+import type { ProviderRegistry } from '../providers/core/provider-registry';
 import { logger } from '../utils/logger';
 
 export interface ToolInitializationContext {
   config: AIReceptionistConfig;
   agent: Agent;
-  callProcessor?: CallProcessor;
-  messagingProcessor?: MessagingProcessor;
-  calendarProcessor?: CalendarProcessor;
-  emailProcessor?: EmailProcessor;
+  providerRegistry: ProviderRegistry;
 }
 
 /**
@@ -141,25 +135,16 @@ async function registerProviderTools(
 ): Promise<void> {
   // Register call and messaging tools (if Twilio configured)
   if (context.config.providers?.communication?.twilio) {
-    if (!context.callProcessor || !context.messagingProcessor) {
-      throw new Error('Twilio configured but processors not initialized');
-    }
     await registerTwilioTools(context, toolRegistry);
   }
 
   // Register calendar tools (if Google Calendar configured)
   if (context.config.providers?.calendar?.google) {
-    if (!context.calendarProcessor) {
-      throw new Error('Google Calendar configured but processor not initialized');
-    }
     await registerCalendarTools(context, toolRegistry);
   }
 
   // Register email tools (if any email provider configured)
   if (context.config.providers?.email) {
-    if (!context.emailProcessor) {
-      throw new Error('Email provider configured but processor not initialized');
-    }
     await registerEmailTools(context, toolRegistry);
   }
 }
@@ -173,11 +158,11 @@ async function registerTwilioTools(
 ): Promise<void> {
   // Register call tools
   const { setupCallTools } = await import('./standard/call-tools');
-  await setupCallTools(toolRegistry, { callProcessor: context.callProcessor! });
+  await setupCallTools(toolRegistry, { providerRegistry: context.providerRegistry });
 
   // Register messaging tools
   const { setupMessagingTools } = await import('./standard/messaging-tools');
-  await setupMessagingTools(toolRegistry, { messagingProcessor: context.messagingProcessor! });
+  await setupMessagingTools(toolRegistry, { providerRegistry: context.providerRegistry });
 
   logger.info('[ToolInit] Twilio tools registered (calls, messaging)');
 }
@@ -190,7 +175,7 @@ async function registerCalendarTools(
   toolRegistry: ToolRegistry
 ): Promise<void> {
   const { setupCalendarTools } = await import('./standard/calendar-tools');
-  await setupCalendarTools(toolRegistry, { calendarProcessor: context.calendarProcessor! });
+  await setupCalendarTools(toolRegistry, { providerRegistry: context.providerRegistry });
 
   logger.info('[ToolInit] Calendar tools registered (Google Calendar)');
 }
@@ -203,7 +188,7 @@ async function registerEmailTools(
   toolRegistry: ToolRegistry
 ): Promise<void> {
   const { setupEmailTools } = await import('./standard/email-tools');
-  await setupEmailTools(toolRegistry, { emailProcessor: context.emailProcessor! });
+  await setupEmailTools(toolRegistry, { providerRegistry: context.providerRegistry });
 
   logger.info('[ToolInit] Email tools registered');
 }

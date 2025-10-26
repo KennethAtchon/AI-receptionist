@@ -5,7 +5,19 @@
  */
 
 import type { IEmailProvider, EmailParams, EmailResult } from './email-provider.interface';
+import type { Agent } from '../../agent/core/Agent';
 import { logger } from '../../utils/logger';
+
+export interface ParsedEmail {
+  messageId: string;
+  from: string;
+  to: string | string[];
+  subject: string;
+  text?: string;
+  html?: string;
+  headers?: Record<string, string>;
+  receivedAt: string;
+}
 
 export interface EmailProviderEntry {
   provider: IEmailProvider;
@@ -17,6 +29,11 @@ export interface EmailProviderEntry {
 export class EmailRouter {
   private providers: Map<string, EmailProviderEntry> = new Map();
   private sortedProviders: EmailProviderEntry[] = [];
+  private agent?: Agent;
+
+  constructor(agent?: Agent) {
+    this.agent = agent;
+  }
 
   /**
    * Register an email provider
@@ -135,9 +152,208 @@ export class EmailRouter {
   }
 
   /**
-   * Get provider by name
+   * Handle incoming webhook from email provider
+   * Automatically stores in conversation and triggers AI response
    */
-  getProvider(name: string): IEmailProvider | undefined {
-    return this.providers.get(name)?.provider;
+  async handleInboundWebhook(payload: {
+    provider: 'resend' | 'sendgrid';
+    data: any;
+  }): Promise<{
+    conversationId: string;
+    emailId: string;
+    autoReplied: boolean;
+  }> {
+    const parsed = this.parseWebhookPayload(payload);
+    const conversation = await this.findOrCreateConversation(parsed);
+    await this.storeInboundEmail(parsed, conversation);
+    const aiReply = await this.triggerAutoReply(parsed, conversation);
+
+    return {
+      conversationId: conversation.id,
+      emailId: parsed.messageId,
+      autoReplied: !!aiReply
+    };
+  }
+
+  private parseWebhookPayload(payload: any): ParsedEmail {
+    switch (payload.provider) {
+      case 'resend':
+        return {
+          messageId: payload.data.id,
+          from: payload.data.from,
+          to: payload.data.to,
+          subject: payload.data.subject,
+          text: payload.data.text,
+          html: payload.data.html,
+          headers: payload.data.headers,
+          receivedAt: payload.data.receivedAt
+        };
+
+      case 'sendgrid':
+        return {
+          messageId: payload.data.message_id,
+          from: payload.data.from,
+          to: payload.data.to,
+          subject: payload.data.subject,
+          text: payload.data.text,
+          html: payload.data.html,
+          headers: this.parseSendGridHeaders(payload.data.headers),
+          receivedAt: new Date().toISOString()
+        };
+
+      default:
+        throw new Error(`Unknown provider: ${payload.provider}`);
+    }
+  }
+
+  // Additional helper methods would be implemented here
+  // These are placeholder methods that would need to be implemented
+  // based on the specific requirements of the email automation system
+
+  private async findOrCreateConversation(email: ParsedEmail): Promise<any> {
+    if (!this.agent) {
+      return { id: `conv-${Date.now()}` };
+    }
+
+    const memory = this.agent.getMemory();
+    
+    // Try to find existing conversation by message ID
+    if (email.headers?.['message-id']) {
+      const existingConv = await memory.getConversationByMessageId(email.headers['message-id']);
+      if (existingConv) {
+        return existingConv;
+      }
+    }
+
+    // Try to find by subject line
+    if (email.subject) {
+      const conversations = await memory.search({
+        channel: 'email',
+        limit: 10
+      });
+      
+      const matchingConv = conversations.find(conv => 
+        conv.sessionMetadata?.subject === email.subject
+      );
+      
+      if (matchingConv) {
+        return matchingConv;
+      }
+    }
+
+    // Try to find by participants
+    const participants = Array.isArray(email.to) ? email.to : [email.to];
+    const conversations = await memory.search({
+      channel: 'email',
+      limit: 20
+    });
+    
+    const matchingConv = conversations.find(conv => {
+      const convParticipants = conv.sessionMetadata?.participants || [];
+      return participants.some(to => convParticipants.includes(to));
+    });
+    
+    if (matchingConv) {
+      return matchingConv;
+    }
+
+    // Create new conversation
+    return {
+      id: `conv-${Date.now()}`,
+      channel: 'email',
+      sessionMetadata: {
+        participants: participants,
+        subject: email.subject,
+        messageId: email.messageId
+      }
+    };
+  }
+
+  private async storeInboundEmail(email: ParsedEmail, conversation: any): Promise<void> {
+    if (!this.agent) {
+      return;
+    }
+
+    const memory = this.agent.getMemory();
+    
+    // Store the inbound email in memory
+    await memory.store({
+      id: `email-${email.messageId}`,
+      content: email.text || email.html || '',
+      timestamp: new Date(email.receivedAt),
+      type: 'conversation',
+      channel: 'email',
+      importance: 5,
+      metadata: {
+        messageId: email.messageId,
+        from: email.from,
+        to: email.to,
+        subject: email.subject,
+        receivedAt: email.receivedAt,
+        headers: email.headers,
+        type: 'inbound',
+        conversationId: conversation.id,
+        sessionMetadata: {
+          ...conversation.sessionMetadata,
+          lastMessageAt: email.receivedAt
+        }
+      }
+    });
+
+    logger.info(`[EmailRouter] Stored inbound email ${email.messageId} in conversation ${conversation.id}`);
+  }
+
+  private async triggerAutoReply(email: ParsedEmail, conversation: any): Promise<any> {
+    if (!this.agent) {
+      return null;
+    }
+
+    try {
+      // Use the agent to process the inbound email and generate a response
+      const response = await this.agent.process({
+        id: `reply-${email.messageId}`,
+        input: `Inbound email from ${email.from}:\n\nSubject: ${email.subject}\n\nContent: ${email.text || email.html || ''}`,
+        channel: 'email',
+        context: {
+          conversationId: conversation.id,
+          sessionMetadata: conversation.sessionMetadata
+        }
+      });
+
+      if (response.content && response.content.trim()) {
+        // Send the auto-reply using the email router
+        const replyResult = await this.sendEmail({
+          to: email.from,
+          subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+          text: response.content,
+          html: response.content,
+          headers: {
+            'In-Reply-To': email.messageId,
+            'References': email.messageId
+          }
+        });
+
+        logger.info(`[EmailRouter] Sent auto-reply for email ${email.messageId}: ${replyResult.messageId}`);
+        return replyResult;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error(`[EmailRouter] Failed to send auto-reply for email ${email.messageId}:`, error as Error);
+      return null;
+    }
+  }
+
+  private parseSendGridHeaders(headers: string): Record<string, string> {
+    // Parse SendGrid's raw header string
+    const parsed: Record<string, string> = {};
+    const lines = headers.split('\n');
+    for (const line of lines) {
+      const match = line.match(/^([^:]+):\s*(.+)$/);
+      if (match) {
+        parsed[match[1].toLowerCase()] = match[2];
+      }
+    }
+    return parsed;
   }
 }

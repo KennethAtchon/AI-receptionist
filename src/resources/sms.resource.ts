@@ -1,78 +1,129 @@
 /**
  * SMS Resource
- * User-facing API for SMS operations
+ * User-facing API for SMS operations with webhook support
  */
 
-import { SendSMSOptions, SMSSession } from '../types';
-import { logger } from '../utils/logger';
+import { BaseResource, ResourceSession, WebhookContext } from './base.resource';
 import type { Agent } from '../agent/core/Agent';
-import type { MessagingProcessor } from '../processors/messaging.processor';
+import { logger } from '../utils/logger';
 
-export class SMSResource {
-  constructor(
-    private agent: Agent,
-    private messagingProcessor: MessagingProcessor
-  ) {}
+export interface SMSSession extends ResourceSession {
+  messageSid?: string;
+  to: string;
+  from?: string;
+  direction: 'inbound' | 'outbound';
+}
+
+export interface SendSMSOptions {
+  to: string;
+  body: string;
+  metadata?: Record<string, any>;
+}
+
+export class SMSResource extends BaseResource<SMSSession> {
+  constructor(agent: Agent) {
+    super(agent, 'sms');
+  }
 
   /**
-   * Send an SMS message
-   *
-   * @example
-   * ```typescript
-   * const sms = await client.sms.send({
-   *   to: '+1234567890',
-   *   body: 'Hello from our AI assistant!'
-   * });
-   * logger.info('SMS sent:', sms.id);
-   * ```
+   * Send an SMS
+   * Uses Agent → send_sms tool → Twilio provider
    */
   async send(options: SendSMSOptions): Promise<SMSSession> {
     logger.info(`[SMSResource] Sending SMS to ${options.to}`);
 
-    // Validate phone number
-    if (!this.messagingProcessor.isValidPhoneNumber(options.to)) {
-      throw new Error('Invalid phone number format');
-    }
+    const conversationId = await this.createSession(options.metadata);
 
-    if (!options.body || options.body.length === 0) {
-      throw new Error('Message cannot be empty');
-    }
+    const agentResponse = await this.processWithAgent(
+      `Send SMS to ${options.to}: ${options.body}`,
+      {
+        conversationId,
+        toolHint: 'send_sms',
+        toolParams: {
+          to: options.to,
+          message: options.body
+        }
+      }
+    );
 
-    // Use processor for administrative SMS sending
-    const result = await this.messagingProcessor.sendSMS({
-      to: options.to,
-      body: options.body
-    });
-
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to send SMS');
-    }
-
-    logger.info('[SMSResource] SMS sent', { messageId: result.messageId });
+    const messageSid = agentResponse.metadata?.toolResults?.[0]?.result?.data?.messageSid;
 
     return {
-      id: result.messageId!,
-      conversationId: options.conversationId || 'unknown',
+      id: messageSid || `sms-${Date.now()}`,
+      messageSid,
+      conversationId,
       to: options.to,
-      body: options.body,
-      status: 'sent',
-      sentAt: new Date()
+      channel: 'sms',
+      direction: 'outbound',
+      status: 'completed',
+      startedAt: new Date(),
+      metadata: options.metadata
     };
   }
 
   /**
-   * Get SMS details
-   * TODO: Implement
+   * Handle incoming SMS webhook (Twilio)
    */
-  async get(messageId: string): Promise<SMSSession> {
-    throw new Error('Not implemented yet');
+  async handleWebhook(context: WebhookContext): Promise<any> {
+    logger.info('[SMSResource] Handling inbound SMS webhook');
+
+    const { MessageSid, From, To, Body } = context.payload;
+
+    // Find or create conversation
+    let conversationId = await this.findConversationByParticipants(From, To);
+    if (!conversationId) {
+      conversationId = await this.createSession({
+        messageSid: MessageSid,
+        from: From,
+        to: To,
+        direction: 'inbound'
+      });
+    }
+
+    // Store incoming SMS
+    await this.agent.getMemory().store({
+      id: `msg-${conversationId}-${Date.now()}`,
+      content: Body,
+      timestamp: new Date(),
+      type: 'conversation',
+      channel: 'sms',
+      role: 'user',
+      sessionMetadata: {
+        conversationId,
+        messageSid: MessageSid,
+        from: From,
+        to: To
+      }
+    });
+
+    // Use Agent to compose reply
+    const agentResponse = await this.processWithAgent(Body, {
+      conversationId,
+      messageSid: MessageSid,
+      from: From,
+      to: To
+    });
+
+    // Return TwiML response
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${agentResponse.content}</Message>
+</Response>`;
   }
 
-  /**
-   * List recent SMS messages
-   * TODO: Implement
-   */
-  async list(options?: { limit?: number }): Promise<SMSSession[]> {
-    throw new Error('Not implemented yet');
+  private async findConversationByParticipants(from: string, to: string): Promise<string | null> {
+    // Search for SMS conversations and filter by participants
+    const memory = await this.agent.getMemory().search({
+      channel: 'sms',
+      limit: 50 // Get more results to filter through
+    });
+
+    // Filter by participants
+    const match = memory.find(m => 
+      m.sessionMetadata?.from === from && 
+      m.sessionMetadata?.to === to
+    );
+
+    return match?.sessionMetadata?.conversationId || null;
   }
 }

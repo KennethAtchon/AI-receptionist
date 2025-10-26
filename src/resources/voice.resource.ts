@@ -142,15 +142,9 @@ export class VoiceResource extends BaseResource<VoiceSession> {
   }
 
   private async findConversationByCallSid(callSid: string): Promise<string | null> {
-    // Query agent memory for conversation with this callSid
-    const memory = await this.agent.getMemory().query({
-      filters: {
-        'sessionMetadata.callSid': callSid
-      },
-      limit: 1
-    });
-
-    return memory.results[0]?.sessionMetadata?.conversationId || null;
+    // Use the specific method for finding conversation by call SID
+    const memory = await this.agent.getMemory().getConversationByCallId(callSid);
+    return memory?.sessionMetadata?.conversationId || null;
   }
 
   private generateTwiML(response: string): string {

@@ -14,19 +14,15 @@ import { ProviderRegistry } from './providers/core/provider-registry';
 // Initialization modules
 import { initializeProviders, getAIProvider } from './providers/initialization';
 import { createToolInfrastructure, registerAllTools } from './tools/initialization';
-import { initializeProcessors } from './processors/initialization';
 import { initializeResources } from './resources/initialization';
+import { WebhookRouter } from './webhooks/webhook-router';
 
 // Type-only imports for tree-shaking
 import type { OpenAIProvider, OpenRouterProvider } from './providers';
-import type { CallsResource } from './resources/calls.resource';
+import type { VoiceResource } from './resources/voice.resource';
 import type { SMSResource } from './resources/sms.resource';
 import type { EmailResource } from './resources/email.resource';
 import type { TextResource } from './resources/text.resource';
-import type { CallProcessor } from './processors/call.processor';
-import type { CalendarProcessor } from './processors/calendar.processor';
-import type { MessagingProcessor } from './processors/messaging.processor';
-import type { EmailProcessor } from './processors/email.processor';
 
 /**
  * AIReceptionist - Agent-centric AI SDK
@@ -80,13 +76,13 @@ import type { EmailProcessor } from './processors/email.processor';
  * await sarah.initialize();
  *
  * // Use across different channels
- * await sarah.calls.make({ to: '+1234567890' });
+ * await sarah.voice.make({ to: '+1234567890' });
  * await sarah.sms.send({ to: '+1234567890', body: 'Hello!' });
  * ```
  */
 export class AIReceptionist {
   // Resources (user-facing APIs)
-  public readonly calls?: CallsResource;
+  public readonly voice?: VoiceResource;
   public readonly sms?: SMSResource;
   public readonly email?: EmailResource;
   public readonly text?: TextResource;
@@ -97,12 +93,6 @@ export class AIReceptionist {
   private providerRegistry!: ProviderRegistry; // Centralized provider management
   private toolRegistry!: ToolRegistry;
   private toolStore!: ToolStore;
-  
-  // Processors (AI-driven orchestration)
-  private callProcessor?: CallProcessor;
-  private calendarProcessor?: CalendarProcessor;
-  private messagingProcessor?: MessagingProcessor;
-  private emailProcessor?: EmailProcessor;
 
   private initialized = false;
 
@@ -134,7 +124,6 @@ export class AIReceptionist {
    * - Providers (AI, communication, calendar)
    * - Agent (six-pillar architecture)
    * - Tools (standard, custom, provider-specific)
-   * - Processors (business logic)
    * - Resources (user-facing APIs)
    */
   async initialize(): Promise<void> {
@@ -166,54 +155,35 @@ export class AIReceptionist {
       .withToolRegistry(this.toolRegistry)
       .build();
 
-    // Link tool store to agent
     this.toolStore.setAgent(this.agent);
-
     await this.agent.initialize();
 
-    // 5. Initialize processors (business logic layer)
-    const processors = await initializeProcessors(this.providerRegistry);
-    this.callProcessor = processors.callProcessor;
-    this.messagingProcessor = processors.messagingProcessor;
-    this.calendarProcessor = processors.calendarProcessor;
-    this.emailProcessor = processors.emailProcessor;
-
-    // 6. Register all tools (standard, custom, provider-specific)
+    // 4. Register all tools (tools call providers directly - NO processors)
     await registerAllTools(
       {
         config: this.config,
         agent: this.agent,
-        callProcessor: this.callProcessor,
-        messagingProcessor: this.messagingProcessor,
-        calendarProcessor: this.calendarProcessor,
-        emailProcessor: this.emailProcessor
+        providerRegistry: this.providerRegistry // Pass registry, not processors
       },
       this.toolRegistry
     );
 
-    // 7. Initialize resources (user-facing APIs)
-    const resources = await initializeResources({
-      agent: this.agent,
-      callProcessor: this.callProcessor,
-      messagingProcessor: this.messagingProcessor,
-      calendarProcessor: this.calendarProcessor,
-      emailProcessor: this.emailProcessor
-    });
+    // 5. Initialize resources (session managers)
+    const resources = initializeResources(this.agent);
 
     // Assign resources
-    (this as any).calls = resources.calls;
+    (this as any).voice = resources.voice;
     (this as any).sms = resources.sms;
     (this as any).email = resources.email;
     (this as any).text = resources.text;
 
     this.initialized = true;
 
-    // Log initialization summary
     logger.info(`[AIReceptionist] Initialized successfully`);
     logger.info(`[AIReceptionist] - Registered providers: ${this.providerRegistry.list().join(', ')}`);
     logger.info(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);
     logger.info(`[AIReceptionist] - Available channels: ${[
-      this.calls ? 'calls' : null,
+      this.voice ? 'voice' : null,
       this.sms ? 'sms' : null,
       this.email ? 'email' : null,
       this.text ? 'text' : null
@@ -327,6 +297,14 @@ export class AIReceptionist {
   public getProviderRegistry(): ProviderRegistry {
     this.ensureInitialized();
     return this.providerRegistry;
+  }
+
+  /**
+   * Get webhook router for handling inbound messages
+   */
+  public getWebhookRouter(): WebhookRouter {
+    this.ensureInitialized();
+    return new WebhookRouter(this);
   }
 
   /**

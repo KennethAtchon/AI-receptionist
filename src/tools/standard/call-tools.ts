@@ -1,16 +1,17 @@
 /**
  * Call Tools (Standard)
- * Tools for voice call operations - uses CallProcessor
+ * Tools for voice call operations - uses Twilio provider directly
  */
 
 import { ToolBuilder } from '../builder';
 import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
-import type { CallProcessor } from '../../processors/call.processor';
+import type { ProviderRegistry } from '../../providers/core/provider-registry';
+import type { TwilioProvider } from '../../providers/api/twilio.provider';
 
 export interface CallToolsConfig {
-  callProcessor?: CallProcessor;
+  providerRegistry: ProviderRegistry;
 }
 
 /**
@@ -31,8 +32,8 @@ export function buildInitiateCallTool(config?: CallToolsConfig): ITool {
     .default(async (params, ctx) => {
       logger.info('[InitiateCallTool] Starting call', { to: params.to });
 
-      if (!config?.callProcessor) {
-        logger.warn('[InitiateCallTool] No call processor configured, returning mock data');
+      if (!config?.providerRegistry) {
+        logger.warn('[InitiateCallTool] No provider registry configured, returning mock data');
         return {
           success: true,
           data: { callSid: 'MOCK_CALL_123', status: 'initiated' },
@@ -41,16 +42,28 @@ export function buildInitiateCallTool(config?: CallToolsConfig): ITool {
       }
 
       try {
-        const result = await config.callProcessor.initiateCall({
+        // Get Twilio provider directly
+        const twilioProvider = await config.providerRegistry.get<TwilioProvider>('twilio');
+        const client = twilioProvider.createClient();
+        const twilioConfig = twilioProvider.getConfig();
+
+        // Create webhook URL for call handling
+        const webhookUrl = `${process.env.BASE_URL || 'https://your-app.com'}/webhooks/voice/inbound`;
+
+        // Make the call using Twilio directly
+        const call = await client.calls.create({
           to: params.to,
-          conversationId: ctx.conversationId || `call-${Date.now()}`,
-          greeting: params.greeting
+          from: twilioConfig.phoneNumber,
+          url: webhookUrl,
+          method: 'POST'
         });
+
+        logger.info('[InitiateCallTool] Call created', { callSid: call.sid });
 
         return {
           success: true,
-          data: { callSid: result.callSid, status: 'initiated' },
-          response: { text: `Call initiated to ${params.to}. Call SID: ${result.callSid}` }
+          data: { callSid: call.sid, status: 'initiated' },
+          response: { text: `Call initiated to ${params.to}. Call SID: ${call.sid}` }
         };
       } catch (error) {
         logger.error('[InitiateCallTool] Failed', error as Error);
@@ -81,8 +94,8 @@ export function buildEndCallTool(config?: CallToolsConfig): ITool {
     .default(async (params, ctx) => {
       logger.info('[EndCallTool] Ending call', { callSid: params.callSid });
 
-      if (!config?.callProcessor) {
-        logger.warn('[EndCallTool] No call processor configured, returning mock data');
+      if (!config?.providerRegistry) {
+        logger.warn('[EndCallTool] No provider registry configured, returning mock data');
         return {
           success: true,
           data: { callSid: params.callSid },
@@ -91,7 +104,14 @@ export function buildEndCallTool(config?: CallToolsConfig): ITool {
       }
 
       try {
-        await config.callProcessor.endCall({ callSid: params.callSid });
+        // Get Twilio provider directly
+        const twilioProvider = await config.providerRegistry.get<TwilioProvider>('twilio');
+        const client = twilioProvider.createClient();
+
+        // End the call using Twilio directly
+        await client.calls(params.callSid).update({ status: 'completed' });
+
+        logger.info('[EndCallTool] Call ended', { callSid: params.callSid });
 
         return {
           success: true,
@@ -116,5 +136,5 @@ export function buildEndCallTool(config?: CallToolsConfig): ITool {
 export async function setupCallTools(registry: ToolRegistry, config?: CallToolsConfig): Promise<void> {
   registry.register(buildInitiateCallTool(config));
   registry.register(buildEndCallTool(config));
-  logger.info('[CallTools] Registered call tools with processor');
+  logger.info('[CallTools] Registered call tools with provider registry');
 }
