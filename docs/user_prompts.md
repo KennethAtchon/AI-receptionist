@@ -23,3 +23,9 @@ Same for sms
 
 Thats my goal
 
+
+
+Verify that all core resource, aside from text, are independent and only need to be called once, and thats like this is just an example the naming is bad: .setsession(phone), this will make the AI listen for calls and take calls, and lsiten for SMS and take sms from that number
+For email basically the same thing
+For text, its like the thats truly for dev, in a sense where they can manage it to my degree
+

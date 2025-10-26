@@ -7,12 +7,10 @@ import { ProviderRegistry } from './core/provider-registry';
 import { TwilioValidator } from './validation/twilio-validator';
 import { OpenAIValidator } from './validation/openai-validator';
 import { GoogleValidator } from './validation/google-validator';
-import { ResendValidator } from './validation/resend-validator';
-import { SendGridValidator } from './validation/sendgrid-validator';
-import { SMTPValidator } from './validation/smtp-validator';
+import { PostmarkValidator } from './validation/postmark-validator';
 import type { AIReceptionistConfig } from '../types';
 import type { OpenAIProvider, OpenRouterProvider, TwilioProvider, GoogleProvider } from './index';
-import type { ResendProvider, SendGridProvider, SMTPProvider } from './index';
+import type { PostmarkProvider } from './index';
 import { logger } from '../utils/logger';
 
 /**
@@ -155,7 +153,7 @@ export async function getGoogleProvider(
 }
 
 /**
- * Register email providers (Resend, SendGrid, SMTP)
+ * Register email providers (Postmark only)
  */
 async function registerEmailProviders(
   registry: ProviderRegistry,
@@ -168,48 +166,29 @@ async function registerEmailProviders(
     return;
   }
 
-  // Register Resend if configured
-  if (emailConfig.resend) {
+  // Register Postmark if configured
+  if (emailConfig.postmark) {
     registry.registerIfConfigured(
-      'resend',
+      'postmark',
       async () => {
-        const { ResendProvider } = await import('./email/resend.provider');
-        return new ResendProvider(emailConfig.resend!);
+        const { PostmarkProvider } = await import('./email/postmark.provider');
+        return new PostmarkProvider(emailConfig.postmark!);
       },
-      new ResendValidator(),
-      emailConfig.resend
+      new PostmarkValidator(),
+      emailConfig.postmark
     );
 
-    logger.info('[ProviderInit] Registered email provider: resend');
+    logger.info('[ProviderInit] Registered email provider: postmark');
   }
+}
 
-  // Register SendGrid if configured
-  if (emailConfig.sendgrid) {
-    registry.registerIfConfigured(
-      'sendgrid',
-      async () => {
-        const { SendGridProvider } = await import('./email/sendgrid.provider');
-        return new SendGridProvider(emailConfig.sendgrid!);
-      },
-      new SendGridValidator(),
-      emailConfig.sendgrid
-    );
-
-    logger.info('[ProviderInit] Registered email provider: sendgrid');
-  }
-
-  // Register SMTP if configured
-  if (emailConfig.smtp) {
-    registry.registerIfConfigured(
-      'smtp',
-      async () => {
-        const { SMTPProvider } = await import('./email/smtp.provider');
-        return new SMTPProvider(emailConfig.smtp!);
-      },
-      new SMTPValidator(),
-      emailConfig.smtp
-    );
-
-    logger.info('[ProviderInit] Registered email provider: smtp');
-  }
+/**
+ * Get Postmark provider from registry (if exists)
+ */
+export async function getPostmarkProvider(
+  registry: ProviderRegistry
+): Promise<PostmarkProvider | undefined> {
+  return registry.has('postmark')
+    ? registry.get<PostmarkProvider>('postmark')
+    : undefined;
 }

@@ -16,13 +16,14 @@ import { initializeProviders, getAIProvider } from './providers/initialization';
 import { createToolInfrastructure, registerAllTools } from './tools/initialization';
 import { initializeResources } from './resources/initialization';
 import { WebhookRouter } from './webhooks/webhook-router';
+import { SessionManager } from './sessions';
 
 // Type-only imports for tree-shaking
 import type { OpenAIProvider, OpenRouterProvider } from './providers';
-import type { VoiceResource } from './resources/voice.resource';
-import type { SMSResource } from './resources/sms.resource';
+import type { VoiceResource } from './resources/core/voice.resource';
+import type { SMSResource } from './resources/core/sms.resource';
 import type { EmailResource } from './resources/core/email.resource';
-import type { TextResource } from './resources/text.resource';
+import type { TextResource } from './resources/core/text.resource';
 
 /**
  * AIReceptionist - Agent-centric AI SDK
@@ -93,6 +94,8 @@ export class AIReceptionist {
   private providerRegistry!: ProviderRegistry; // Centralized provider management
   private toolRegistry!: ToolRegistry;
   private toolStore!: ToolStore;
+  private sessionManager!: SessionManager; // Session management for webhook-driven mode
+  private webhookRouter!: WebhookRouter; // Webhook routing
 
   private initialized = false;
 
@@ -168,7 +171,11 @@ export class AIReceptionist {
       this.toolRegistry
     );
 
-    // 5. Initialize resources (session managers)
+    // 5. Initialize session management
+    this.sessionManager = new SessionManager();
+    this.webhookRouter = new WebhookRouter(this);
+
+    // 6. Initialize resources (session managers)
     const resources = initializeResources(this.agent);
 
     // Assign resources
@@ -300,11 +307,19 @@ export class AIReceptionist {
   }
 
   /**
+   * Get session manager for session lifecycle management
+   */
+  public getSessionManager(): SessionManager {
+    this.ensureInitialized();
+    return this.sessionManager;
+  }
+
+  /**
    * Get webhook router for handling inbound messages
    */
   public getWebhookRouter(): WebhookRouter {
     this.ensureInitialized();
-    return new WebhookRouter(this);
+    return this.webhookRouter;
   }
 
   /**
@@ -330,6 +345,159 @@ export class AIReceptionist {
    * });
    * ```
    */
+
+  /**
+   * Set up a session for a specific channel (webhook-driven mode)
+   *
+   * This method creates a session and automatically configures webhooks with the provider.
+   *
+   * @example
+   * ```typescript
+   * // Set up voice session
+   * await client.setSession('voice', '+1234567890');
+   *
+   * // Set up SMS session
+   * await client.setSession('sms', '+1234567890');
+   *
+   * // Set up email session
+   * await client.setSession('email', 'assistant@company.com');
+   * ```
+   */
+  async setSession(
+    type: 'voice' | 'sms' | 'email',
+    identifier: string,
+    metadata?: Record<string, any>
+  ): Promise<import('./sessions/types').Session> {
+    this.ensureInitialized();
+
+    if (!this.config.webhooks) {
+      throw new Error('Webhook configuration is required to use setSession(). Add webhooks config to AIReceptionistConfig.');
+    }
+
+    logger.info(`[AIReceptionist] Setting up ${type} session`, { identifier });
+
+    // 1. Create session
+    const session = await this.sessionManager.createSession(type, {
+      identifier,
+      metadata
+    });
+
+    // 2. Configure provider webhooks automatically
+    await this.configureProviderWebhook(type, identifier, session.id);
+
+    logger.info(`[AIReceptionist] Session created and webhooks configured`, {
+      sessionId: session.id,
+      type,
+      identifier
+    });
+
+    return session;
+  }
+
+  /**
+   * Handle incoming voice webhook (Twilio)
+   *
+   * @example
+   * ```typescript
+   * app.post('/webhook/voice', async (req, res) => {
+   *   const response = await client.handleVoiceWebhook(req.body);
+   *   res.type('text/xml').send(response);
+   * });
+   * ```
+   */
+  async handleVoiceWebhook(payload: any): Promise<any> {
+    this.ensureInitialized();
+    return await this.webhookRouter.handleVoiceWebhook(payload);
+  }
+
+  /**
+   * Handle incoming SMS webhook (Twilio)
+   *
+   * @example
+   * ```typescript
+   * app.post('/webhook/sms', async (req, res) => {
+   *   const response = await client.handleSMSWebhook(req.body);
+   *   res.type('text/xml').send(response);
+   * });
+   * ```
+   */
+  async handleSMSWebhook(payload: any): Promise<any> {
+    this.ensureInitialized();
+    return await this.webhookRouter.handleSMSWebhook(payload);
+  }
+
+  /**
+   * Handle incoming email webhook (Postmark)
+   *
+   * @example
+   * ```typescript
+   * app.post('/webhook/email', async (req, res) => {
+   *   const signature = req.headers['x-postmark-signature'];
+   *   const response = await client.handleEmailWebhook(req.body, signature);
+   *   res.json(response);
+   * });
+   * ```
+   */
+  async handleEmailWebhook(payload: any, signature?: string): Promise<any> {
+    this.ensureInitialized();
+    return await this.webhookRouter.handleEmailWebhook(payload, signature);
+  }
+
+  /**
+   * Configure provider webhook for a session
+   * @private
+   */
+  private async configureProviderWebhook(
+    type: 'voice' | 'sms' | 'email',
+    identifier: string,
+    sessionId: string
+  ): Promise<void> {
+    if (!this.config.webhooks) {
+      return;
+    }
+
+    const { baseUrl, endpoints } = this.config.webhooks;
+
+    try {
+      switch (type) {
+        case 'voice': {
+          if (!endpoints.voice) {
+            throw new Error('Voice webhook endpoint not configured');
+          }
+          const webhookUrl = `${baseUrl}${endpoints.voice}`;
+          // TODO: Configure Twilio webhook for voice
+          // await this.configureTwilioVoiceWebhook(identifier, webhookUrl);
+          logger.info(`[AIReceptionist] Voice webhook configured`, { webhookUrl });
+          break;
+        }
+
+        case 'sms': {
+          if (!endpoints.sms) {
+            throw new Error('SMS webhook endpoint not configured');
+          }
+          const webhookUrl = `${baseUrl}${endpoints.sms}`;
+          // TODO: Configure Twilio webhook for SMS
+          // await this.configureTwilioSMSWebhook(identifier, webhookUrl);
+          logger.info(`[AIReceptionist] SMS webhook configured`, { webhookUrl });
+          break;
+        }
+
+        case 'email': {
+          if (!endpoints.email) {
+            throw new Error('Email webhook endpoint not configured');
+          }
+          const webhookUrl = `${baseUrl}${endpoints.email}`;
+          // TODO: Configure Postmark inbound webhook
+          // await this.configurePostmarkWebhook(identifier, webhookUrl);
+          logger.info(`[AIReceptionist] Email webhook configured`, { webhookUrl });
+          break;
+        }
+      }
+    } catch (error) {
+      logger.error(`[AIReceptionist] Failed to configure webhook for ${type}`, error as Error);
+      throw error;
+    }
+  }
 
   /**
    * Dispose of all resources

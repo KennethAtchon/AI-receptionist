@@ -284,7 +284,7 @@ export class EmailResource extends BaseResource<EmailSession> {
         emailId: email.id,
         direction: 'inbound',
         from: email.from,
-        to: email.to,
+        to: Array.isArray(email.to) ? email.to.join(', ') : email.to,
         subject: email.subject
       }
     });

@@ -3,9 +3,9 @@
  * User-facing API for SMS operations with webhook support
  */
 
-import { BaseResource, ResourceSession, WebhookContext } from './base.resource';
-import type { Agent } from '../agent/core/Agent';
-import { logger } from '../utils/logger';
+import { BaseResource, ResourceSession, WebhookContext } from '../base.resource';
+import type { Agent } from '../../agent/core/Agent';
+import { logger } from '../../utils/logger';
 
 export interface SMSSession extends ResourceSession {
   messageSid?: string;

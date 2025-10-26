@@ -13,14 +13,11 @@ export { GoogleProvider } from './api/google.provider';
 // Email Providers
 export type { IEmailProvider } from './email/email-provider.interface';
 export { EmailRouter } from './email/email-router';
-export { ResendProvider } from './email/resend.provider';
-export { SendGridProvider } from './email/sendgrid.provider';
-export { SMTPProvider } from './email/smtp.provider';
+export { PostmarkProvider } from './email/postmark.provider';
+export type { PostmarkConfig, PostmarkInboundEmail } from './email/postmark.provider';
 
-// Email Validators
-export { ResendValidator } from './validation/resend-validator';
-export { SendGridValidator } from './validation/sendgrid-validator';
-export { SMTPValidator } from './validation/smtp-validator';
+// Email Validator
+export { PostmarkValidator } from './validation/postmark-validator';
 
 // AI Providers
 export type { IAIProvider } from './ai/ai-provider.interface';

@@ -27,10 +27,10 @@ export { InteractionTracer } from './agent/observability/InteractionTracer';
 // Resources (User-facing API)
 // ============================================================================
 
-export { CallsResource } from './resources/calls.resource';
-export { SMSResource } from './resources/sms.resource';
+export { VoiceResource } from './resources/core/voice.resource';
+export { SMSResource } from './resources/core/sms.resource';
 export { EmailResource } from './resources/core/email.resource';
-export { TextResource } from './resources/text.resource';
+export { TextResource } from './resources/core/text.resource';
 
 // ============================================================================
 // Tools (Tool System)
@@ -50,8 +50,8 @@ export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter
 export { GoogleProvider } from './providers/api/google.provider';
 
 // Email Providers
-export { ResendProvider, SendGridProvider, SMTPProvider, EmailRouter } from './providers';
-export type { IEmailProvider } from './providers';
+export { PostmarkProvider, EmailRouter } from './providers';
+export type { IEmailProvider, PostmarkInboundEmail } from './providers';
 
 // ============================================================================
 // Services (Business Logic Layer) - REMOVED
@@ -190,9 +190,7 @@ export type {
 
   // Email Providers
   BaseEmailConfig,
-  ResendConfig,
-  SendGridConfig,
-  SMTPConfig,
+  PostmarkConfig,
   EmailProviderConfig,
 
   // Resources

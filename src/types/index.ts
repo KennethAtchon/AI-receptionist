@@ -206,28 +206,17 @@ export interface BaseEmailConfig {
   domains?: string[]; // Route emails to these domains to this provider
 }
 
-export interface ResendConfig extends BaseEmailConfig {
+export interface PostmarkConfig extends BaseEmailConfig {
   apiKey: string;
+  inboundWebhook?: {
+    url: string;
+    secret?: string;
+  };
 }
 
-export interface SendGridConfig extends BaseEmailConfig {
-  apiKey: string;
-}
-
-export interface SMTPConfig extends BaseEmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  username: string;
-  password: string;
-  options?: Record<string, any>;
-}
-
-// Email provider configuration (supports multiple providers)
+// Email provider configuration - now only Postmark
 export interface EmailProviderConfig {
-  resend?: ResendConfig;
-  sendgrid?: SendGridConfig;
-  smtp?: SMTPConfig;
+  postmark?: PostmarkConfig;
 }
 
 export interface CallOptions {
@@ -297,6 +286,19 @@ export interface CalendarEvent {
 }
 
 // ============================================================================
+// Webhook Configuration
+// ============================================================================
+
+export interface WebhookConfig {
+  baseUrl: string; // Consumer's base webhook URL (e.g., 'https://your-app.com')
+  endpoints: {
+    voice?: string; // Voice webhook endpoint path (e.g., '/webhooks/voice')
+    sms?: string; // SMS webhook endpoint path (e.g., '/webhooks/sms')
+    email?: string; // Email webhook endpoint path (e.g., '/webhooks/email')
+  };
+}
+
+// ============================================================================
 // Main SDK Configuration
 // ============================================================================
 
@@ -330,6 +332,9 @@ export interface AIReceptionistConfig {
 
   // Provider configuration
   providers?: ProviderConfig;
+
+  // Webhook configuration (optional - enables webhook-driven mode)
+  webhooks?: WebhookConfig;
 
   // Optional features
   notifications?: NotificationConfig;
@@ -508,17 +513,8 @@ export interface TextResponse {
 }
 
 // ============================================================================
-// Processor Types
+// Processor Types (Deprecated - Using Agent/Tool system instead)
 // ============================================================================
 
-export type {
-  IProcessor,
-  ProcessorResponse,
-  AIConsultationParams,
-  BookingResult,
-  MessagingResult,
-  ProcessUserSpeechParams,
-  InitiateCallParams,
-  FindAndBookParams,
-  SendMessageParams
-} from '../processors';
+// Note: Processors have been replaced by the Agent + Tool architecture
+// These types are kept for backward compatibility but are no longer actively used

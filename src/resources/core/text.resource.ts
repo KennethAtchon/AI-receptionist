@@ -6,9 +6,9 @@
  * with conversation continuity and tool execution capabilities.
  */
 
-import { Agent } from '../agent/core/Agent';
-import { GenerateTextOptions, TextResponse } from '../types';
-import { logger } from '../utils/logger';
+import { Agent } from '../../agent/core/Agent';
+import { GenerateTextOptions, TextResponse } from '../../types';
+import { logger } from '../../utils/logger';
 
 export class TextResource {
   constructor(

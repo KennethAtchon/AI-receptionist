@@ -156,7 +156,7 @@ export class EmailRouter {
    * Automatically stores in conversation and triggers AI response
    */
   async handleInboundWebhook(payload: {
-    provider: 'resend' | 'sendgrid';
+    provider: 'postmark';
     data: any;
   }): Promise<{
     conversationId: string;
@@ -177,28 +177,17 @@ export class EmailRouter {
 
   private parseWebhookPayload(payload: any): ParsedEmail {
     switch (payload.provider) {
-      case 'resend':
+      case 'postmark':
+        // Postmark inbound email format
         return {
-          messageId: payload.data.id,
-          from: payload.data.from,
-          to: payload.data.to,
-          subject: payload.data.subject,
-          text: payload.data.text,
-          html: payload.data.html,
-          headers: payload.data.headers,
-          receivedAt: payload.data.receivedAt
-        };
-
-      case 'sendgrid':
-        return {
-          messageId: payload.data.message_id,
-          from: payload.data.from,
-          to: payload.data.to,
-          subject: payload.data.subject,
-          text: payload.data.text,
-          html: payload.data.html,
-          headers: this.parseSendGridHeaders(payload.data.headers),
-          receivedAt: new Date().toISOString()
+          messageId: payload.data.MessageID,
+          from: payload.data.From || payload.data.FromFull?.Email,
+          to: payload.data.To || (payload.data.ToFull ? payload.data.ToFull.map((t: any) => t.Email) : []),
+          subject: payload.data.Subject,
+          text: payload.data.TextBody,
+          html: payload.data.HtmlBody,
+          headers: payload.data.Headers ? this.parsePostmarkHeaders(payload.data.Headers) : {},
+          receivedAt: payload.data.Date || new Date().toISOString()
         };
 
       default:
@@ -344,15 +333,11 @@ export class EmailRouter {
     }
   }
 
-  private parseSendGridHeaders(headers: string): Record<string, string> {
-    // Parse SendGrid's raw header string
+  private parsePostmarkHeaders(headers: Array<{ Name: string; Value: string }>): Record<string, string> {
+    // Parse Postmark's header array format
     const parsed: Record<string, string> = {};
-    const lines = headers.split('\n');
-    for (const line of lines) {
-      const match = line.match(/^([^:]+):\s*(.+)$/);
-      if (match) {
-        parsed[match[1].toLowerCase()] = match[2];
-      }
+    for (const header of headers) {
+      parsed[header.Name.toLowerCase()] = header.Value;
     }
     return parsed;
   }

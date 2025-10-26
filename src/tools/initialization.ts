@@ -175,7 +175,7 @@ async function registerCalendarTools(
   toolRegistry: ToolRegistry
 ): Promise<void> {
   const { setupCalendarTools } = await import('./standard/calendar-tools');
-  await setupCalendarTools(toolRegistry, { providerRegistry: context.providerRegistry });
+  await setupCalendarTools(toolRegistry);
 
   logger.info('[ToolInit] Calendar tools registered (Google Calendar)');
 }

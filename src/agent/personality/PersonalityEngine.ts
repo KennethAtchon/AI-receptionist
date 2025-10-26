@@ -171,7 +171,8 @@ export class PersonalityEngineImpl implements PersonalityEngine {
     const messages: Record<Channel, string> = {
       call: this.getCallErrorMessage(),
       sms: this.getSmsErrorMessage(),
-      email: this.getEmailErrorMessage()
+      email: this.getEmailErrorMessage(),
+      text: this.getDefaultErrorMessage()
     };
 
     return messages[channel] || this.getDefaultErrorMessage();

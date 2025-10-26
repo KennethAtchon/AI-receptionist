@@ -4,10 +4,10 @@
  */
 
 import type { Agent } from '../agent/core/Agent';
-import type { VoiceResource } from './voice.resource';
-import type { SMSResource } from './sms.resource';
+import type { VoiceResource } from './core/voice.resource';
+import type { SMSResource } from './core/sms.resource';
 import type { EmailResource } from './core/email.resource';
-import type { TextResource } from './text.resource';
+import type { TextResource } from './core/text.resource';
 import { logger } from '../utils/logger';
 
 export interface InitializedResources {
@@ -24,10 +24,10 @@ export function initializeResources(agent: Agent): InitializedResources {
   const resources: InitializedResources = {};
 
   // Initialize all resources (they only need the Agent)
-  const { VoiceResource } = require('./voice.resource');
-  const { SMSResource } = require('./sms.resource');
-  const { EmailResource } = require('./email.resource');
-  const { TextResource } = require('./text.resource');
+  const { VoiceResource } = require('./core/voice.resource');
+  const { SMSResource } = require('./core/sms.resource');
+  const { EmailResource } = require('./core/email.resource');
+  const { TextResource } = require('./core/text.resource');
 
   resources.voice = new VoiceResource(agent);
   resources.sms = new SMSResource(agent);
