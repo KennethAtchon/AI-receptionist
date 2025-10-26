@@ -21,7 +21,7 @@ import { WebhookRouter } from './webhooks/webhook-router';
 import type { OpenAIProvider, OpenRouterProvider } from './providers';
 import type { VoiceResource } from './resources/voice.resource';
 import type { SMSResource } from './resources/sms.resource';
-import type { EmailResource } from './resources/email.resource';
+import type { EmailResource } from './resources/core/email.resource';
 import type { TextResource } from './resources/text.resource';
 
 /**

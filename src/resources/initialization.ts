@@ -6,7 +6,7 @@
 import type { Agent } from '../agent/core/Agent';
 import type { VoiceResource } from './voice.resource';
 import type { SMSResource } from './sms.resource';
-import type { EmailResource } from './email.resource';
+import type { EmailResource } from './core/email.resource';
 import type { TextResource } from './text.resource';
 import { logger } from '../utils/logger';
 

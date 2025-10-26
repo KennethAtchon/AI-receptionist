@@ -3,9 +3,9 @@
  * User-facing API for email operations with webhook support and AI auto-reply
  */
 
-import { BaseResource, ResourceSession, WebhookContext } from './base.resource';
-import type { Agent } from '../agent/core/Agent';
-import { logger } from '../utils/logger';
+import { BaseResource, ResourceSession, WebhookContext } from '../base.resource';
+import type { Agent } from '../../agent/core/Agent';
+import { logger } from '../../utils/logger';
 
 export interface EmailSession extends ResourceSession {
   messageId?: string;

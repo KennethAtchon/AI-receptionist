@@ -29,7 +29,7 @@ export { InteractionTracer } from './agent/observability/InteractionTracer';
 
 export { CallsResource } from './resources/calls.resource';
 export { SMSResource } from './resources/sms.resource';
-export { EmailResource } from './resources/email.resource';
+export { EmailResource } from './resources/core/email.resource';
 export { TextResource } from './resources/text.resource';
 
 // ============================================================================
