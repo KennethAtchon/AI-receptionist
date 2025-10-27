@@ -83,15 +83,11 @@
   "author": "Loctelli",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.0",
-    "@google/generative-ai": "^0.3.0",
     "google-auth-library": "^9.6.0",
     "googleapis": "^134.0.0",
-    "livekit-client": "^2.0.0",
     "openai": "^4.104.0",
     "postmark": "^4.0.5",
-    "twilio": "^5.0.0",
-    "twitter-api-v2": "^1.16.0"
+    "twilio": "^5.0.0"
   },
   "optionalDependencies": {
     "express": "^4.21.2"
