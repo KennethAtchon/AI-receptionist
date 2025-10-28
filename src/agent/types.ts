@@ -439,6 +439,12 @@ export interface PromptContext {
   policies?: PolicyRule[];
   escalationRules?: string[];
   examples?: PromptExample[];
+  // Business context injection points for domain-specific data
+  businessContext?: {
+    companyInfo?: string;      // Formatted company information
+    leadInfo?: string;          // Formatted lead/customer information
+    additionalContext?: string; // Any other contextual data (e.g., booking availability, pricing)
+  };
 }
 
 export interface PromptExample {

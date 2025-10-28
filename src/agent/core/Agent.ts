@@ -38,6 +38,7 @@ import { PromptOptimizer } from '../prompt/PromptOptimizer';
 import { AgentLogger } from '../observability/AgentLogger';
 import { InteractionTracer } from '../observability/InteractionTracer';
 import { AgentBuilder } from './AgentBuilder';
+import { InputValidator } from '../security/InputValidator';
 
 export class Agent {
   // ==================== CORE COMPONENTS (The 5 Pillars) ====================
@@ -64,6 +65,10 @@ export class Agent {
   // ==================== OBSERVABILITY ====================
   private readonly logger: AgentLogger;
   private readonly tracer: InteractionTracer;
+
+  // ==================== SECURITY ====================
+  private readonly inputValidator: InputValidator;
+  private readonly securityEnabled: boolean;
 
   /**
    * Private constructor - use Agent.builder() to create instances
@@ -93,6 +98,10 @@ export class Agent {
     const agentId = `agent-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     this.logger = new AgentLogger(agentId, this.identity.name);
     this.tracer = new InteractionTracer();
+
+    // Initialize security
+    this.inputValidator = new InputValidator();
+    this.securityEnabled = (config as any).security?.inputValidation !== false; // Enabled by default
 
     // Set external dependencies
     this.aiProvider = config.aiProvider;
@@ -153,29 +162,64 @@ export class Agent {
     const startTime = Date.now();
 
     try {
-      // 1. Retrieve conversation history
+      // 1. Security validation
+      if (this.securityEnabled) {
+        const securityCheck = this.inputValidator.validate(request.input);
+
+        if (!securityCheck.isSecure) {
+          this.logger.warn('Security check failed', {
+            detectedPatterns: securityCheck.detectedPatterns,
+            riskLevel: securityCheck.riskLevel,
+            conversationId: request.context.conversationId
+          });
+
+          // Block high-risk attempts immediately
+          if (securityCheck.riskLevel === 'high') {
+            return {
+              content: this.inputValidator.getSecurityResponse('high'),
+              channel: request.channel,
+              metadata: {
+                securityBlock: true,
+                riskLevel: 'high',
+                detectedPatterns: securityCheck.detectedPatterns
+              }
+            };
+          }
+
+          // For medium risk, log but continue with sanitized content
+          this.logger.info('Processing with sanitized content', {
+            riskLevel: securityCheck.riskLevel
+          });
+        }
+
+        // Use sanitized content for all subsequent processing
+        request = { ...request, input: securityCheck.sanitizedContent };
+      }
+
+      // 2. Retrieve conversation history
       const conversationHistory = await this.memory.retrieve(request.input, {
         conversationId: request.context.conversationId,
         channel: request.channel
       });
       this.tracer.log('conversation_history_retrieval', conversationHistory);
 
-      // 2. Build system prompt (static, no memory)
+      // 3. Build system prompt (static, no memory)
       const systemPrompt = request.channel
         ? await this.promptBuilder.build({
             identity: this.identity,
             personality: this.personality,
             knowledge: this.knowledge,
             goals: this.goals.getCurrent(),
-            channel: request.channel
+            channel: request.channel,
+            businessContext: request.context.businessContext
           })
         : this.cachedSystemPrompt!;
 
-      // 3. Execute with AI provider
+      // 4. Execute with AI provider
       const response = await this.execute(request, systemPrompt, conversationHistory);
       this.tracer.log('response', response);
 
-      // 4. Update memory - Store user and assistant messages separately
+      // 5. Update memory - Store user and assistant messages separately
       // Store user message
       await this.memory.store({
         id: `${interactionId}-user`,
@@ -204,7 +248,7 @@ export class Agent {
         importance: 5
       });
 
-      // 5. Track goal progress
+      // 6. Track goal progress
       await this.goals.trackProgress(request, response);
 
       // Update performance metrics

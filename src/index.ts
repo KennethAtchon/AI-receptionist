@@ -22,6 +22,8 @@ export { SystemPromptBuilder } from './agent/prompt/SystemPromptBuilder';
 export { PromptOptimizer, PromptTooLargeError } from './agent/prompt/PromptOptimizer';
 export { AgentLogger, FileLogger } from './agent/observability/AgentLogger';
 export { InteractionTracer } from './agent/observability/InteractionTracer';
+export { InputValidator } from './agent/security';
+export type { SecurityResult } from './agent/security';
 
 // ============================================================================
 // Resources (User-facing API)

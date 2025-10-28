@@ -55,13 +55,18 @@ export class SystemPromptBuilder {
       sections.push(this.buildCommunicationSection(context.channel));
     }
 
-    // 7. CONSTRAINTS & BOUNDARIES
+    // 7. BUSINESS CONTEXT (domain-specific data)
+    if (context.businessContext) {
+      sections.push(this.buildBusinessContextSection(context.businessContext));
+    }
+
+    // 8. CONSTRAINTS & BOUNDARIES
     sections.push(this.buildConstraintsSection(context));
 
-    // 8. ERROR HANDLING
+    // 9. ERROR HANDLING
     sections.push(this.buildErrorHandlingSection());
 
-    // 9. EXAMPLES (few-shot learning)
+    // 10. EXAMPLES (few-shot learning)
     if (context.examples && context.examples.length > 0) {
       sections.push(this.buildExamplesSection(context.examples));
     }
@@ -328,6 +333,35 @@ export class SystemPromptBuilder {
   }
 
   /**
+   * Build BUSINESS CONTEXT section (domain-specific data)
+   */
+  private buildBusinessContextSection(businessContext: {
+    companyInfo?: string;
+    leadInfo?: string;
+    additionalContext?: string;
+  }): PromptSection {
+    let content = '# BUSINESS CONTEXT\n\n';
+
+    if (businessContext.companyInfo) {
+      content += `## Company Information\n${businessContext.companyInfo}\n\n`;
+    }
+
+    if (businessContext.leadInfo) {
+      content += `## Current Lead/Customer\n${businessContext.leadInfo}\n\n`;
+    }
+
+    if (businessContext.additionalContext) {
+      content += `## Additional Context\n${businessContext.additionalContext}\n\n`;
+    }
+
+    return {
+      name: 'BUSINESS_CONTEXT',
+      priority: 7,
+      content: content.trim()
+    };
+  }
+
+  /**
    * Build CONSTRAINTS section
    */
   private buildConstraintsSection(context: PromptContext): PromptSection {
@@ -501,6 +535,7 @@ export class SystemPromptBuilder {
       'GOALS',
       'DECISION_PRINCIPLES',
       'COMMUNICATION',
+      'BUSINESS_CONTEXT',
       'CONSTRAINTS',
       'ERROR_HANDLING',
       'EXAMPLES'
