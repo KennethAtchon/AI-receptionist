@@ -85,7 +85,7 @@ export class EmailResource extends BaseResource<EmailSession> {
   }
 
   /**
-   * Handle incoming email webhook (Resend/SendGrid)
+   * Handle incoming email webhook (Postmark/Resend/SendGrid)
    *
    * This implements the WEBHOOK-EMAIL-AUTOMATION-PLAN vision:
    * 1. Parse webhook payload
@@ -203,8 +203,20 @@ export class EmailResource extends BaseResource<EmailSession> {
   // Private helper methods
 
   private parseWebhookPayload(context: WebhookContext): InboundEmailPayload {
-    // Provider-specific parsing (Resend, SendGrid, etc.)
+    // Provider-specific parsing (Resend, SendGrid, Postmark)
     switch (context.provider) {
+      case 'postmark':
+        return {
+          id: context.payload.MessageID,
+          from: context.payload.From || context.payload.FromFull?.Email,
+          to: context.payload.To || (context.payload.ToFull ? context.payload.ToFull.map((t: any) => t.Email) : []),
+          subject: context.payload.Subject,
+          text: context.payload.TextBody,
+          html: context.payload.HtmlBody,
+          headers: context.payload.Headers ? this.parsePostmarkHeaders(context.payload.Headers) : {},
+          receivedAt: context.payload.Date || new Date().toISOString()
+        };
+
       case 'resend':
         return {
           id: context.payload.id,
@@ -306,8 +318,11 @@ export class EmailResource extends BaseResource<EmailSession> {
     logger.info(`[EmailResource] Triggering AI auto-reply for ${email.from}`);
 
     // Use Agent to compose and send reply
+    // toolParams will override AI's parameters when the send_email tool is called
     await this.processWithAgent(
-      `Respond to this customer email professionally`,
+      `A customer email was received from ${email.from} with the subject "${email.subject}". 
+      Respond to this customer email professionally and be helpful. 
+      Use the send_email tool to send your response.`,
       {
         conversationId,
         toolHint: 'send_email',
@@ -360,6 +375,15 @@ export class EmailResource extends BaseResource<EmailSession> {
     );
 
     return match?.sessionMetadata?.conversationId || null;
+  }
+
+  private parsePostmarkHeaders(headers: Array<{ Name: string; Value: string }>): Record<string, string> {
+    // Parse Postmark's header array format
+    const parsed: Record<string, string> = {};
+    for (const header of headers) {
+      parsed[header.Name.toLowerCase()] = header.Value;
+    }
+    return parsed;
   }
 
   private parseSendGridHeaders(headers: string): Record<string, string> {

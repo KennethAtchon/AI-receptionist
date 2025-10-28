@@ -265,7 +265,12 @@ export class Agent {
 
     // If tool calls needed, execute them directly with registry
     if (aiResponse.toolCalls && aiResponse.toolCalls.length > 0 && this.toolRegistry) {
-      const toolResults = await this.executeTools(aiResponse.toolCalls, request.context);
+      // Build execution context with channel from request
+      const executionContext = {
+        ...request.context,
+        channel: request.channel
+      };
+      const toolResults = await this.executeTools(aiResponse.toolCalls, executionContext);
 
       // Get final response after tool execution
       return this.synthesizeResponse(aiResponse, toolResults, request.channel);
@@ -291,8 +296,22 @@ export class Agent {
 
     for (const toolCall of toolCalls) {
       this.logger.info(`[Agent] Executing tool '${toolCall.name}'`);
-      const result = await this.toolRegistry.execute(toolCall.name, toolCall.parameters, context);
-      results.push({ toolName: toolCall.name, result });
+      try {
+        // Merge provided toolParams with AI-generated parameters
+        // toolParams take precedence over AI's parameters
+        const mergedParameters = context.toolParams ? {
+          ...toolCall.parameters,
+          ...context.toolParams
+        } : toolCall.parameters;
+        
+        const result = await this.toolRegistry.execute(toolCall.name, mergedParameters, context);
+        this.logger.info(`[Agent] Tool '${toolCall.name}' executed`, { success: result.success, error: result.error });
+        results.push({ toolName: toolCall.name, result });
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`[Agent] Tool '${toolCall.name}' threw error: ${errorMsg}`, { error, stack: error instanceof Error ? error.stack : undefined });
+        throw error; // Re-throw to be caught by parent handler
+      }
     }
 
     return results;

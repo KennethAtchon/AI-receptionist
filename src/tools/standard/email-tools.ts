@@ -45,6 +45,10 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           type: 'string',
           description: 'Force specific provider (resend, sendgrid, smtp)'
         },
+        inReplyTo: {
+          type: 'string',
+          description: 'Message ID to reply to (for email threading)'
+        },
         attachments: {
           type: 'array',
           description: 'File attachments',
@@ -81,7 +85,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
           // Try to get any available email provider
-          const providers = ['resend', 'sendgrid', 'smtp'];
+          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
           for (const providerName of providers) {
             if (config.providerRegistry.has(providerName)) {
               emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
@@ -98,7 +102,11 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           subject: params.subject,
           text: params.body,
           html: params.html,
-          attachments: params.attachments
+          attachments: params.attachments,
+          headers: params.inReplyTo ? {
+            'In-Reply-To': params.inReplyTo,
+            'References': params.inReplyTo
+          } : undefined
         });
 
         if (!result.success) {
@@ -120,12 +128,14 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           }
         };
       } catch (error) {
-        logger.error('[SendEmailTool] Failed', error as Error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        logger.error('[SendEmailTool] Failed', error as Error, { errorMessage, errorStack });
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMessage,
           response: {
-            speak: 'I apologize, but I was unable to send the email. Please try again or contact support.'
+            speak: `I apologize, but I was unable to send the email: ${errorMessage}`
           }
         };
       }
@@ -151,7 +161,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
           // Try to get any available email provider
-          const providers = ['resend', 'sendgrid', 'smtp'];
+          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
           for (const providerName of providers) {
             if (config.providerRegistry.has(providerName)) {
               emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
@@ -167,7 +177,11 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           to: params.to,
           subject: params.subject,
           text: params.body,
-          html: params.html
+          html: params.html,
+          headers: params.inReplyTo ? {
+            'In-Reply-To': params.inReplyTo,
+            'References': params.inReplyTo
+          } : undefined
         });
 
         if (!result.success) {
@@ -220,7 +234,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
           // Try to get any available email provider
-          const providers = ['resend', 'sendgrid', 'smtp'];
+          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
           for (const providerName of providers) {
             if (config.providerRegistry.has(providerName)) {
               emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
@@ -237,7 +251,11 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           subject: params.subject,
           text: params.body,
           html: params.html,
-          attachments: params.attachments
+          attachments: params.attachments,
+          headers: params.inReplyTo ? {
+            'In-Reply-To': params.inReplyTo,
+            'References': params.inReplyTo
+          } : undefined
         });
 
         if (!result.success) {
@@ -295,7 +313,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
           // Try to get any available email provider
-          const providers = ['resend', 'sendgrid', 'smtp'];
+          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
           for (const providerName of providers) {
             if (config.providerRegistry.has(providerName)) {
               emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
@@ -311,7 +329,11 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           to: params.to,
           subject: params.subject,
           text: params.body,
-          html: params.html
+          html: params.html,
+          headers: params.inReplyTo ? {
+            'In-Reply-To': params.inReplyTo,
+            'References': params.inReplyTo
+          } : undefined
         });
 
         return {

@@ -84,6 +84,9 @@ export class ToolRegistry {
     }
 
     // Get channel-specific handler or fall back to default
+    if (!context.channel) {
+      throw new Error(`Execution context must have a channel property`);
+    }
     const handlerKey = `on${this.capitalizeFirst(context.channel)}` as keyof typeof tool.handlers;
     const handler = tool.handlers[handlerKey] || tool.handlers.default;
 
@@ -101,7 +104,14 @@ export class ToolRegistry {
 
       return result;
     } catch (error) {
-      logger.error(`[ToolRegistry] Tool execution failed:`, error instanceof Error ? error : new Error(String(error)));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error(`[ToolRegistry] Tool '${toolName}' execution failed: ${errorMessage}`, error instanceof Error ? error : new Error(String(error)), {
+        toolName,
+        parameters,
+        errorMessage,
+        errorStack
+      });
       const duration = Date.now() - startTime;
 
       // Log error to ToolStore (if configured)
@@ -111,9 +121,9 @@ export class ToolRegistry {
 
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMessage,
         response: {
-          text: 'Sorry, I encountered an error while performing that action.'
+          text: `Sorry, I encountered an error while performing that action: ${errorMessage}`
         }
       };
     }
@@ -134,7 +144,10 @@ export class ToolRegistry {
     this.tools.clear();
   }
 
-  private capitalizeFirst(str: string): string {
+  private capitalizeFirst(str: string | undefined): string {
+    if (!str) {
+      return '';
+    }
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 }
