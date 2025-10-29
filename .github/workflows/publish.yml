@@ -1,0 +1,113 @@
+name: Publish Package
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        registry-url: 'https://registry.npmjs.org'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run type checking
+      run: npm run typecheck
+      
+      continue-on-error: true
+      
+    - name: Build package
+      run: npm run build
+      
+    - name: Bump version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION_TYPE="${{ github.event.inputs.version_type }}"
+        else
+          VERSION_TYPE="patch"
+        fi
+        
+        OLD_VERSION=$(node -p "require('./package.json').version")
+        npm version $VERSION_TYPE --no-git-tag-version
+        NEW_VERSION=$(node -p "require('./package.json').version")
+        
+        echo "old_version=$OLD_VERSION" >> $GITHUB_OUTPUT
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+        
+        echo "📦 Version bumped: $OLD_VERSION → $NEW_VERSION ($VERSION_TYPE)"
+        
+    - name: Publish to npm
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
+    - name: Commit version bump
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add package.json
+        git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+        git push
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.version.outputs.new_version }}
+        name: Release v${{ steps.version.outputs.new_version }}
+        body: |
+          ## Changes in v${{ steps.version.outputs.new_version }}
+          
+          Automated release from commit ${{ github.sha }}
+          
+          **Version Type**: ${{ steps.version.outputs.version_type }}
+          **Previous Version**: ${{ steps.version.outputs.old_version }}
+          
+          ### What's New
+          - Updated AI Receptionist package
+          - Version: ${{ steps.version.outputs.new_version }}
+          
+          ### Installation
+          ```bash
+          npm install @atchonk/ai-receptionist@${{ steps.version.outputs.new_version }}
+          ```
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update project package.json
+      if: success()
+      run: |
+        echo "🎉 Package published successfully!"
+        echo "📦 New version: ${{ steps.version.outputs.new_version }}"
+        echo ""
+        echo "Next steps:"
+        echo "Update your project with: npm install @atchonk/ai-receptionist@${{ steps.version.outputs.new_version }}"

@@ -163,7 +163,7 @@ import {
   AgentBuilder,          // ✅ Exported
   ToolRegistry,          // ✅ Exported
   ToolBuilder,           // ✅ Exported
-} from '@loctelli/ai-receptionist';
+} from '@atchonk/ai-receptionist';
 ```
 
 ### Resource Exports
@@ -174,7 +174,7 @@ import {
   SMSResource,           // ✅ Exported
   EmailResource,         // ✅ Exported
   TextResource,          // ✅ Exported
-} from '@loctelli/ai-receptionist';
+} from '@atchonk/ai-receptionist';
 ```
 
 ### Provider Exports
@@ -187,7 +187,7 @@ import {
   PostmarkProvider,      // ✅ Exported
   GoogleProvider,        // ✅ Exported
   EmailRouter,           // ✅ Exported
-} from '@loctelli/ai-receptionist';
+} from '@atchonk/ai-receptionist';
 ```
 
 ### Type Exports
@@ -202,7 +202,7 @@ import type {
   MakeCallOptions,       // ✅ Exported
   SendSMSOptions,        // ✅ Exported
   SendEmailOptions,      // ✅ Exported
-} from '@loctelli/ai-receptionist';
+} from '@atchonk/ai-receptionist';
 ```
 
 ---

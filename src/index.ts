@@ -1,5 +1,5 @@
 /**
- * @loctelli/ai-receptionist
+ * @atchonk/ai-receptionist
  * Agent-Centric AI Communication SDK
  *
  * Build AI agents that can communicate through multiple channels (calls, SMS, email)

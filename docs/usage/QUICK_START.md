@@ -7,7 +7,7 @@ Get up and running in 5 minutes!
 ## Installation
 
 ```bash
-npm install @loctelli/ai-receptionist
+npm install @atchonk/ai-receptionist
 ```
 
 ---
@@ -18,7 +18,7 @@ Perfect for testing without any external services.
 
 ```typescript
 // demo.ts
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 async function demo() {
   // Create AI agent
@@ -69,7 +69,7 @@ Make an AI-powered phone call.
 
 ```typescript
 // call-demo.ts
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 async function callDemo() {
   const agent = new AIReceptionist({
@@ -133,7 +133,7 @@ Handle incoming calls, SMS, and emails.
 ```typescript
 // webhook-server.ts
 import express from 'express';
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 const app = express();
 app.use(express.json());
@@ -262,7 +262,7 @@ Full-featured sales agent with calendar booking.
 
 ```typescript
 // sales-agent.ts
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 async function createSalesAgent() {
   const sarah = new AIReceptionist({

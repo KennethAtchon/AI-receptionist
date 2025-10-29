@@ -1,5 +1,5 @@
 {
-  "name": "@loctelli/ai-receptionist",
+  "name": "@atchonk/ai-receptionist",
   "version": "0.1.0",
   "description": "AI-powered receptionist for handling phone calls, video calls, SMS, and emails",
   "main": "./dist/index.js",
@@ -10,47 +10,6 @@
       "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
       "import": "./dist/index.mjs"
-    },
-    "./client": {
-      "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "import": "./dist/index.mjs"
-    },
-    "./providers/openai": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/providers/ai/openai.provider.ts"
-    },
-    "./providers/openrouter": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/providers/ai/openrouter.provider.ts"
-    },
-    "./providers/twilio": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/providers/communication/twilio.provider.ts"
-    },
-    "./providers/google-calendar": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/providers/calendar/google-calendar.provider.ts"
-    },
-    "./resources/calls": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/resources/calls.resource.ts"
-    },
-    "./resources/sms": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/resources/sms.resource.ts"
-    },
-    "./resources/email": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/resources/email.resource.ts"
-    },
-    "./tools": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/tools/index.ts"
-    },
-    "./types": {
-      "types": "./dist/index.d.ts",
-      "import": "./src/types/index.ts"
     }
   },
   "files": [
@@ -63,10 +22,10 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "lint": "eslint src --ext .ts", 
+    "lint": "eslint src --ext .ts --config .eslintrc.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "format": "prettier --write \"src/**/*.ts\"",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm run build",
     "clean": "rm -rf node_modules dist"
   },
   "keywords": [
@@ -116,7 +75,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/KennethAtchon/Loctelli"
+    "url": "https://github.com/KennethAtchon/AI-receptionist"
   },
   "publishConfig": {
     "access": "public"

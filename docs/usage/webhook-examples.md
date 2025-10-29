@@ -21,7 +21,7 @@ Complete Express.js webhook server.
 ### Installation
 
 ```bash
-npm install express @loctelli/ai-receptionist
+npm install express @atchonk/ai-receptionist
 ```
 
 ### Server Code
@@ -29,7 +29,7 @@ npm install express @loctelli/ai-receptionist
 ```typescript
 // server.ts
 import express from 'express';
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 const app = express();
 
@@ -218,7 +218,7 @@ High-performance webhook server with Fastify.
 ### Installation
 
 ```bash
-npm install fastify @loctelli/ai-receptionist
+npm install fastify @atchonk/ai-receptionist
 ```
 
 ### Server Code
@@ -226,7 +226,7 @@ npm install fastify @loctelli/ai-receptionist
 ```typescript
 // server.ts
 import Fastify from 'fastify';
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 const fastify = Fastify({
   logger: true
@@ -359,7 +359,7 @@ lib/
 
 ```typescript
 // lib/receptionist.ts
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 let receptionistInstance: AIReceptionist | null = null;
 

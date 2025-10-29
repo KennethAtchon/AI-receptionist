@@ -19,7 +19,7 @@ Complete guide for building AI-powered communication agents with the AI Receptio
 ## Installation
 
 ```bash
-npm install @loctelli/ai-receptionist
+npm install @atchonk/ai-receptionist
 ```
 
 ### Required Dependencies
@@ -40,7 +40,7 @@ The SDK automatically installs these providers:
 Create an AI agent that can make calls, send SMS, and emails:
 
 ```typescript
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 const sarah = new AIReceptionist({
   // Define your agent's identity
@@ -179,7 +179,7 @@ Handle **inbound** messages with webhook-driven architecture.
 
 ```typescript
 import express from 'express';
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 const app = express();
 app.use(express.json());
@@ -482,7 +482,7 @@ console.log(response.text);
 ### Example 1: Sales Agent with Calendar Booking
 
 ```typescript
-import { AIReceptionist } from '@loctelli/ai-receptionist';
+import { AIReceptionist } from '@atchonk/ai-receptionist';
 
 const salesAgent = new AIReceptionist({
   agent: {

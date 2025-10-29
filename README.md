@@ -1,700 +1,568 @@
-## ToolStore (Automatic Tool Execution Logging)
+# @atchonk/ai-receptionist
 
-The SDK can automatically persist tool executions and errors into the agent's memory. This enables querying prior tool outcomes during a conversation.
+**Autonomous AI agent that handles voice calls, SMS, and emails independently**
 
-Setup happens automatically when you initialize the client. Internally, a `ToolStore` is attached to the `ToolRegistry` and linked to the `Agent` after it is built.
+[![npm version](https://img.shields.io/npm/v/@atchonk/ai-receptionist.svg)](https://www.npmjs.com/package/@atchonk/ai-receptionist)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Access it at runtime:
+Set up an AI agent once, and it autonomously handles all incoming communications across voice, SMS, and email—booking appointments, sending confirmations, and managing conversations without any additional code.
 
-```ts
-const registry = client.getToolRegistry(); // manage tools
-const toolStore = (client as any).getToolStore?.(); // if using TypeScript, add a typed getter
+## Philosophy
 
-// Query recent tool executions for a conversation
-const recent = await toolStore.findExecutions({ conversationId, limit: 10 });
+**The AI should just work.** Configure your agent's personality and goals, connect your communication channels, and the AI handles everything else autonomously. No manual orchestration, no per-request coding—just pure autonomy.
 
-// Get most recent success for a tool in this conversation
-const last = await toolStore.getLastExecution('book_appointment', conversationId);
-```
+## How It Works
 
-Notes:
-- Memory logging requires agent memory to be enabled; long‑term storage improves persistence across sessions.
-- You can still use `onToolExecute`/`onToolError` callbacks for custom side effects; `ToolStore` focuses on memory persistence.
+1. **You configure** an AI agent with identity, personality, knowledge, and goals
+2. **You set up** webhook endpoints for voice, SMS, and email
+3. **The AI handles** all incoming communications autonomously using built-in tools
 
-# AI Receptionist SDK - New Architecture 🚀
+When a customer calls, texts, or emails:
+- The AI understands the request
+- The AI autonomously books appointments (tool: `calendar`)
+- The AI sends confirmation emails (tool: `send_email`)
+- The AI schedules SMS reminders (tool: `send_sms`)
+- The AI maintains conversation context across channels
 
-**Agent-centric AI communication SDK with extensible tool system and multi-channel support**
+**You write zero additional code.** The AI decides what to do and does it.
 
-## Overview
+## Installation
 
-This is a barebones implementation showcasing the new architecture vision:
-
-- **Agent-Centric**: AI agent is the primary entity, channels are communication methods
-- **Provider Pattern**: Clean abstraction for external APIs (Twilio, OpenAI, Google Calendar, etc.)
-- **Service Layer**: Business logic separated from resources and providers
-- **Tool Registry**: Flexible, extensible tool system with channel-specific handlers
-- **Clone Pattern**: Easy multi-agent setup with shared infrastructure
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      AIReceptionist (Agent)                      │
-│                                                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Calls      │  │     SMS      │  │    Email     │          │
-│  │  Resource    │  │  Resource    │  │  Resource    │          │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
-└─────────┼──────────────────┼──────────────────┼─────────────────┘
-          │                  │                  │
-          ↓                  ↓                  ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                         Services Layer                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │ CallService  │  │ Conversation │  │ ToolExecution│          │
-│  │              │  │   Service    │  │   Service    │          │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
-└─────────┼──────────────────┼──────────────────┼─────────────────┘
-          │                  │                  │
-          ↓                  ↓                  ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                       Providers Layer                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Twilio     │  │    OpenAI    │  │    Google    │          │
-│  │   Provider   │  │   Provider   │  │   Calendar   │          │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
-└─────────┼──────────────────┼──────────────────┼─────────────────┘
-          │                  │                  │
-          ↓                  ↓                  ↓
-      Twilio API         OpenAI API       Google Calendar API
+```bash
+npm install @atchonk/ai-receptionist
 ```
 
 ## Quick Start
 
-```typescript
-import { AIReceptionist, Tools } from '@loctelli/ai-receptionist';
+### Step 1: Configure Your AI Agent
 
-// Create an AI agent
-const sarah = new AIReceptionist({
+```typescript
+import { AIReceptionist } from '@atchonk/ai-receptionist';
+
+const agent = new AIReceptionist({
   agent: {
-    name: 'Sarah',
-    role: 'Sales Representative',
-    personality: 'friendly and enthusiastic'
+    identity: {
+      name: 'Sarah',
+      role: 'Sales Representative',
+      organization: 'Acme Corp'
+    },
+    personality: {
+      traits: [
+        { name: 'friendly', description: 'Warm and welcoming' },
+        { name: 'professional', description: 'Maintains professionalism' }
+      ],
+      communicationStyle: {
+        primary: 'consultative',
+        tone: 'friendly',
+        formalityLevel: 7
+      }
+    },
+    knowledge: {
+      domain: 'B2B SaaS sales',
+      expertise: ['lead qualification', 'appointment booking', 'product demos']
+    },
+    goals: {
+      primary: 'Qualify leads and book product demos',
+      secondary: ['Gather lead information', 'Handle objections professionally']
+    }
   },
 
   model: {
     provider: 'openai',
-    apiKey: process.env.OPENAI_API_KEY!,
+    apiKey: process.env.OPENAI_API_KEY,
     model: 'gpt-4'
-  },
-
-  tools: {
-    defaults: ['calendar', 'booking'],
-    custom: [
-      Tools.custom({
-        name: 'check_inventory',
-        description: 'Check product inventory',
-        parameters: { /* ... */ },
-        handler: async (params, ctx) => {
-          // Your custom logic
-          return {
-            success: true,
-            response: {
-              speak: 'We have 42 units in stock.',
-              message: 'Stock: 42 units'
-            }
-          };
-        }
-      })
-    ]
   },
 
   providers: {
     communication: {
       twilio: {
-        accountSid: process.env.TWILIO_ACCOUNT_SID!,
-        authToken: process.env.TWILIO_AUTH_TOKEN!,
-        phoneNumber: process.env.TWILIO_PHONE_NUMBER!
+        accountSid: process.env.TWILIO_ACCOUNT_SID,
+        authToken: process.env.TWILIO_AUTH_TOKEN,
+        phoneNumber: process.env.TWILIO_PHONE_NUMBER
       }
-    }
-  }
-});
-
-// Initialize
-await sarah.initialize();
-
-// Use across different channels
-await sarah.calls.make({ to: '+1234567890' });
-await sarah.sms.send({ to: '+1234567890', body: 'Hello!' });
-```
-
-## Key Features
-
-### 1. Tree-Shakable & Optimized 🌲
-
-The SDK is built with tree-shaking in mind for minimal bundle sizes:
-
-```typescript
-// Only OpenAI + Twilio + SMS are bundled (~25 KB)
-const client = new AIReceptionist({
-  model: { provider: 'openai', ... },  // ✅ Only OpenAI bundled
-  providers: {
-    communication: { twilio: { ... } }  // ✅ Only Twilio bundled
-    // No calendar = Calendar NOT bundled ✅
-  }
-});
-```
-
-**Bundle sizes:**
-- **Core**: 24.75 KB
-- **+ OpenAI**: +0.12 KB
-- **+ OpenRouter**: +4.70 KB
-- **+ Twilio**: +0.12 KB
-- **+ Calendar**: +0.13 KB
-
-📖 See [TREE_SHAKING.md](TREE_SHAKING.md) for optimization guide
-
-### 1.5. OpenRouter - Dynamic Model Switching
-
-OpenRouter provider gives you access to **100+ AI models** from multiple providers (OpenAI, Anthropic, Google, Meta, Mistral, etc.) and the ability to **switch models at runtime**.
-
-```typescript
-import { AIReceptionist, OPENROUTER_MODELS } from '@loctelli/ai-receptionist';
-
-const client = new AIReceptionist({
-  ai: {
-    provider: 'openrouter',
-    apiKey: process.env.OPENROUTER_API_KEY!,
-    model: OPENROUTER_MODELS.anthropic.claude35Sonnet,
-  },
-  agent: { name: 'Alex', role: 'Assistant' }
-});
-
-await client.initialize();
-
-// Get the provider to switch models
-const provider = client['aiProvider'];
-
-// Switch to GPT-4 Turbo
-provider.setModel(OPENROUTER_MODELS.openai.gpt4Turbo);
-await client.chat('user-1', { message: 'Hello from GPT-4!' });
-
-// Switch to Google Gemini
-provider.setModel(OPENROUTER_MODELS.google.geminiPro15);
-await client.chat('user-1', { message: 'Hello from Gemini!' });
-
-// Switch to Meta Llama
-provider.setModel(OPENROUTER_MODELS.meta.llama3_70b);
-await client.chat('user-1', { message: 'Hello from Llama!' });
-
-// List all available models
-const models = await provider.listAvailableModels();
-console.log(`${models.length} models available`);
-
-// Validate before switching
-const isValid = await provider.validateModel('anthropic/claude-3-opus');
-if (isValid) {
-  provider.setModel('anthropic/claude-3-opus');
-}
-```
-
-**Available model constants:**
-- `OPENROUTER_MODELS.openai.*` - GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
-- `OPENROUTER_MODELS.anthropic.*` - Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
-- `OPENROUTER_MODELS.google.*` - Gemini Pro, Gemini Pro 1.5
-- `OPENROUTER_MODELS.meta.*` - Llama 3 70B, Llama 3 8B
-- `OPENROUTER_MODELS.mistral.*` - Mistral Large, Medium, Mixtral
-
-📖 See [examples/openrouter-model-switching.ts](examples/openrouter-model-switching.ts) for complete example
-
-### 2. Agent-Centric Design
-
-Each `AIReceptionist` instance represents one AI agent with unified personality across all channels.
-
-📖 **See [docs/AGENT_SYSTEM.md](docs/AGENT_SYSTEM.md) for complete guide on:**
-- Defining agent personality and identity
-- Building custom system prompts
-- Adding tools to agents
-- Complete agent examples
-
-```typescript
-// Sarah is the same agent across all channels
-await sarah.calls.make({ to: '+123' });  // Sarah speaks on phone
-await sarah.sms.send({ to: '+123', body: '...' });  // Sarah texts
-await sarah.email.send({ to: 'user@example.com', subject: '...' });  // Sarah emails
-```
-
-### 2. Clone Pattern for Multi-Agent
-
-Create multiple agents easily by cloning and overriding configuration:
-
-```typescript
-const sarah = new AIReceptionist({
-  agent: { name: 'Sarah', role: 'Sales' },
-  tools: { defaults: ['calendar', 'crm'] },
-  providers: { /* shared infrastructure */ }
-});
-
-await sarah.initialize();
-
-// Clone for Bob - shares providers but different personality/tools
-const bob = sarah.clone({
-  agent: { name: 'Bob', role: 'Support' },
-  tools: { custom: [ticketingTool, knowledgeBaseTool] }
-});
-
-await bob.initialize();
-
-// Each works independently
-await sarah.calls.make({ to: '+111' });  // Sales call
-await bob.calls.make({ to: '+222' });    // Support call
-```
-
-### 3. Channel-Specific Tool Handlers
-
-Tools can behave differently based on communication channel:
-
-```typescript
-import { ToolBuilder } from '@loctelli/ai-receptionist';
-
-const calendarTool = new ToolBuilder()
-  .withName('book_appointment')
-  .withDescription('Book customer appointment')
-  .withParameters({ /* ... */ })
-
-  // Voice call: conversational
-  .onCall(async (params, ctx) => {
-    return {
-      success: true,
-      response: {
-        speak: `Perfect! I've booked your appointment for ${params.date} at ${params.time}. You'll receive a confirmation text shortly.`
+    },
+    email: {
+      postmark: {
+        apiKey: process.env.POSTMARK_API_KEY,
+        fromEmail: 'sarah@acme.com'
       }
-    };
-  })
-
-  // SMS: brief
-  .onSMS(async (params, ctx) => {
-    return {
-      success: true,
-      response: {
-        message: `✓ Booked!\n${params.date} at ${params.time}\nConf: ${bookingId}`
-      }
-    };
-  })
-
-  // Email: formal with calendar invite
-  .onEmail(async (params, ctx) => {
-    return {
-      success: true,
-      response: {
-        html: `<h2>Appointment Confirmed</h2>...`,
-        attachments: [calendarInvite]
-      }
-    };
-  })
-
-  // Fallback for any channel
-  .default(async (params, ctx) => {
-    return {
-      success: true,
-      response: {
-        text: `Appointment booked for ${params.date}`
-      }
-    };
-  })
-  .build();
-```
-
-### 4. Flexible Tool System
-
-**Standard Tools:**
-```typescript
-{
-  tools: {
-    defaults: ['calendar', 'booking', 'crm'],
+    },
     calendar: {
-      provider: 'google',
-      apiKey: '...'
+      google: {
+        clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
+        privateKey: process.env.GOOGLE_PRIVATE_KEY,
+        calendarId: process.env.GOOGLE_CALENDAR_ID
+      }
     }
   }
+});
+
+await agent.initialize();
+```
+
+### Step 2: Set Up Webhook Endpoints
+
+```typescript
+import express from 'express';
+const app = express();
+
+// Incoming voice calls - AI handles automatically
+app.post('/webhooks/voice',
+  express.urlencoded({ extended: false }),
+  async (req, res) => {
+    const twiml = await agent.handleVoiceWebhook(req.body);
+    res.type('text/xml').send(twiml);
+  }
+);
+
+// Incoming SMS - AI handles automatically
+app.post('/webhooks/sms',
+  express.urlencoded({ extended: false }),
+  async (req, res) => {
+    const twiml = await agent.handleSMSWebhook(req.body);
+    res.type('text/xml').send(twiml);
+  }
+);
+
+// Incoming emails - AI handles automatically
+app.post('/webhooks/email',
+  express.json(),
+  async (req, res) => {
+    await agent.handleEmailWebhook(req.body);
+    res.json({ success: true });
+  }
+);
+
+app.listen(3000);
+```
+
+### Step 3: Configure Your Providers
+
+**Twilio (Voice & SMS):**
+- Go to Twilio Console → Phone Numbers
+- Set voice webhook: `https://your-app.com/webhooks/voice`
+- Set SMS webhook: `https://your-app.com/webhooks/sms`
+
+**Postmark (Email):**
+- Go to Postmark → Inbound
+- Set inbound webhook: `https://your-app.com/webhooks/email`
+
+### That's It!
+
+Your AI agent now **autonomously handles all incoming communications**. No additional code needed.
+
+## What Happens Automatically
+
+### Example: Incoming Phone Call
+
+**Customer calls your Twilio number:**
+
+```
+1. Twilio → POST /webhooks/voice
+2. AI agent receives call
+3. AI: "Hi! This is Sarah from Acme Corp. How can I help?"
+4. Customer: "I'd like to schedule a demo"
+5. AI checks calendar (tool: calendar_check_availability)
+6. AI: "I have Tuesday at 2pm or Thursday at 10am available"
+7. Customer: "Tuesday works"
+8. AI books appointment (tool: calendar_book)
+9. AI sends confirmation email (tool: send_email)
+10. AI schedules SMS reminder (tool: send_sms)
+11. AI: "Perfect! I've booked your demo for Tuesday at 2pm.
+    You'll receive a confirmation email shortly."
+```
+
+**You wrote zero code for steps 5-10.** The AI decided to use those tools autonomously.
+
+### Example: Incoming SMS
+
+**Customer texts your Twilio number:**
+
+```
+Customer: "Can I reschedule my appointment?"
+AI: "Of course! What time works better for you?"
+Customer: "Friday morning?"
+AI checks calendar (tool: calendar_check_availability)
+AI: "I have Friday at 9am or 11am available"
+Customer: "9am please"
+AI cancels old appointment (tool: calendar_cancel)
+AI books new appointment (tool: calendar_book)
+AI sends confirmation email (tool: send_email)
+AI: "Done! Your demo is now Friday at 9am. Confirmation sent to your email."
+```
+
+### Example: Incoming Email
+
+**Customer emails your Postmark address:**
+
+```
+Subject: Urgent: Need to talk about pricing
+Body: Can someone call me ASAP? My number is +1234567890
+
+AI reads email
+AI analyzes urgency
+AI initiates phone call (tool: initiate_call)
+AI sends email confirmation: "Hi [Name], I just tried calling you..."
+```
+
+**All of this happens automatically.** The AI decides what actions to take based on your agent configuration.
+
+## Built-in Tools (Used Autonomously)
+
+The AI has access to these tools and uses them **automatically** when needed:
+
+### Communication Tools
+- **`initiate_call`** - Make phone calls
+- **`send_sms`** - Send text messages
+- **`send_email`** - Send emails with HTML/attachments
+
+### Calendar Tools
+- **`calendar_check_availability`** - Check available time slots
+- **`calendar_book`** - Book appointments
+- **`calendar_cancel`** - Cancel appointments
+- **`calendar_reschedule`** - Reschedule appointments
+
+### Database Tools (When database storage is configured)
+- **`save_customer_info`** - Save customer/lead data
+- **`find_customer`** - Find existing customers
+- **`log_call_outcome`** - Log call results
+- **`remember_preference`** - Save customer preferences
+- **`recall_preference`** - Retrieve preferences
+
+**You never call these tools manually.** The AI decides when and how to use them.
+
+## Agent Configuration (Six Pillars)
+
+Configure your AI agent's behavior through six core pillars:
+
+### 1. Identity - Who the agent is
+
+```typescript
+identity: {
+  name: 'Sarah',
+  role: 'Sales Representative',
+  organization: 'Acme Corp',
+  title: 'Senior Sales Specialist',
+  backstory: 'Experienced sales professional with 5 years in B2B SaaS',
+  authorityLevel: 'medium', // What decisions can they make?
+  specializations: ['lead qualification', 'product demos']
 }
 ```
 
-**Custom Tools:**
+### 2. Personality - How the agent behaves
+
 ```typescript
-{
-  tools: {
-    custom: [
-      Tools.custom({
-        name: 'check_inventory',
-        description: 'Check product inventory',
-        parameters: { /* JSON Schema */ },
-        handler: async (params, ctx) => {
-          // Your logic
-        }
-      })
-    ]
+personality: {
+  traits: [
+    { name: 'friendly', description: 'Warm and welcoming' },
+    { name: 'professional', description: 'Maintains professionalism' },
+    { name: 'patient', description: 'Takes time to explain' }
+  ],
+  communicationStyle: {
+    primary: 'consultative',        // consultative | transactional | educational
+    tone: 'friendly',                // formal | friendly | casual
+    formalityLevel: 7                // 1-10 scale
+  },
+  emotionalIntelligence: 'high',     // low | medium | high
+  adaptability: 'high'                // low | medium | high
+}
+```
+
+### 3. Knowledge - What the agent knows
+
+```typescript
+knowledge: {
+  domain: 'B2B SaaS sales and customer success',
+  expertise: ['lead qualification', 'pricing discussions', 'product demos'],
+  industries: ['SaaS', 'Technology', 'Professional Services'],
+  contextDocs: [
+    'Product Features: Our platform offers...',
+    'Pricing Tiers: Starter ($99/mo), Professional ($299/mo)...',
+    'Common Objections: When customers mention price...'
+  ],
+  languages: {
+    fluent: ['English'],
+    conversational: ['Spanish']
   }
 }
 ```
 
-**Runtime Tool Management:**
+### 4. Goals - What the agent aims to achieve
+
 ```typescript
-const registry = client.getToolRegistry();
-
-registry.register(newTool);
-registry.unregister('old-tool');
-
-const callTools = registry.listAvailable('call');
+goals: {
+  primary: 'Qualify leads and book product demos',
+  secondary: [
+    'Gather information about lead needs and budget',
+    'Handle objections professionally',
+    'Maintain high customer satisfaction'
+  ],
+  constraints: [
+    'Never discuss pricing over email',
+    'Always confirm appointments via email',
+    'Escalate technical questions to engineering'
+  ]
+}
 ```
 
-### 5. Database Integration & Memory Persistence 🗄️
+### 5. Memory - What the agent remembers
 
-The SDK uses a **Memory-Centric Architecture** where the agent's memory system is the single source of truth. Database integration provides automatic persistence with **5 powerful database tools** that are auto-registered when you configure storage.
-
-**Quick Setup with PostgreSQL:**
 ```typescript
-import { AIReceptionist, DatabaseStorage } from '@loctelli/ai-receptionist';
+memory: {
+  contextWindow: 20,           // Number of recent messages to remember
+  longTermEnabled: true,       // Enable persistent memory
+  longTermStorage: databaseStorage,  // Database for persistence
+  autoPersist: {
+    minImportance: 7,          // Auto-save memories with importance >= 7
+    types: ['decision', 'tool_execution', 'customer_info']
+  }
+}
+```
+
+### 6. Voice - How the agent sounds (for voice calls)
+
+```typescript
+voice: {
+  provider: 'elevenlabs',      // elevenlabs | google | amazon
+  voiceId: 'sarah-voice-id',
+  stability: 0.5,              // 0-1 (higher = more consistent)
+  similarityBoost: 0.75        // 0-1 (higher = more similar to training)
+}
+```
+
+## Database Integration (Optional)
+
+Enable persistent memory and auto-registered database tools:
+
+```typescript
+import { DatabaseStorage } from '@atchonk/ai-receptionist';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
-
 const db = drizzle(pool);
 
-const receptionist = new AIReceptionist({
+const agent = new AIReceptionist({
   agent: {
-    identity: {
-      name: 'Sarah',
-      role: 'Sales Representative'
-    },
-    // Configure memory with database persistence
+    identity: { name: 'Sarah', role: 'Sales' },
     memory: {
       contextWindow: 20,
       longTermEnabled: true,
       longTermStorage: new DatabaseStorage({
         db,
-        autoMigrate: true // Automatically creates tables
+        autoMigrate: true // Creates tables automatically
       }),
       autoPersist: {
-        minImportance: 7, // Auto-save important memories
-        types: ['decision', 'tool_execution', 'system']
+        minImportance: 7,
+        types: ['decision', 'tool_execution', 'customer_info']
       }
     }
   },
-  model: {
-    provider: 'openai',
-    apiKey: process.env.OPENAI_API_KEY!,
-    model: 'gpt-4'
-  }
+  model: { provider: 'openai', apiKey: '...', model: 'gpt-4' }
 });
 
-await receptionist.initialize();
-
-// 5 database tools are automatically registered! 🎉
-// - save_customer_info
-// - find_customer
-// - log_call_outcome
-// - remember_preference
-// - recall_preference
+await agent.initialize();
 ```
 
-**What Gets Auto-Created:**
-- `ai_receptionist_memory` - All agent memories (conversations, decisions, tool executions)
-- `ai_receptionist_leads` - Customer/lead information
-- `ai_receptionist_call_logs` - Call outcomes and summaries
+**What this enables:**
+- **Persistent memory** across sessions (customers remembered between calls)
+- **5 auto-registered database tools** the AI can use autonomously:
+  - `save_customer_info` - Save customer data
+  - `find_customer` - Find existing customers
+  - `log_call_outcome` - Log call results
+  - `remember_preference` - Save preferences
+  - `recall_preference` - Retrieve preferences
 
-**AI Can Now Automatically:**
-```typescript
-// During conversations, AI can:
-// 1. Save customer info
-"Can I get your email?"
-→ AI calls save_customer_info({ email: 'john@example.com' })
+**Example autonomous behavior:**
+```
+Call 1:
+Customer: "My name is John Doe, email john@example.com"
+AI saves: save_customer_info({ name: "John Doe", email: "john@example.com" })
 
-// 2. Remember preferences
-"I prefer morning appointments"
-→ AI calls remember_preference({ key: 'preferred_time', value: 'morning' })
-
-// 3. Log outcomes
-After booking → AI calls log_call_outcome({
-  outcome: 'appointment_booked',
-  summary: 'Booked demo for Tuesday 2pm'
-})
-
-// 4. Find returning customers
-→ AI calls find_customer({ email: 'john@example.com' })
-
-// 5. Recall preferences
-→ AI calls recall_preference({ key: 'preferred_time' })
+Call 2 (days later):
+AI finds: find_customer({ phone: "+1234567890" })
+AI: "Hi John! Great to hear from you again. How can I help today?"
+AI recalls: recall_preference({ key: "preferred_time" })
+AI: "I see you prefer morning appointments. I have Tuesday at 9am available."
 ```
 
-**Supported Databases:**
-- **PostgreSQL** (recommended for production)
-- **MySQL** (via `drizzle-orm/mysql2`)
-- **SQLite** (via `drizzle-orm/better-sqlite3`)
-- **In-Memory** (for testing)
+## Custom Tools (Advanced)
 
-**Query Memories:**
-```typescript
-// Get conversation history
-const history = await receptionist.agent.memory.getConversationHistory('conv_123');
-
-// Get recent call memories
-const calls = await receptionist.agent.memory.getChannelHistory('call', {
-  limit: 20
-});
-
-// Advanced search
-const important = await receptionist.agent.memory.search({
-  type: ['decision', 'tool_execution'],
-  channel: 'call',
-  minImportance: 8,
-  keywords: ['appointment', 'booked'],
-  orderBy: 'timestamp',
-  orderDirection: 'desc'
-});
-```
-
-📖 **Complete Guide:** [docs/database-integration.md](docs/database-integration.md)
-📖 **Example:** [examples/database-integration-example.ts](examples/database-integration-example.ts)
-
-### 6. Event Monitoring
+Add custom tools for the AI to use autonomously:
 
 ```typescript
-const client = new AIReceptionist({
-  // ... config
+import { ToolBuilder } from '@atchonk/ai-receptionist';
 
-  onToolExecute: (event) => {
-    console.log(`Tool ${event.toolName} executed in ${event.duration}ms`);
-  },
+const crmTool = new ToolBuilder()
+  .withName('create_lead')
+  .withDescription('Create a new lead in the CRM system')
+  .withParameters({
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      email: { type: 'string' },
+      phone: { type: 'string' },
+      company: { type: 'string' }
+    },
+    required: ['name', 'email']
+  })
 
-  onToolError: (event) => {
-    console.error(`Tool ${event.toolName} failed:`, event.error);
-  },
+  // Different responses for different channels
+  .onCall(async (params, ctx) => ({
+    success: true,
+    data: { leadId: '123' },
+    response: {
+      speak: `Perfect! I've created a lead for ${params.name} in our CRM.`
+    }
+  }))
 
-  onConversationStart: (event) => {
-    console.log(`Conversation started on ${event.channel}`);
-  },
+  .onSMS(async (params, ctx) => ({
+    success: true,
+    response: { message: `✓ Lead created: ${params.name}` }
+  }))
 
-  onConversationEnd: (event) => {
-    console.log(`Conversation ended: ${event.conversationId}`);
-  }
+  .onEmail(async (params, ctx) => ({
+    success: true,
+    response: {
+      html: `<h2>Lead Created</h2><p>${params.name} has been added to our CRM.</p>`
+    }
+  }))
+
+  .build();
+
+// Register tool - AI will use it autonomously when appropriate
+agent.getToolRegistry().register(crmTool);
+```
+
+Now when a customer provides their information, the AI **automatically** creates a CRM lead without you writing any additional logic.
+
+## AI Provider Options
+
+### OpenAI (Recommended)
+
+```typescript
+model: {
+  provider: 'openai',
+  apiKey: process.env.OPENAI_API_KEY,
+  model: 'gpt-4-turbo',
+  temperature: 0.7,
+  maxTokens: 500
+}
+```
+
+### OpenRouter (100+ Models)
+
+Access models from OpenAI, Anthropic, Google, Meta, Mistral, and more:
+
+```typescript
+import { OPENROUTER_MODELS } from '@atchonk/ai-receptionist';
+
+model: {
+  provider: 'openrouter',
+  apiKey: process.env.OPENROUTER_API_KEY,
+  model: OPENROUTER_MODELS.anthropic.claude35Sonnet
+}
+
+// Available models:
+// OPENROUTER_MODELS.openai.gpt4Turbo
+// OPENROUTER_MODELS.anthropic.claude35Sonnet
+// OPENROUTER_MODELS.google.geminiPro15
+// OPENROUTER_MODELS.meta.llama3_70b
+```
+
+## Architecture
+
+```
+Incoming Message (Voice/SMS/Email)
+         │
+         ↓
+    Webhook Handler
+         │
+         ↓
+    AI Agent (Six Pillars)
+    - Identity
+    - Personality
+    - Knowledge
+    - Goals
+    - Memory
+         │
+         ↓
+    Autonomous Decision
+    "What should I do?"
+         │
+         ↓
+    Tool Selection & Execution
+    - send_email
+    - calendar_book
+    - send_sms
+    - initiate_call
+    - custom_tools
+         │
+         ↓
+    Providers
+    - Twilio
+    - Postmark
+    - Google Calendar
+         │
+         ↓
+    Action Executed
+    Response Sent
+```
+
+## Manual API (Advanced Use Cases)
+
+For programmatic control (testing, integrations, etc.):
+
+```typescript
+// Generate text response (for chat/testing)
+const response = await agent.text.generate({
+  prompt: 'Book a demo for tomorrow at 2pm',
+  conversationId: 'user-123'
+});
+
+// Make outbound call (rare - usually AI does this)
+await agent.voice.make({
+  to: '+1234567890',
+  greeting: 'Hi! This is Sarah from Acme Corp.'
+});
+
+// Send SMS (rare - usually AI does this)
+await agent.sms.send({
+  to: '+1234567890',
+  body: 'Your appointment is confirmed for tomorrow at 2pm'
+});
+
+// Send email (rare - usually AI does this)
+await agent.email.send({
+  to: 'customer@example.com',
+  subject: 'Demo Confirmation',
+  body: 'Your demo is scheduled for...'
 });
 ```
 
-## Folder Structure
+**Note:** These are mostly for testing. In production, the AI handles everything via webhooks.
 
-```
-src/
-  types/
-    index.ts                    # All TypeScript type definitions
+## Requirements
 
-  providers/                    # External API adapters
-    base.provider.ts
-    communication/
-      twilio.provider.ts        # Twilio API adapter
-    ai/
-      openai.provider.ts        # OpenAI API adapter
-    calendar/
-      google-calendar.provider.ts
-    index.ts
+- **Node.js**: 18+ (native fetch support)
+- **TypeScript**: 5.0+ (recommended)
+- **Providers**: At least one communication provider (Twilio, Postmark, etc.)
+- **Database** (optional): PostgreSQL, MySQL, or SQLite for persistent memory
 
-  services/                     # Business logic layer
-    conversation.service.ts     # Conversation management
-    tool-execution.service.ts   # Tool execution with monitoring
-    call.service.ts             # Call-specific business logic
-    index.ts
+## Supported Providers
 
-  tools/                        # Tool system
-    registry.ts                 # Tool registry
-    builder.ts                  # Tool builder (fluent API)
-    standard/
-      index.ts                  # Standard tools (calendar, booking, CRM)
-    index.ts
+- **AI**: OpenAI, OpenRouter (100+ models)
+- **Voice/SMS**: Twilio
+- **Email**: Postmark
+- **Calendar**: Google Calendar
 
-  resources/                    # User-facing APIs
-    calls.resource.ts           # Call operations
-    sms.resource.ts             # SMS operations
-    email.resource.ts           # Email operations
-    index.ts
+## License
 
-  storage/                      # Conversation storage
-    in-memory-conversation.store.ts
+MIT © Loctelli
 
-  client.ts                     # Main AIReceptionist class
-  index.ts                      # Public API exports
+## Support
 
-examples/
-  basic-usage.ts                # Comprehensive example
-```
-
-## How It Works
-
-### Flow: User Makes a Call
-
-```
-1. User code:
-   await client.calls.make({ to: '+123' })
-
-2. CallsResource:
-   → Delegates to CallService
-
-3. CallService:
-   → Creates conversation via ConversationService
-   → Gets available tools from ToolExecutionService
-   → Initiates call via TwilioProvider
-
-4. TwilioProvider:
-   → Calls Twilio API
-   → Returns call SID
-
-5. When user speaks:
-   → CallService.handleUserSpeech()
-   → OpenAIProvider.chat() with available tools
-   → If AI wants to use tool:
-     → ToolExecutionService.execute()
-     → ToolRegistry finds and runs handler
-     → Returns result to AI
-   → Final AI response sent back to user
-```
-
-### Flow: Tool Execution
-
-```
-1. AI decides to use "check_calendar" tool
-
-2. ToolExecutionService.execute():
-   → Gets tool from ToolRegistry
-   → Determines channel (call/sms/email)
-   → Selects appropriate handler
-
-3. ToolRegistry.execute():
-   → Runs channel-specific handler (e.g., onCall)
-   → Or falls back to default handler
-
-4. Handler returns ToolResult:
-   {
-     success: true,
-     data: { slots: [...] },
-     response: {
-       speak: "I have 3 times available...",  // For calls
-       message: "Available: 9am, 2pm, 4pm",   // For SMS
-       html: "<ul><li>9:00 AM</li>...</ul>"   // For email
-     }
-   }
-
-5. Result fed back to AI for final response
-```
-
-## Design Patterns Used
-
-1. **Provider Pattern (Adapter)** - Clean abstraction for external APIs
-2. **Service Layer Pattern** - Business logic separated from resources
-3. **Registry Pattern** - Centralized tool management
-4. **Builder Pattern** - Fluent API for creating tools
-5. **Strategy Pattern** - Channel-specific tool handlers
-6. **Clone Pattern** - Easy multi-agent setup
-
-## What's Implemented
-
-✅ Complete type system
-✅ Provider layer (Twilio, OpenAI, OpenRouter, Google Calendar)
-✅ Service layer (Conversation, ToolExecution, Call)
-✅ Tool registry and builder
-✅ Resource layer (Calls, SMS, Email)
-✅ Main AIReceptionist client with clone pattern
-✅ **Six-Pillar Agent Architecture** (Identity, Personality, Knowledge, Capabilities, Memory, Goals)
-✅ **Memory-Centric Architecture** with database persistence
-✅ **Database Storage** (PostgreSQL, MySQL, SQLite support)
-✅ **5 Auto-Registered Database Tools** (save_customer_info, find_customer, log_call_outcome, remember_preference, recall_preference)
-✅ **In-memory storage** for testing
-✅ Standard tools (calendar, booking, CRM) - placeholder implementations
-✅ Event callbacks for monitoring
-✅ **Runtime pillar updates** via PillarManager
-✅ **MCP (Model Context Protocol) adapter**
-✅ Comprehensive examples and documentation
-
-## What's TODO (Actual Implementation)
-
-- [ ] Actual Twilio API integration
-- [ ] Actual OpenAI API integration
-- [ ] Actual Google Calendar API integration
-- [ ] Complete CallService webhook handlers
-- [ ] SMS conversation management
-- [ ] Email conversation management
-- [ ] Standard tool real implementations
-- [ ] Error handling and retry logic
-- [ ] Rate limiting
-- [ ] Logging system
-- [ ] Testing suite
-- [ ] Documentation
-- [ ] Migration guide from old architecture
-
-## Comparison: Old vs New
-
-### Old Architecture (Orchestrator-based)
-
-```
-AIReceptionist
-  ├─ CallsResource → TwilioOrchestrator → Twilio
-  ├─ SMSResource → TwilioOrchestrator → Twilio
-  └─ EmailResource → EmailOrchestrator → Email API
-
-Issues:
-- Tight coupling
-- No service layer
-- No tool system
-- Channel-centric (not agent-centric)
-```
-
-### New Architecture (Agent-centric)
-
-```
-AIReceptionist (Agent)
-  ├─ CallsResource → CallService → TwilioProvider → Twilio
-  ├─ SMSResource → SMSService → TwilioProvider → Twilio
-  └─ EmailResource → EmailService → EmailProvider → Email API
-
-Services Layer:
-- ConversationService (manages state)
-- ToolExecutionService (manages tools)
-- CallService, SMSService, etc. (business logic)
-
-Benefits:
-- Clean separation of concerns
-- Flexible tool system
-- Agent is primary entity
-- Easy to test and extend
-```
-
-## Migration Path
-
-See [Design_Improvements.md](Design_Improvements.md) for detailed migration strategy.
-
-**Phase 1**: Rename orchestrators → providers
-**Phase 2**: Introduce service layer and tool system
-**Phase 3**: Refactor to agent-centric
-**Phase 4**: Advanced features
-
-## Next Steps
-
-1. **Review this barebones implementation** - Does the architecture match your vision?
-2. **Decide on priorities** - What to implement first?
-3. **Start implementation** - I can help with:
-   - Actual API integrations (Twilio, OpenAI, etc.)
-   - Complete service implementations
-   - Testing infrastructure
-   - Documentation
-
-## Notes
-
-- All current implementations are **placeholders** showing **how things should work**
-- No actual API calls are made (just console.log statements)
-- This is a **structural blueprint** for the real implementation
-- Old code is backed up in `_old_backup/` folder
-
----
-
-**Questions? Feedback? Let's discuss and refine! 🎯**
+- **Documentation**: See [docs/SDK_VISION.md](docs/SDK_VISION.md) for architectural philosophy
+- **Issues**: [GitHub Issues](https://github.com/KennethAtchon/AI-receptionist/issues)
