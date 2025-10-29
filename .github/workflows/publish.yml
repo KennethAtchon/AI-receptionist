@@ -53,15 +53,18 @@ jobs:
         else
           VERSION_TYPE="patch"
         fi
-        
+
         OLD_VERSION=$(node -p "require('./package.json').version")
+
+        # Bump version without creating git tag
         npm version $VERSION_TYPE --no-git-tag-version
+
         NEW_VERSION=$(node -p "require('./package.json').version")
-        
+
         echo "old_version=$OLD_VERSION" >> $GITHUB_OUTPUT
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
-        
+
         echo "📦 Version bumped: $OLD_VERSION → $NEW_VERSION ($VERSION_TYPE)"
         
     - name: Publish to npm
@@ -73,27 +76,29 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add package.json
+        git add package.json package-lock.json
         git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
         git push
         
     - name: Create Release
+      # Only create releases for minor/major versions, not patches
+      if: steps.version.outputs.version_type != 'patch'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.version.outputs.new_version }}
         name: Release v${{ steps.version.outputs.new_version }}
         body: |
           ## Changes in v${{ steps.version.outputs.new_version }}
-          
+
           Automated release from commit ${{ github.sha }}
-          
+
           **Version Type**: ${{ steps.version.outputs.version_type }}
           **Previous Version**: ${{ steps.version.outputs.old_version }}
-          
+
           ### What's New
           - Updated AI Receptionist package
           - Version: ${{ steps.version.outputs.new_version }}
-          
+
           ### Installation
           ```bash
           npm install @atchonk/ai-receptionist@${{ steps.version.outputs.new_version }}
