@@ -1,6 +1,6 @@
 {
   "name": "@atchonk/ai-receptionist",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "AI-powered receptionist for handling phone calls, video calls, SMS, and emails",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
