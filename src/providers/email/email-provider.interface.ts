@@ -35,6 +35,7 @@ export interface IEmailProvider extends IProvider {
 export interface EmailParams {
   to: string | string[];
   from?: string; // Override default from address
+  cc?: string | string[]; // CC recipients (combined with provider's archiveCc)
   replyTo?: string;
   subject: string;
   text?: string; // Plain text

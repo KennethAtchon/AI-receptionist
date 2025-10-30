@@ -11,10 +11,9 @@ export interface PostmarkCredentials {
   fromEmail: string;
   fromName?: string;
   replyTo?: string;
-  inboundWebhook?: {
-    url: string;
-    secret?: string;
-  };
+  // Webhook secret for verifying inbound webhook signatures (optional)
+  // Note: The webhook URL is configured in Postmark's dashboard, not here
+  webhookSecret?: string;
 }
 
 export class PostmarkValidator implements ICredentialValidator {
@@ -40,18 +39,6 @@ export class PostmarkValidator implements ICredentialValidator {
     // Validate reply-to email (if provided)
     if (config.replyTo && !this.isValidEmail(config.replyTo)) {
       errors.push('Reply-to must be a valid email address');
-    }
-
-    // Validate inbound webhook URL (if provided)
-    if (config.inboundWebhook?.url) {
-      try {
-        const url = new URL(config.inboundWebhook.url);
-        if (!url.protocol.startsWith('http')) {
-          errors.push('Inbound webhook URL must use HTTP or HTTPS');
-        }
-      } catch {
-        errors.push('Inbound webhook URL is not a valid URL');
-      }
     }
 
     const isValid = errors.length === 0;
@@ -133,10 +120,7 @@ export class PostmarkValidator implements ICredentialValidator {
       fromEmail: credentials.fromEmail,
       fromName: credentials.fromName,
       replyTo: credentials.replyTo,
-      inboundWebhook: credentials.inboundWebhook ? {
-        url: credentials.inboundWebhook.url,
-        secret: credentials.inboundWebhook.secret ? '***' : undefined
-      } : undefined
+      webhookSecret: credentials.webhookSecret ? '***' : undefined
     };
   }
 

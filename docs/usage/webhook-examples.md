@@ -70,10 +70,9 @@ const receptionist = new AIReceptionist({
         apiKey: process.env.POSTMARK_API_KEY!,
         fromEmail: 'receptionist@acmecorp.com',
         fromName: 'Emma - Acme Corp',
-        inboundWebhook: {
-          url: `${process.env.BASE_URL}/webhooks/email`,
-          secret: process.env.POSTMARK_WEBHOOK_SECRET
-        }
+        // Optional: Webhook secret for signature verification
+        // Note: Configure the webhook URL in Postmark's dashboard
+        webhookSecret: process.env.POSTMARK_WEBHOOK_SECRET
       }
     }
   },

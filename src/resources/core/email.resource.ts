@@ -70,6 +70,17 @@ export class EmailResource extends BaseResource<EmailSession> {
     // Extract message ID from tool result
     const messageId = agentResponse.metadata?.toolResults?.[0]?.result?.data?.messageId;
 
+    // Store outbound email metadata for thread tracking
+    if (messageId) {
+      await this.storeOutboundEmail({
+        messageId,
+        conversationId,
+        to: options.to,
+        subject: options.subject,
+        body: options.body
+      });
+    }
+
     return {
       id: messageId || `email-${Date.now()}`,
       messageId,
@@ -247,33 +258,61 @@ export class EmailResource extends BaseResource<EmailSession> {
   }
 
   private async findOrCreateConversation(email: InboundEmailPayload): Promise<string> {
-    // Method 1: Check In-Reply-To header
+    // Method 1: Check In-Reply-To header (standard email threading)
     if (email.headers?.['in-reply-to']) {
-      const conversationId = await this.findConversationByMessageId(email.headers['in-reply-to']);
-      if (conversationId) return conversationId;
-    }
-
-    // Method 2: Check References header (full thread)
-    if (email.headers?.references) {
-      const messageIds = email.headers.references.split(' ');
-      for (const msgId of messageIds) {
-        const conversationId = await this.findConversationByMessageId(msgId);
-        if (conversationId) return conversationId;
+      const cleanMessageId = this.cleanMessageId(email.headers['in-reply-to']);
+      const conversationId = await this.findConversationByMessageId(cleanMessageId);
+      if (conversationId) {
+        logger.info(`[EmailResource] Found conversation via In-Reply-To: ${conversationId}`);
+        return conversationId;
       }
     }
 
-    // Method 3: Check subject line (Re: prefix)
-    if (email.subject.startsWith('Re:')) {
-      const originalSubject = email.subject.replace(/^Re:\s*/, '');
-      const conversationId = await this.findConversationBySubject(originalSubject, email.from);
-      if (conversationId) return conversationId;
+    // Method 2: Check References header (full thread history)
+    if (email.headers?.references) {
+      const messageIds = email.headers.references.split(/\s+/).map(id => this.cleanMessageId(id));
+      for (const msgId of messageIds) {
+        const conversationId = await this.findConversationByMessageId(msgId);
+        if (conversationId) {
+          logger.info(`[EmailResource] Found conversation via References: ${conversationId}`);
+          return conversationId;
+        }
+      }
     }
 
-    // Method 4: Check from/to participants
+    // Method 3: Check subject line (Re:, Fwd:, Fw: prefixes)
+    const subjectPatterns = [/^Re:\s*/i, /^Fwd:\s*/i, /^Fw:\s*/i];
+    let cleanSubject = email.subject;
+    let isReplyOrForward = false;
+
+    for (const pattern of subjectPatterns) {
+      if (pattern.test(email.subject)) {
+        cleanSubject = email.subject.replace(pattern, '');
+        isReplyOrForward = true;
+        break;
+      }
+    }
+
+    if (isReplyOrForward) {
+      // Strip multiple prefixes (e.g., "Re: Fwd: Original Subject")
+      cleanSubject = cleanSubject.replace(/^(Re|Fwd|Fw):\s*/gi, '').trim();
+
+      const conversationId = await this.findConversationBySubject(cleanSubject, email.from);
+      if (conversationId) {
+        logger.info(`[EmailResource] Found conversation via subject matching: ${conversationId}`);
+        return conversationId;
+      }
+    }
+
+    // Method 4: Check from/to participants (for ongoing conversations)
     const conversationId = await this.findConversationByParticipants(email.from, email.to);
-    if (conversationId) return conversationId;
+    if (conversationId) {
+      logger.info(`[EmailResource] Found conversation via participants: ${conversationId}`);
+      return conversationId;
+    }
 
     // No match found - create new conversation
+    logger.info(`[EmailResource] Creating new conversation for ${email.from}`);
     return await this.createSession({
       messageId: email.id,
       from: email.from,
@@ -281,6 +320,13 @@ export class EmailResource extends BaseResource<EmailSession> {
       subject: email.subject,
       direction: 'inbound'
     });
+  }
+
+  /**
+   * Clean message ID by removing angle brackets and whitespace
+   */
+  private cleanMessageId(messageId: string): string {
+    return messageId.replace(/^<|>$/g, '').trim();
   }
 
   private async storeInboundEmail(email: InboundEmailPayload, conversationId: string): Promise<void> {
@@ -293,7 +339,7 @@ export class EmailResource extends BaseResource<EmailSession> {
       role: 'user', // Incoming emails are from the user
       sessionMetadata: {
         conversationId,
-        emailId: email.id,
+        emailId: email.id, // Store email ID for thread detection
         direction: 'inbound',
         from: email.from,
         to: Array.isArray(email.to) ? email.to.join(', ') : email.to,
@@ -302,6 +348,38 @@ export class EmailResource extends BaseResource<EmailSession> {
     });
 
     logger.info(`[EmailResource] Stored inbound email in conversation ${conversationId}`);
+  }
+
+  /**
+   * Store outbound email metadata
+   * CRITICAL: This ensures we can link future replies to this conversation
+   */
+  private async storeOutboundEmail(options: {
+    messageId: string;
+    conversationId: string;
+    to: string | string[];
+    subject: string;
+    body: string;
+    inReplyTo?: string;
+  }): Promise<void> {
+    await this.agent.getMemory().store({
+      id: `msg-${options.conversationId}-${Date.now()}`,
+      content: options.body,
+      timestamp: new Date(),
+      type: 'conversation',
+      channel: 'email',
+      role: 'assistant', // Outgoing emails are from the assistant
+      sessionMetadata: {
+        conversationId: options.conversationId,
+        emailId: options.messageId, // Store email ID for thread detection
+        direction: 'outbound',
+        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        subject: options.subject,
+        inReplyTo: options.inReplyTo
+      }
+    });
+
+    logger.info(`[EmailResource] Stored outbound email ${options.messageId} in conversation ${options.conversationId}`);
   }
 
   private async triggerAutoReply(
@@ -319,9 +397,9 @@ export class EmailResource extends BaseResource<EmailSession> {
 
     // Use Agent to compose and send reply
     // toolParams will override AI's parameters when the send_email tool is called
-    await this.processWithAgent(
-      `A customer email was received from ${email.from} with the subject "${email.subject}". 
-      Respond to this customer email professionally and be helpful. 
+    const agentResponse = await this.processWithAgent(
+      `A customer email was received from ${email.from} with the subject "${email.subject}".
+      Respond to this customer email professionally and be helpful.
       Use the send_email tool to send your response.`,
       {
         conversationId,
@@ -334,26 +412,64 @@ export class EmailResource extends BaseResource<EmailSession> {
       }
     );
 
+    // Extract message ID and body from tool result
+    const toolResult = agentResponse.metadata?.toolResults?.[0]?.result;
+    const messageId = toolResult?.data?.messageId;
+    const emailBody = agentResponse.content;
+
+    // Store outbound email metadata for thread tracking
+    if (messageId) {
+      await this.storeOutboundEmail({
+        messageId,
+        conversationId,
+        to: email.from,
+        subject: `Re: ${email.subject}`,
+        body: emailBody,
+        inReplyTo: email.id
+      });
+    }
+
     return true;
   }
 
   private async findConversationByMessageId(messageId: string): Promise<string | null> {
-    // Use the specific method for finding conversation by message ID
-    const memory = await this.agent.getMemory().getConversationByMessageId(messageId);
-    return memory?.sessionMetadata?.conversationId || null;
+    // Search for email conversations by emailId
+    const memories = await this.agent.getMemory().search({
+      channel: 'email',
+      limit: 100 // Search through recent emails
+    });
+
+    // Find memory with matching emailId
+    const match = memories.find(m => m.sessionMetadata?.emailId === messageId);
+    return match?.sessionMetadata?.conversationId || null;
   }
 
   private async findConversationBySubject(subject: string, from: string): Promise<string | null> {
-    // Search for email conversations and filter by subject and from
-    const memory = await this.agent.getMemory().search({
+    // Search for email conversations and filter by subject
+    const memories = await this.agent.getMemory().search({
       channel: 'email',
-      limit: 50 // Get more results to filter through
+      limit: 100 // Get more results to filter through
     });
 
-    // Filter by subject and from
-    const match = memory.find(m => 
-      m.sessionMetadata?.subject === subject && 
+    // Normalize subject for comparison
+    const normalizeSubject = (subj: string) =>
+      subj.replace(/^(Re|Fwd|Fw):\s*/gi, '').trim().toLowerCase();
+
+    const normalizedSearchSubject = normalizeSubject(subject);
+
+    // First try: exact match with same sender
+    let match = memories.find(m =>
+      m.sessionMetadata?.subject &&
+      normalizeSubject(m.sessionMetadata.subject) === normalizedSearchSubject &&
       m.sessionMetadata?.from === from
+    );
+
+    if (match) return match.sessionMetadata?.conversationId || null;
+
+    // Second try: exact match with any participant (for forwarded emails)
+    match = memories.find(m =>
+      m.sessionMetadata?.subject &&
+      normalizeSubject(m.sessionMetadata.subject) === normalizedSearchSubject
     );
 
     return match?.sessionMetadata?.conversationId || null;

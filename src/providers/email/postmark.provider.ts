@@ -16,11 +16,10 @@ export interface PostmarkConfig {
   priority?: number;
   tags?: string[];
   domains?: string[];
-  // Inbound webhook configuration
-  inboundWebhook?: {
-    url: string;
-    secret?: string;
-  };
+  archiveCc?: string | string[]; // CC address(es) for all outbound emails (for monitoring/archiving)
+  // Webhook secret for verifying inbound webhook signatures (optional)
+  // Note: The webhook URL is configured in Postmark's dashboard, not here
+  webhookSecret?: string;
 }
 
 /**
@@ -94,11 +93,6 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
 
       this.initialized = true;
       logger.info('[PostmarkProvider] SDK loaded');
-
-      // Configure inbound webhook if provided
-      if (this.config.inboundWebhook) {
-        await this.configureInboundWebhook();
-      }
     } catch (error) {
       logger.error('[PostmarkProvider] Failed to load SDK:', error as Error);
       throw error;
@@ -109,9 +103,27 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
     this.ensureInitialized();
 
     try {
+      // Build CC list: combine params.cc with config archiveCc
+      const ccList: string[] = [];
+
+      // Add CC from params if provided
+      if (params.cc) {
+        const paramCc = Array.isArray(params.cc) ? params.cc : [params.cc];
+        ccList.push(...paramCc);
+      }
+
+      // Add archiveCc from config (for monitoring/archiving)
+      if (this.config.archiveCc) {
+        const archiveCc = Array.isArray(this.config.archiveCc)
+          ? this.config.archiveCc
+          : [this.config.archiveCc];
+        ccList.push(...archiveCc);
+      }
+
       const response = await this.postmarkClient.sendEmail({
         From: params.from || `${this.config.fromName || 'No Reply'} <${this.config.fromEmail}>`,
         To: Array.isArray(params.to) ? params.to.join(',') : params.to,
+        Cc: ccList.length > 0 ? ccList.join(',') : undefined,
         ReplyTo: params.replyTo || this.config.replyTo,
         Subject: params.subject,
         TextBody: params.text,
@@ -128,7 +140,8 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
 
       logger.info('[PostmarkProvider] Email sent', {
         messageId: response.MessageID,
-        to: params.to
+        to: params.to,
+        cc: ccList.length > 0 ? ccList : undefined
       });
 
       return {
@@ -146,39 +159,6 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
     }
   }
 
-  /**
-   * Configure inbound email webhook
-   * Sets up Postmark to forward incoming emails to the webhook URL
-   */
-  async configureInboundWebhook(): Promise<void> {
-    if (!this.config.inboundWebhook) {
-      return;
-    }
-
-    try {
-      logger.info('[PostmarkProvider] Configuring inbound webhook', {
-        url: this.config.inboundWebhook.url
-      });
-
-      // Note: Postmark inbound webhooks are configured per "inbound domain" in the dashboard
-      // The SDK doesn't provide direct API access to modify inbound webhook settings
-      // This method serves as documentation and validation
-
-      // Validate webhook URL format
-      const url = new URL(this.config.inboundWebhook.url);
-      if (!url.protocol.startsWith('http')) {
-        throw new Error('Webhook URL must use HTTP or HTTPS');
-      }
-
-      logger.info('[PostmarkProvider] Inbound webhook validated. Configure in Postmark dashboard:', {
-        url: this.config.inboundWebhook.url,
-        documentation: 'https://postmarkapp.com/developer/webhooks/inbound-webhook'
-      });
-    } catch (error) {
-      logger.error('[PostmarkProvider] Failed to configure inbound webhook:', error as Error);
-      throw error;
-    }
-  }
 
   /**
    * Parse Postmark inbound webhook payload
@@ -221,14 +201,14 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
    * Validates that the webhook request came from Postmark
    */
   async verifyWebhookSignature(payload: any, signature: string): Promise<boolean> {
-    if (!this.config.inboundWebhook?.secret) {
+    if (!this.config.webhookSecret) {
       logger.warn('[PostmarkProvider] No webhook secret configured, skipping verification');
       return true;
     }
 
     try {
       const crypto = await import('crypto');
-      const hmac = crypto.createHmac('sha256', this.config.inboundWebhook.secret);
+      const hmac = crypto.createHmac('sha256', this.config.webhookSecret);
       const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
       const expectedSignature = hmac.update(payloadString).digest('hex');
 

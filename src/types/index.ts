@@ -204,14 +204,14 @@ export interface BaseEmailConfig {
   priority?: number; // Lower = higher priority (1 = primary, 2 = fallback, etc.)
   tags?: string[]; // Route emails with these tags to this provider
   domains?: string[]; // Route emails to these domains to this provider
+  archiveCc?: string | string[]; // CC address(es) for all outbound emails (for monitoring/archiving)
 }
 
 export interface PostmarkConfig extends BaseEmailConfig {
   apiKey: string;
-  inboundWebhook?: {
-    url: string;
-    secret?: string;
-  };
+  // Webhook secret for verifying inbound webhook signatures (optional)
+  // Note: The webhook URL is configured in Postmark's dashboard, not here
+  webhookSecret?: string;
 }
 
 // Email provider configuration - now only Postmark
