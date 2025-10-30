@@ -74,14 +74,15 @@ export class WebhookRouter {
 
   /**
    * Handle incoming email webhook (Postmark)
+   *
+   * Note: Postmark does NOT provide webhook signatures for inbound emails.
+   * Recommended security measures:
+   * - Use Basic HTTP Authentication in webhook URL
+   * - Use HTTPS (enforced)
+   * - Implement IP whitelisting for Postmark IPs
    */
-  async handleEmailWebhook(payload: any, signature?: string): Promise<any> {
+  async handleEmailWebhook(payload: any): Promise<any> {
     try {
-      // Verify webhook signature
-      if (signature) {
-        await this.verifyWebhookSignature('postmark', payload, signature);
-      }
-
       const response = await this.routeWebhook('email', payload);
       return response;
     } catch (error) {
@@ -269,25 +270,4 @@ export class WebhookRouter {
     }
   }
 
-  /**
-   * Verify webhook signature
-   */
-  private async verifyWebhookSignature(
-    provider: string,
-    payload: any,
-    signature: string
-  ): Promise<void> {
-    logger.debug(`[WebhookRouter] Verifying ${provider} webhook signature`);
-
-    // TODO: Implement actual signature verification per provider
-    // For Postmark: https://postmarkapp.com/developer/webhooks/webhooks-overview#webhook-security
-    // This would involve:
-    // 1. Getting the webhook secret from config
-    // 2. Computing the expected signature using HMAC
-    // 3. Comparing with the provided signature
-    // 4. Throwing error if verification fails
-
-    // For now, we'll log and skip verification
-    logger.warn('[WebhookRouter] Signature verification not yet implemented');
-  }
 }

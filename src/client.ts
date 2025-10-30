@@ -429,18 +429,20 @@ export class AIReceptionist {
   /**
    * Handle incoming email webhook (Postmark)
    *
+   * Note: Postmark does NOT provide webhook signatures for inbound emails.
+   * For security, use Basic HTTP Authentication in your webhook URL or IP whitelisting.
+   *
    * @example
    * ```typescript
    * app.post('/webhook/email', async (req, res) => {
-   *   const signature = req.headers['x-postmark-signature'];
-   *   const response = await client.handleEmailWebhook(req.body, signature);
+   *   const response = await client.handleEmailWebhook(req.body);
    *   res.json(response);
    * });
    * ```
    */
-  async handleEmailWebhook(payload: any, signature?: string): Promise<any> {
+  async handleEmailWebhook(payload: any): Promise<any> {
     this.ensureInitialized();
-    return await this.webhookRouter.handleEmailWebhook(payload, signature);
+    return await this.webhookRouter.handleEmailWebhook(payload);
   }
 
   /**
