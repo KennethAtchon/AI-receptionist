@@ -251,6 +251,9 @@ export interface MemorySearchQuery {
   // Filter by conversation
   conversationId?: string;
 
+  // Filter by sessionMetadata fields (JSONB query)
+  sessionMetadata?: Record<string, any>;
+
   // Filter by date range
   startDate?: Date;
   endDate?: Date;

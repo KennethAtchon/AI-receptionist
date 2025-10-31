@@ -197,6 +197,17 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    // Filter by sessionMetadata fields (JSONB queries)
+    if (query.sessionMetadata) {
+      for (const [key, value] of Object.entries(query.sessionMetadata)) {
+        if (value !== undefined && value !== null) {
+          conditions.push(
+            sql`${this.table.sessionMetadata}->>${key} = ${String(value)}`
+          );
+        }
+      }
+    }
+
     // Filter by channel
     if (query.channel) {
       conditions.push(eq(this.table.channel, query.channel));

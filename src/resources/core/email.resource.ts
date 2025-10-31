@@ -649,41 +649,49 @@ export class EmailResource extends BaseResource<EmailSession> {
   }
 
   private async findConversationByMessageId(messageId: string): Promise<string | null> {
-    // Search for email conversations by emailId
+    // Search directly in database using JSONB query for emailId
     const memories = await this.agent.getMemory().search({
       channel: 'email',
-      limit: 100 // Search through recent emails
+      sessionMetadata: { emailId: messageId },
+      limit: 1 // Only need the first match
     });
 
-    // Find memory with matching emailId
-    const match = memories.find(m => m.sessionMetadata?.emailId === messageId);
-    return match?.sessionMetadata?.conversationId || null;
+    return memories[0]?.sessionMetadata?.conversationId || null;
   }
 
   private async findConversationBySubject(subject: string, from: string): Promise<string | null> {
-    // Search for email conversations and filter by subject
-    const memories = await this.agent.getMemory().search({
-      channel: 'email',
-      limit: 100 // Get more results to filter through
-    });
-
     // Normalize subject for comparison
     const normalizeSubject = (subj: string) =>
       subj.replace(/^(Re|Fwd|Fw):\s*/gi, '').trim().toLowerCase();
 
     const normalizedSearchSubject = normalizeSubject(subject);
 
-    // First try: exact match with same sender
-    let match = memories.find(m =>
+    // First try: Search only emails from this sender (database query optimization)
+    const memoriesFromSender = await this.agent.getMemory().search({
+      channel: 'email',
+      sessionMetadata: { from },
+      limit: 100,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+
+    // Filter by normalized subject
+    let match = memoriesFromSender.find(m =>
       m.sessionMetadata?.subject &&
-      normalizeSubject(m.sessionMetadata.subject) === normalizedSearchSubject &&
-      m.sessionMetadata?.from === from
+      normalizeSubject(m.sessionMetadata.subject) === normalizedSearchSubject
     );
 
     if (match) return match.sessionMetadata?.conversationId || null;
 
-    // Second try: exact match with any participant (for forwarded emails)
-    match = memories.find(m =>
+    // Second try: Search all emails (for forwarded emails from different senders)
+    const allMemories = await this.agent.getMemory().search({
+      channel: 'email',
+      limit: 100,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+
+    match = allMemories.find(m =>
       m.sessionMetadata?.subject &&
       normalizeSubject(m.sessionMetadata.subject) === normalizedSearchSubject
     );
@@ -693,16 +701,18 @@ export class EmailResource extends BaseResource<EmailSession> {
 
   private async findConversationByParticipants(from: string, to: string | string[]): Promise<string | null> {
     const toArray = Array.isArray(to) ? to : [to];
-    
-    // Search for email conversations and filter by participants
-    const memory = await this.agent.getMemory().search({
+
+    // Search directly in database using JSONB query for sender
+    const memories = await this.agent.getMemory().search({
       channel: 'email',
-      limit: 50 // Get more results to filter through
+      sessionMetadata: { from },
+      limit: 50,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
     });
 
-    // Filter by participants
-    const match = memory.find(m => 
-      m.sessionMetadata?.from === from && 
+    // Filter by recipient (can't use JSONB query since 'to' could be comma-separated string)
+    const match = memories.find(m =>
       toArray.includes(m.sessionMetadata?.to || '')
     );
 
@@ -755,15 +765,27 @@ export class EmailResource extends BaseResource<EmailSession> {
    * Check if we have any conversation history with this email address
    */
   private async hasConversationHistory(email: string): Promise<boolean> {
-    const memories = await this.agent.getMemory().search({
+    // First check: emails sent FROM this address
+    const memoriesFrom = await this.agent.getMemory().search({
       channel: 'email',
-      limit: 50
+      sessionMetadata: { from: email },
+      limit: 1
     });
 
-    // Check if we've ever communicated with this email address
-    return memories.some(m =>
-      m.sessionMetadata?.from === email ||
-      (m.sessionMetadata?.to && m.sessionMetadata.to.includes(email))
+    if (memoriesFrom.length > 0) {
+      return true;
+    }
+
+    // Second check: emails sent TO this address (requires in-memory filtering since 'to' is comma-separated)
+    const memoriesTo = await this.agent.getMemory().search({
+      channel: 'email',
+      limit: 50,
+      orderBy: 'timestamp',
+      orderDirection: 'desc'
+    });
+
+    return memoriesTo.some(m =>
+      m.sessionMetadata?.to && m.sessionMetadata.to.includes(email)
     );
   }
 
