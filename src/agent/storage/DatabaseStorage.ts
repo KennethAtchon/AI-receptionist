@@ -106,6 +106,19 @@ export class DatabaseStorage implements IStorage {
       await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_conversation_id_idx ON ai_receptionist_call_logs (conversation_id)`);
       await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_outcome_idx ON ai_receptionist_call_logs (outcome)`);
       await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_created_at_idx ON ai_receptionist_call_logs (created_at)`);
+
+      // ai_receptionist_email_allowlist
+      await this.db.execute(sql`
+        CREATE TABLE IF NOT EXISTS ai_receptionist_email_allowlist (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email TEXT NOT NULL UNIQUE,
+          added_at TIMESTAMP DEFAULT NOW() NOT NULL,
+          added_by TEXT
+        )
+      `);
+
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS email_allowlist_email_idx ON ai_receptionist_email_allowlist (email)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS email_allowlist_added_at_idx ON ai_receptionist_email_allowlist (added_at)`);
     } catch (error) {
       console.warn('Auto-migration failed; ensure database role has CREATE privileges. Error:', error);
     }

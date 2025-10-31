@@ -193,7 +193,9 @@ export interface Memory {
     messageSid?: string;
     emailId?: string;
     threadId?: string; // Email thread tracking
+    threadRoot?: string; // First message ID in the email thread
     inReplyTo?: string; // Parent email ID
+    references?: string; // Full email thread references chain
     direction?: 'inbound' | 'outbound'; // Email/message direction
     to?: string; // Recipient (for emails/SMS)
     from?: string; // Sender (for emails/SMS)
@@ -201,6 +203,12 @@ export interface Memory {
     status?: 'active' | 'completed' | 'failed';
     duration?: number; // For calls
     participants?: string[]; // Phone numbers, emails, etc.
+    attachments?: Array<{ // Email/MMS attachments
+      name: string;
+      contentType: string;
+      contentLength: number;
+      contentId?: string;
+    }>;
   };
 
   // Role tracking (like messages)

@@ -102,6 +102,20 @@ export const callLogs = pgTable('ai_receptionist_call_logs', {
   callLogsCreatedAtIdx: index('call_logs_created_at_idx').on(table.createdAt),
 }));
 
+/**
+ * Email allowlist table for auto-reply control
+ * Stores emails that are permitted to receive auto-replies
+ */
+export const emailAllowlist = pgTable('ai_receptionist_email_allowlist', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  addedAt: timestamp('added_at').defaultNow().notNull(),
+  addedBy: text('added_by') // 'system' | 'manual' | 'conversation_init'
+}, (table) => ({
+  // Indexes for email allowlist table
+  emailAllowlistEmailIdx: index('email_allowlist_email_idx').on(table.email),
+  emailAllowlistAddedAtIdx: index('email_allowlist_added_at_idx').on(table.addedAt),
+}));
 
 // Type exports for use in code
 export type Memory = typeof memory.$inferSelect;
@@ -110,3 +124,5 @@ export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
 export type CallLog = typeof callLogs.$inferSelect;
 export type NewCallLog = typeof callLogs.$inferInsert;
+export type EmailAllowlist = typeof emailAllowlist.$inferSelect;
+export type NewEmailAllowlist = typeof emailAllowlist.$inferInsert;

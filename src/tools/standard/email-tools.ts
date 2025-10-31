@@ -49,6 +49,10 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           type: 'string',
           description: 'Message ID to reply to (for email threading)'
         },
+        references: {
+          type: 'string',
+          description: 'Full References header chain for email threading (space-separated message IDs)'
+        },
         attachments: {
           type: 'array',
           description: 'File attachments',
@@ -105,7 +109,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           attachments: params.attachments,
           headers: params.inReplyTo ? {
             'In-Reply-To': params.inReplyTo,
-            'References': params.inReplyTo
+            'References': params.references || params.inReplyTo
           } : undefined
         });
 
@@ -180,7 +184,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           html: params.html,
           headers: params.inReplyTo ? {
             'In-Reply-To': params.inReplyTo,
-            'References': params.inReplyTo
+            'References': params.references || params.inReplyTo
           } : undefined
         });
 
@@ -254,7 +258,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           attachments: params.attachments,
           headers: params.inReplyTo ? {
             'In-Reply-To': params.inReplyTo,
-            'References': params.inReplyTo
+            'References': params.references || params.inReplyTo
           } : undefined
         });
 
@@ -332,7 +336,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           html: params.html,
           headers: params.inReplyTo ? {
             'In-Reply-To': params.inReplyTo,
-            'References': params.inReplyTo
+            'References': params.references || params.inReplyTo
           } : undefined
         });
 

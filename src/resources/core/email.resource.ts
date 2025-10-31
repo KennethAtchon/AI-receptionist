@@ -6,6 +6,7 @@
 import { BaseResource, ResourceSession, WebhookContext } from '../base.resource';
 import type { Agent } from '../../agent/core/Agent';
 import { logger } from '../../utils/logger';
+import { EmailAllowlist } from '../../utils/EmailAllowlist';
 
 export interface EmailSession extends ResourceSession {
   messageId?: string;
@@ -21,8 +22,17 @@ export interface SendEmailOptions {
   subject: string;
   body: string;
   html?: string;
-  attachments?: any[];
+  attachments?: EmailAttachment[];
   metadata?: Record<string, any>;
+}
+
+export interface EmailAttachment {
+  name: string;
+  contentType: string;
+  contentLength: number;
+  content?: string; // Base64 encoded content
+  contentId?: string; // For inline images
+  url?: string; // Download URL (provider-specific)
 }
 
 export interface InboundEmailPayload {
@@ -33,12 +43,84 @@ export interface InboundEmailPayload {
   text?: string;
   html?: string;
   headers?: Record<string, string>;
+  attachments?: EmailAttachment[];
   receivedAt: string;
+
+  // Extended Postmark fields
+  fromName?: string;
+  fromFull?: {
+    email: string;
+    name: string;
+    mailboxHash?: string;
+  };
+  toFull?: Array<{
+    email: string;
+    name: string;
+    mailboxHash?: string;
+  }>;
+  cc?: string;
+  ccFull?: Array<{
+    email: string;
+    name: string;
+    mailboxHash?: string;
+  }>;
+  bcc?: string;
+  bccFull?: Array<{
+    email: string;
+    name: string;
+    mailboxHash?: string;
+  }>;
+  replyTo?: string;
+  messageStream?: string;
+  originalRecipient?: string;
+  mailboxHash?: string;
+  tag?: string;
+  strippedTextReply?: string;
+
+  // Raw payload for provider-specific data
+  rawPayload?: any;
 }
 
 export class EmailResource extends BaseResource<EmailSession> {
+  private allowlist: EmailAllowlist;
+
   constructor(agent: Agent) {
     super(agent, 'email');
+
+    // Get database instance from agent's memory storage and initialize allowlist
+    const memory = agent.getMemory() as any;
+    const db = memory.longTerm?.storage?.db;
+    this.allowlist = new EmailAllowlist(db);
+  }
+
+  /**
+   * Add an email to the allowlist (persists to database)
+   */
+  private async addToAllowlist(email: string, addedBy: string = 'conversation_init'): Promise<void> {
+    await this.allowlist.add(email, addedBy);
+  }
+
+  /**
+   * Check if an email is in the allowlist
+   */
+  private isInAllowlist(email: string): boolean {
+    return this.allowlist.has(email);
+  }
+
+  /**
+   * Remove an email from the allowlist (removes from database)
+   * Public method for manual management
+   */
+  async removeFromAllowlist(email: string): Promise<void> {
+    await this.allowlist.remove(email);
+  }
+
+  /**
+   * Get all emails in the allowlist
+   * Public method for inspection
+   */
+  getAllowlist(): string[] {
+    return this.allowlist.getAll();
   }
 
   /**
@@ -102,7 +184,7 @@ export class EmailResource extends BaseResource<EmailSession> {
    * 1. Parse webhook payload
    * 2. Find or create conversation by analyzing email headers
    * 3. Store incoming email in agent memory as 'user' message
-   * 4. Optionally trigger AI auto-reply
+   * 4. trigger AI auto-reply
    */
   async handleWebhook(context: WebhookContext): Promise<{
     conversationId: string;
@@ -120,7 +202,7 @@ export class EmailResource extends BaseResource<EmailSession> {
     // Store incoming email in memory as 'user' message
     await this.storeInboundEmail(parsed, conversationId);
 
-    // Optionally trigger AI auto-reply
+    // trigger AI auto-reply
     const autoReplied = await this.triggerAutoReply(parsed, conversationId);
 
     return {
@@ -214,56 +296,74 @@ export class EmailResource extends BaseResource<EmailSession> {
   // Private helper methods
 
   private parseWebhookPayload(context: WebhookContext): InboundEmailPayload {
-    // Provider-specific parsing (Resend, SendGrid, Postmark)
-    switch (context.provider) {
-      case 'postmark':
-        return {
-          id: context.payload.MessageID,
-          from: context.payload.From || context.payload.FromFull?.Email,
-          to: context.payload.To || (context.payload.ToFull ? context.payload.ToFull.map((t: any) => t.Email) : []),
-          subject: context.payload.Subject,
-          text: context.payload.TextBody,
-          html: context.payload.HtmlBody,
-          headers: context.payload.Headers ? this.parsePostmarkHeaders(context.payload.Headers) : {},
-          receivedAt: context.payload.Date || new Date().toISOString()
-        };
-
-      case 'resend':
-        return {
-          id: context.payload.id,
-          from: context.payload.from,
-          to: context.payload.to,
-          subject: context.payload.subject,
-          text: context.payload.text,
-          html: context.payload.html,
-          headers: context.payload.headers,
-          receivedAt: context.payload.receivedAt
-        };
-
-      case 'sendgrid':
-        return {
-          id: context.payload.message_id || `sg-${Date.now()}`,
-          from: context.payload.from,
-          to: context.payload.to,
-          subject: context.payload.subject,
-          text: context.payload.text,
-          html: context.payload.html,
-          headers: this.parseSendGridHeaders(context.payload.headers),
-          receivedAt: new Date().toISOString()
-        };
-
-      default:
-        throw new Error(`Unknown email provider: ${context.provider}`);
+    // Only Postmark is supported for inbound emails
+    if (context.provider !== 'postmark') {
+      throw new Error(`Unsupported email provider for webhooks: ${context.provider}. Only Postmark is supported.`);
     }
+
+    return {
+      id: context.payload.MessageID,
+      from: context.payload.From || context.payload.FromFull?.Email,
+      to: context.payload.To || (context.payload.ToFull ? context.payload.ToFull.map((t: any) => t.Email) : []),
+      subject: context.payload.Subject,
+      text: context.payload.TextBody,
+      html: context.payload.HtmlBody,
+      headers: context.payload.Headers ? this.parsePostmarkHeaders(context.payload.Headers) : {},
+      attachments: context.payload.Attachments ? this.parsePostmarkAttachments(context.payload.Attachments) : [],
+      receivedAt: context.payload.Date || new Date().toISOString(),
+
+      // Extended Postmark fields
+      fromName: context.payload.FromName,
+      fromFull: context.payload.FromFull ? {
+        email: context.payload.FromFull.Email,
+        name: context.payload.FromFull.Name,
+        mailboxHash: context.payload.FromFull.MailboxHash
+      } : undefined,
+      toFull: context.payload.ToFull?.map((t: any) => ({
+        email: t.Email,
+        name: t.Name,
+        mailboxHash: t.MailboxHash
+      })),
+      cc: context.payload.Cc,
+      ccFull: context.payload.CcFull?.map((c: any) => ({
+        email: c.Email,
+        name: c.Name,
+        mailboxHash: c.MailboxHash
+      })),
+      bcc: context.payload.Bcc,
+      bccFull: context.payload.BccFull?.map((b: any) => ({
+        email: b.Email,
+        name: b.Name,
+        mailboxHash: b.MailboxHash
+      })),
+      replyTo: context.payload.ReplyTo,
+      messageStream: context.payload.MessageStream,
+      originalRecipient: context.payload.OriginalRecipient,
+      mailboxHash: context.payload.MailboxHash,
+      tag: context.payload.Tag,
+      strippedTextReply: context.payload.StrippedTextReply,
+
+      // Store entire raw payload for debugging and advanced use cases
+      rawPayload: context.payload
+    };
   }
 
   private async findOrCreateConversation(email: InboundEmailPayload): Promise<string> {
+    logger.debug('[EmailResource] Thread analysis', {
+      inReplyTo: email.headers?.['in-reply-to'],
+      references: email.headers?.references,
+      subject: email.subject,
+      from: email.from
+    });
+
     // Method 1: Check In-Reply-To header (standard email threading)
     if (email.headers?.['in-reply-to']) {
       const cleanMessageId = this.cleanMessageId(email.headers['in-reply-to']);
       const conversationId = await this.findConversationByMessageId(cleanMessageId);
       if (conversationId) {
-        logger.info(`[EmailResource] Found conversation via In-Reply-To: ${conversationId}`);
+        logger.info(`[EmailResource] Found conversation via In-Reply-To: ${conversationId}`, {
+          messageId: cleanMessageId
+        });
         return conversationId;
       }
     }
@@ -271,10 +371,17 @@ export class EmailResource extends BaseResource<EmailSession> {
     // Method 2: Check References header (full thread history)
     if (email.headers?.references) {
       const messageIds = email.headers.references.split(/\s+/).map(id => this.cleanMessageId(id));
+      logger.debug('[EmailResource] Checking References chain', {
+        messageIds,
+        count: messageIds.length
+      });
+
       for (const msgId of messageIds) {
         const conversationId = await this.findConversationByMessageId(msgId);
         if (conversationId) {
-          logger.info(`[EmailResource] Found conversation via References: ${conversationId}`);
+          logger.info(`[EmailResource] Found conversation via References: ${conversationId}`, {
+            matchedMessageId: msgId
+          });
           return conversationId;
         }
       }
@@ -312,7 +419,16 @@ export class EmailResource extends BaseResource<EmailSession> {
     }
 
     // No match found - create new conversation
-    logger.info(`[EmailResource] Creating new conversation for ${email.from}`);
+    logger.info(`[EmailResource] Creating new conversation for ${email.from}`, {
+      subject: email.subject,
+      messageId: email.id,
+      hadInReplyTo: !!email.headers?.['in-reply-to'],
+      hadReferences: !!email.headers?.references
+    });
+
+    // Add sender to allowlist since they initiated the conversation
+    this.addToAllowlist(email.from);
+
     return await this.createSession({
       messageId: email.id,
       from: email.from,
@@ -329,10 +445,43 @@ export class EmailResource extends BaseResource<EmailSession> {
     return messageId.replace(/^<|>$/g, '').trim();
   }
 
+  /**
+   * Format message ID to standard email format with angle brackets and domain
+   * Ensures Message-IDs are in proper format: <uuid@domain.com>
+   */
+  private formatMessageId(messageId: string, domain: string = 'loctelli.com'): string {
+    // Already in proper format
+    if (messageId.startsWith('<') && messageId.endsWith('>')) {
+      return messageId;
+    }
+
+    // Has @ but missing angle brackets
+    if (messageId.includes('@')) {
+      return `<${messageId}>`;
+    }
+
+    // Just a UUID - add domain and angle brackets
+    return `<${messageId}@${domain}>`;
+  }
+
   private async storeInboundEmail(email: InboundEmailPayload, conversationId: string): Promise<void> {
+    // Extract thread root (first message ID in References chain)
+    const threadRoot = email.headers?.references
+      ? email.headers.references.split(/\s+/)[0].replace(/^<|>$/g, '')
+      : email.id;
+
+    // Build content with attachment info if present
+    let content = email.text || email.html || '';
+    if (email.attachments && email.attachments.length > 0) {
+      const attachmentInfo = email.attachments.map(att =>
+        `[Attachment: ${att.name} (${att.contentType}, ${att.contentLength} bytes)]`
+      ).join('\n');
+      content = `${content}\n\n${attachmentInfo}`;
+    }
+
     await this.agent.getMemory().store({
       id: `msg-${conversationId}-${Date.now()}`,
-      content: email.text || email.html || '',
+      content,
       timestamp: new Date(email.receivedAt),
       type: 'conversation',
       channel: 'email',
@@ -340,14 +489,32 @@ export class EmailResource extends BaseResource<EmailSession> {
       sessionMetadata: {
         conversationId,
         emailId: email.id, // Store email ID for thread detection
+        threadRoot, // First message in the thread
+        inReplyTo: email.headers?.['in-reply-to'],
+        references: email.headers?.references,
         direction: 'inbound',
         from: email.from,
         to: Array.isArray(email.to) ? email.to.join(', ') : email.to,
-        subject: email.subject
-      }
+        subject: email.subject,
+        attachments: email.attachments?.map(att => ({
+          name: att.name,
+          contentType: att.contentType,
+          contentLength: att.contentLength,
+          contentId: att.contentId
+        }))
+      },
     });
 
-    logger.info(`[EmailResource] Stored inbound email in conversation ${conversationId}`);
+    logger.info(`[EmailResource] Stored inbound email in conversation ${conversationId}`, {
+      emailId: email.id,
+      threadRoot,
+      hasReferences: !!email.headers?.references,
+      attachmentCount: email.attachments?.length || 0,
+      fromName: email.fromName,
+      messageStream: email.messageStream,
+      hasCc: !!email.cc,
+      hasBcc: !!email.bcc
+    });
   }
 
   /**
@@ -361,7 +528,13 @@ export class EmailResource extends BaseResource<EmailSession> {
     subject: string;
     body: string;
     inReplyTo?: string;
+    references?: string;
   }): Promise<void> {
+    // Extract thread root from references if available
+    const threadRoot = options.references
+      ? options.references.split(/\s+/)[0].replace(/^<|>$/g, '')
+      : options.messageId;
+
     await this.agent.getMemory().store({
       id: `msg-${options.conversationId}-${Date.now()}`,
       content: options.body,
@@ -372,14 +545,19 @@ export class EmailResource extends BaseResource<EmailSession> {
       sessionMetadata: {
         conversationId: options.conversationId,
         emailId: options.messageId, // Store email ID for thread detection
+        threadRoot, // First message in the thread
+        inReplyTo: options.inReplyTo,
+        references: options.references,
         direction: 'outbound',
         to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
-        subject: options.subject,
-        inReplyTo: options.inReplyTo
+        subject: options.subject
       }
     });
 
-    logger.info(`[EmailResource] Stored outbound email ${options.messageId} in conversation ${options.conversationId}`);
+    logger.info(`[EmailResource] Stored outbound email ${options.messageId} in conversation ${options.conversationId}`, {
+      threadRoot,
+      hasReferences: !!options.references
+    });
   }
 
   private async triggerAutoReply(
@@ -393,21 +571,58 @@ export class EmailResource extends BaseResource<EmailSession> {
       return false;
     }
 
+    // SAFEGUARD 1: Check if this is a forwarded email from a new sender
+    // If subject starts with "Fwd:" and we have no prior conversation, skip auto-reply
+    if (/^Fwd:/i.test(email.subject)) {
+      const hasConversationHistory = await this.hasConversationHistory(email.from);
+      if (!hasConversationHistory) {
+        logger.info(`[EmailResource] Skipping auto-reply for forwarded email from new sender: ${email.from}`);
+        return false;
+      }
+    }
+
+    // SAFEGUARD 2: Check if sender is in our allowlist
+    // Only auto-reply to emails that have been allowlisted (i.e., they initiated a conversation)
+    if (!this.isInAllowlist(email.from)) {
+      logger.info(`[EmailResource] Skipping auto-reply for sender not in allowlist: ${email.from}`);
+      return false;
+    }
+
     logger.info(`[EmailResource] Triggering AI auto-reply for ${email.from}`);
+
+    // Clean subject line (remove redundant "Re:" prefixes)
+    const cleanSubject = email.subject.replace(/^(Re:\s*)+/gi, '').trim();
+
+    // Format message IDs to ensure proper email threading
+    const formattedInReplyTo = this.formatMessageId(email.id);
+
+    // Build full References chain for proper email threading
+    const references = email.headers?.references
+      ? `${email.headers.references} ${formattedInReplyTo}`
+      : formattedInReplyTo;
+
+    logger.debug('[EmailResource] Auto-reply threading info', {
+      originalSubject: email.subject,
+      cleanSubject,
+      inReplyTo: formattedInReplyTo,
+      references,
+      referencesCount: references.split(/\s+/).length
+    });
 
     // Use Agent to compose and send reply
     // toolParams will override AI's parameters when the send_email tool is called
     const agentResponse = await this.processWithAgent(
       `A customer email was received from ${email.from} with the subject "${email.subject}".
-      Respond to this customer email professionally and be helpful.
+      Respond to this customer email.
       Use the send_email tool to send your response.`,
       {
         conversationId,
         toolHint: 'send_email',
         toolParams: {
           to: email.from,
-          subject: `Re: ${email.subject}`,
-          inReplyTo: email.id
+          subject: `Re: ${cleanSubject}`,
+          inReplyTo: formattedInReplyTo,
+          references: references
         }
       }
     );
@@ -423,9 +638,10 @@ export class EmailResource extends BaseResource<EmailSession> {
         messageId,
         conversationId,
         to: email.from,
-        subject: `Re: ${email.subject}`,
+        subject: `Re: ${cleanSubject}`,
         body: emailBody,
-        inReplyTo: email.id
+        inReplyTo: formattedInReplyTo,
+        references: references
       });
     }
 
@@ -493,8 +709,10 @@ export class EmailResource extends BaseResource<EmailSession> {
     return match?.sessionMetadata?.conversationId || null;
   }
 
+  /**
+   * Parse Postmark headers from array format
+   */
   private parsePostmarkHeaders(headers: Array<{ Name: string; Value: string }>): Record<string, string> {
-    // Parse Postmark's header array format
     const parsed: Record<string, string> = {};
     for (const header of headers) {
       parsed[header.Name.toLowerCase()] = header.Value;
@@ -502,17 +720,24 @@ export class EmailResource extends BaseResource<EmailSession> {
     return parsed;
   }
 
-  private parseSendGridHeaders(headers: string): Record<string, string> {
-    // Parse SendGrid's raw header string
-    const parsed: Record<string, string> = {};
-    const lines = headers.split('\n');
-    for (const line of lines) {
-      const match = line.match(/^([^:]+):\s*(.+)$/);
-      if (match) {
-        parsed[match[1].toLowerCase()] = match[2];
-      }
-    }
-    return parsed;
+  /**
+   * Parse Postmark attachment format
+   * Postmark provides: Name, Content, ContentType, ContentLength, ContentID
+   */
+  private parsePostmarkAttachments(attachments: Array<{
+    Name: string;
+    Content: string;
+    ContentType: string;
+    ContentLength: number;
+    ContentID?: string;
+  }>): EmailAttachment[] {
+    return attachments.map(att => ({
+      name: att.Name,
+      contentType: att.ContentType,
+      contentLength: att.ContentLength,
+      content: att.Content, // Base64 encoded
+      contentId: att.ContentID
+    }));
   }
 
   private parseGeneratedEmail(content: string): { subject: string; body: string; html?: string } {
@@ -525,4 +750,21 @@ export class EmailResource extends BaseResource<EmailSession> {
 
     return { subject, body };
   }
+
+  /**
+   * Check if we have any conversation history with this email address
+   */
+  private async hasConversationHistory(email: string): Promise<boolean> {
+    const memories = await this.agent.getMemory().search({
+      channel: 'email',
+      limit: 50
+    });
+
+    // Check if we've ever communicated with this email address
+    return memories.some(m =>
+      m.sessionMetadata?.from === email ||
+      (m.sessionMetadata?.to && m.sessionMetadata.to.includes(email))
+    );
+  }
+
 }
