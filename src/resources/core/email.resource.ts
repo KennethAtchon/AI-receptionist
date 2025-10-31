@@ -359,10 +359,20 @@ export class EmailResource extends BaseResource<EmailSession> {
     // Method 1: Check In-Reply-To header (standard email threading)
     if (email.headers?.['in-reply-to']) {
       const cleanMessageId = this.cleanMessageId(email.headers['in-reply-to']);
-      const conversationId = await this.findConversationByMessageId(cleanMessageId);
+      const normalizedMessageId = this.normalizeMessageIdForMatching(cleanMessageId);
+
+      // Try exact match first
+      let conversationId = await this.findConversationByMessageId(cleanMessageId);
+
+      // If not found and message has domain, try without domain (UUID only)
+      if (!conversationId && cleanMessageId !== normalizedMessageId) {
+        conversationId = await this.findConversationByMessageId(normalizedMessageId);
+      }
+
       if (conversationId) {
         logger.info(`[EmailResource] Found conversation via In-Reply-To: ${conversationId}`, {
-          messageId: cleanMessageId
+          messageId: cleanMessageId,
+          normalizedMessageId
         });
         return conversationId;
       }
@@ -377,10 +387,20 @@ export class EmailResource extends BaseResource<EmailSession> {
       });
 
       for (const msgId of messageIds) {
-        const conversationId = await this.findConversationByMessageId(msgId);
+        const normalizedMsgId = this.normalizeMessageIdForMatching(msgId);
+
+        // Try exact match first
+        let conversationId = await this.findConversationByMessageId(msgId);
+
+        // If not found and message has domain, try without domain (UUID only)
+        if (!conversationId && msgId !== normalizedMsgId) {
+          conversationId = await this.findConversationByMessageId(normalizedMsgId);
+        }
+
         if (conversationId) {
           logger.info(`[EmailResource] Found conversation via References: ${conversationId}`, {
-            matchedMessageId: msgId
+            matchedMessageId: msgId,
+            normalizedMessageId: normalizedMsgId
           });
           return conversationId;
         }
@@ -446,10 +466,20 @@ export class EmailResource extends BaseResource<EmailSession> {
   }
 
   /**
+   * Normalize message ID for matching - removes domain to match just the UUID part
+   * This handles cases where Postmark stores "uuid" but sends "uuid@mtasv.net"
+   */
+  private normalizeMessageIdForMatching(messageId: string): string {
+    const cleaned = this.cleanMessageId(messageId);
+    // Strip domain if present (e.g., "uuid@mtasv.net" → "uuid")
+    return cleaned.split('@')[0];
+  }
+
+  /**
    * Format message ID to standard email format with angle brackets and domain
    * Ensures Message-IDs are in proper format: <uuid@domain.com>
    */
-  private formatMessageId(messageId: string, domain: string = 'loctelli.com'): string {
+  private formatMessageId(messageId: string, domain: string = 'inbound.loctelli.com'): string {
     // Already in proper format
     if (messageId.startsWith('<') && messageId.endsWith('>')) {
       return messageId;

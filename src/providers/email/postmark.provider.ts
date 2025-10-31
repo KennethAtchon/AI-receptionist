@@ -120,28 +120,58 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
         ccList.push(...archiveCc);
       }
 
+      const fromAddress = params.from || `${this.config.fromName || 'No Reply'} <${this.config.fromEmail}>`;
+      const toAddresses = Array.isArray(params.to) ? params.to : [params.to];
+      const attachments = params.attachments?.map(att => ({
+        Name: att.filename,
+        Content: att.content ? Buffer.from(att.content).toString('base64') : undefined,
+        ContentType: att.contentType || 'application/octet-stream'
+      }));
+      const headers = params.headers ? Object.entries(params.headers).map(([Name, Value]) => ({ Name, Value })) : undefined;
+
+      logger.info('[PostmarkProvider] Sending email via Postmark', {
+        to: toAddresses,
+        from: fromAddress,
+        replyTo: params.replyTo || this.config.replyTo || undefined,
+        subject: params.subject,
+        cc: ccList.length > 0 ? ccList : undefined,
+        hasTextBody: !!params.text,
+        hasHtmlBody: !!params.html,
+        textBodyLength: params.text?.length || 0,
+        htmlBodyLength: params.html?.length || 0,
+        attachmentCount: attachments?.length || 0,
+        attachments: attachments?.map(a => ({ name: a.Name, contentType: a.ContentType })) || undefined,
+        headers: headers ? headers.reduce((acc, h) => ({ ...acc, [h.Name]: h.Value }), {} as Record<string, string>) : undefined,
+        tags: params.tags || undefined,
+        archiveCc: this.config.archiveCc || undefined
+      });
+
       const response = await this.postmarkClient.sendEmail({
-        From: params.from || `${this.config.fromName || 'No Reply'} <${this.config.fromEmail}>`,
-        To: Array.isArray(params.to) ? params.to.join(',') : params.to,
+        From: fromAddress,
+        To: toAddresses.join(','),
         Cc: ccList.length > 0 ? ccList.join(',') : undefined,
         ReplyTo: params.replyTo || this.config.replyTo,
         Subject: params.subject,
         TextBody: params.text,
         HtmlBody: params.html,
-        Attachments: params.attachments?.map(att => ({
-          Name: att.filename,
-          Content: att.content ? Buffer.from(att.content).toString('base64') : undefined,
-          ContentType: att.contentType || 'application/octet-stream'
-        })),
-        Headers: params.headers ? Object.entries(params.headers).map(([Name, Value]) => ({ Name, Value })) : undefined,
+        Attachments: attachments,
+        Headers: headers,
         Tag: params.tags?.[0], // Postmark supports single tag per email
         Metadata: params.tags ? { tags: params.tags.join(',') } : undefined
       });
 
-      logger.info('[PostmarkProvider] Email sent', {
+      // Note: Postmark returns MessageID as UUID only (e.g., "249f3e6e-251c-48c0-948b-130b94baf4da")
+      // but actually sends it as <uuid@mtasv.net> in the email headers
+      logger.info('[PostmarkProvider] Email sent successfully', {
         messageId: response.MessageID,
-        to: params.to,
-        cc: ccList.length > 0 ? ccList : undefined
+        messageIdFormatted: `<${response.MessageID}@mtasv.net>`, // How it appears in actual email headers
+        to: toAddresses,
+        from: fromAddress,
+        subject: params.subject,
+        cc: ccList.length > 0 ? ccList : undefined,
+        inReplyTo: params.headers?.['In-Reply-To'] || params.headers?.['in-reply-to'] || undefined,
+        references: params.headers?.References || params.headers?.references || undefined,
+        attachmentCount: attachments?.length || 0
       });
 
       return {
