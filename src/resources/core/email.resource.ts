@@ -146,7 +146,7 @@ export class EmailResource extends BaseResource<EmailSession> {
   }
 
   /**
-   * Handle incoming email webhook (Postmark/Resend/SendGrid)
+   * Handle incoming email webhook (Postmark)
    *
    * This implements the WEBHOOK-EMAIL-AUTOMATION-PLAN vision:
    * 1. Parse webhook payload

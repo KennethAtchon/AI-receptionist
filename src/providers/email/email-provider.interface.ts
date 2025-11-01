@@ -1,6 +1,6 @@
 /**
  * Common interface for all email providers
- * Defines standard email operations across Resend, SendGrid, SMTP, etc.
+ * Defines standard email operations (currently supports Postmark)
  */
 
 import type { IProvider } from '../../types';

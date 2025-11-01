@@ -1,7 +1,7 @@
 /**
  * Postmark Email Provider
  * Modern email provider with excellent inbound webhook support
- * Replaces: Resend, SendGrid, and SMTP providers
+ * Primary email provider for the AI Receptionist SDK
  */
 
 import { BaseProvider } from '../base.provider';

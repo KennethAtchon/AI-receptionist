@@ -51,7 +51,7 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
         },
         provider: {
           type: 'string',
-          description: 'Force specific provider (resend, sendgrid, smtp)'
+          description: 'Email provider (currently only postmark is supported)'
         },
         inReplyTo: {
           type: 'string',
@@ -100,21 +100,16 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
       }
 
       try {
-        // Get email provider (try specific provider first, then default)
+        // Get email provider (postmark only)
         let emailProvider: IEmailProvider;
         if (params.provider) {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
-          // Try to get any available email provider
-          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
-          for (const providerName of providers) {
-            if (config.providerRegistry.has(providerName)) {
-              emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
-              break;
-            }
-          }
-          if (!emailProvider!) {
-            throw new Error('No email provider configured');
+          // Default to postmark
+          if (config.providerRegistry.has('postmark')) {
+            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
+          } else {
+            throw new Error('Postmark email provider not configured');
           }
         }
 
@@ -178,21 +173,16 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
       }
 
       try {
-        // Get email provider (try specific provider first, then default)
+        // Get email provider (postmark only)
         let emailProvider: IEmailProvider;
         if (params.provider) {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
-          // Try to get any available email provider
-          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
-          for (const providerName of providers) {
-            if (config.providerRegistry.has(providerName)) {
-              emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
-              break;
-            }
-          }
-          if (!emailProvider!) {
-            throw new Error('No email provider configured');
+          // Default to postmark
+          if (config.providerRegistry.has('postmark')) {
+            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
+          } else {
+            throw new Error('Postmark email provider not configured');
           }
         }
 
@@ -251,21 +241,16 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
       }
 
       try {
-        // Get email provider (try specific provider first, then default)
+        // Get email provider (postmark only)
         let emailProvider: IEmailProvider;
         if (params.provider) {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
-          // Try to get any available email provider
-          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
-          for (const providerName of providers) {
-            if (config.providerRegistry.has(providerName)) {
-              emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
-              break;
-            }
-          }
-          if (!emailProvider!) {
-            throw new Error('No email provider configured');
+          // Default to postmark
+          if (config.providerRegistry.has('postmark')) {
+            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
+          } else {
+            throw new Error('Postmark email provider not configured');
           }
         }
 
@@ -332,21 +317,16 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
       }
 
       try {
-        // Get email provider (try specific provider first, then default)
+        // Get email provider (postmark only)
         let emailProvider: IEmailProvider;
         if (params.provider) {
           emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
         } else {
-          // Try to get any available email provider
-          const providers = ['postmark', 'resend', 'sendgrid', 'smtp'];
-          for (const providerName of providers) {
-            if (config.providerRegistry.has(providerName)) {
-              emailProvider = await config.providerRegistry.get<IEmailProvider>(providerName);
-              break;
-            }
-          }
-          if (!emailProvider!) {
-            throw new Error('No email provider configured');
+          // Default to postmark
+          if (config.providerRegistry.has('postmark')) {
+            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
+          } else {
+            throw new Error('Postmark email provider not configured');
           }
         }
 

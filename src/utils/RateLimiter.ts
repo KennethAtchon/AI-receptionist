@@ -24,7 +24,7 @@ export interface RateLimitCounter {
  */
 export class RateLimiter {
   private counters = new Map<string, RateLimitCounter>();
-  private config: RateLimitConfig;
+  public config: RateLimitConfig;
 
   constructor(config: RateLimitConfig) {
     this.config = config;

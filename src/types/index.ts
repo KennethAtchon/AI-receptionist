@@ -425,7 +425,7 @@ export interface SendEmailOptions {
   body: string;
   html?: string;
   metadata?: Record<string, any>;
-  provider?: string; // Force specific provider (e.g., 'resend', 'sendgrid', 'smtp')
+  provider?: string; // Force specific provider (currently only 'postmark' is supported)
   tags?: string[]; // Tags for provider routing
   attachments?: Array<{
     filename: string;
