@@ -7,7 +7,6 @@ import { ToolBuilder } from '../builder';
 import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
-// import type { CalendarProcessor } from '../../processors/calendar.processor';
 
 // Calendar processor type (for backward compatibility)
 export interface CalendarProcessor {
