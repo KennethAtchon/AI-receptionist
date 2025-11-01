@@ -41,6 +41,14 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           type: 'string',
           description: 'Email body (HTML format)'
         },
+        cc: {
+          type: 'string',
+          description: 'CC email addresses (comma-separated)'
+        },
+        bcc: {
+          type: 'string',
+          description: 'BCC email addresses (comma-separated)'
+        },
         provider: {
           type: 'string',
           description: 'Force specific provider (resend, sendgrid, smtp)'
@@ -52,6 +60,15 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
         references: {
           type: 'string',
           description: 'Full References header chain for email threading (space-separated message IDs)'
+        },
+        template: {
+          type: 'string',
+          description: 'Template name to use (only in template mode)'
+        },
+        templateVars: {
+          type: 'object',
+          description: 'Variables to substitute in template (only in template mode)',
+          additionalProperties: { type: 'string' }
         },
         attachments: {
           type: 'array',
@@ -106,6 +123,8 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           subject: params.subject,
           text: params.body,
           html: params.html,
+          cc: params.cc,
+          bcc: params.bcc,
           attachments: params.attachments,
           headers: params.inReplyTo ? {
             'In-Reply-To': params.inReplyTo,
@@ -255,6 +274,8 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
           subject: params.subject,
           text: params.body,
           html: params.html,
+          cc: params.cc,
+          bcc: params.bcc,
           attachments: params.attachments,
           headers: params.inReplyTo ? {
             'In-Reply-To': params.inReplyTo,

@@ -3,9 +3,9 @@
  * Manages persistent allowlist for email auto-replies
  */
 
-import { emailAllowlist } from '../agent/storage/schema';
+import { emailAllowlist } from '../../agent/storage/schema';
 import { eq } from 'drizzle-orm';
-import { logger } from './logger';
+import { logger } from '../logger';
 
 export class EmailAllowlist {
   // In-memory cache for fast lookups

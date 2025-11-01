@@ -197,6 +197,8 @@ export interface TwilioConfig {
 // Email Provider Types
 // ============================================================================
 
+export type EmailContentMode = 'text' | 'html' | 'template';
+
 export interface BaseEmailConfig {
   fromEmail: string;
   fromName?: string;

@@ -39,13 +39,13 @@
 
 ## 🔨 TODO - Priority 1 (Production Critical)
 
-### 1. Expose Allowlist Management API
+### 1. Expose Allowlist Management API - **COMPLETED Oct 31, 2025**
 **Why:** Users need a way to manually manage who can interact with the AI via email
 
 **Implementation:**
 - ✅ Already has `removeFromAllowlist(email)` and `getAllowlist()` methods
-- ❌ Need to expose via a separate API (NOT in client.ts)
-- ❌ Add `addToAllowlist(email, source?)` as a public method
+- ✅ Made `addToAllowlist(email, source?)` public
+- ✅ Made `isInAllowlist(email)` public for inspection
 
 **Files to modify:**
 - `src/resources/core/email.resource.ts` - Make `addToAllowlist()` public
@@ -62,12 +62,13 @@ email.isInAllowlist(email: string): boolean  // Make this public too
 
 ---
 
-### 2. Out-of-Office / Auto-Reply Detection
+### 2. Out-of-Office / Auto-Reply Detection - **COMPLETED Oct 31, 2025**
 **Why:** Prevent email loops when AI responds to other auto-responders
 
 **Implementation:**
-- ❌ Check for auto-reply headers before sending response
-- ❌ Skip auto-reply if detected
+- ✅ Check for auto-reply headers before sending response
+- ✅ Skip auto-reply if detected
+- ✅ Implemented checks for Auto-Submitted, X-Auto-Response-Suppress, Precedence, and X-Autorespond headers
 
 **Headers to check:**
 ```typescript
@@ -101,13 +102,14 @@ if (email.headers?.precedence?.match(/auto-reply|bulk|junk/i)) {
 
 ---
 
-### 3. Rate Limiting (Soft Implementation)
+### 3. Rate Limiting (Soft Implementation) - **COMPLETED Oct 31, 2025**
 **Why:** Prevent spam loops if two AIs email each other or if a user sends many emails rapidly
 
 **Implementation:**
-- ❌ Track email send rate per conversation
-- ❌ Limit to N emails per hour per conversation
-- ❌ Log warning if rate limit approached
+- ✅ Track email send rate per conversation
+- ✅ Limit to 10 emails per hour per conversation
+- ✅ Log warning if rate limit exceeded
+- ✅ Implemented in-memory rate limiting with automatic reset
 
 **Note:** Consumer should handle hard rate limits (e.g., API gateway), but we can add soft limits here.
 
@@ -153,13 +155,15 @@ if (!canSend) {
 
 ## 🎯 TODO - Priority 2 (Enhanced Experience)
 
-### 4. CC/BCC Handling with Archive CC
+### 4. CC/BCC Handling with Archive CC - **COMPLETED Oct 31, 2025**
 **Why:** Support CC/BCC in replies, automatically CC a monitoring inbox
 
 **Implementation:**
 - ✅ Already have `cc`, `ccFull`, `bcc`, `bccFull` from Postmark webhook
-- ❌ Need to pass CC/BCC to `send_email` tool
-- ❌ Add archiveCc configuration (already in PostmarkProvider but not used)
+- ✅ Added CC/BCC parameters to `send_email` tool
+- ✅ Updated email provider interface to support BCC
+- ✅ Auto-reply includes original CC recipients
+- ✅ archiveCc configuration supported in PostmarkProvider
 
 **Design:**
 ```typescript
@@ -202,10 +206,20 @@ properties: {
 ---
 
 
-### 6. AI Email Content Generation Modes (Text vs HTML vs Template)
+### 6. AI Email Content Generation Modes (Text vs HTML vs Template) - **COMPLETED Oct 31, 2025**
 **Why:** Give consumers control over whether AI generates plain text, HTML, or uses templates
 
 **📖 Full Design:** See [email-content-modes.md](./email-content-modes.md) for complete documentation
+
+**Implementation Status:**
+- ✅ Added `setContentMode(mode)` method
+- ✅ Added `getContentMode()` method
+- ✅ Added `addHtmlTemplate(name, template)` method
+- ✅ Added `removeHtmlTemplate(name)` method
+- ✅ Added `getAvailableTemplates()` method
+- ✅ System prompt updates dynamically based on mode
+- ✅ Added template and templateVars parameters to send_email tool
+- ✅ Template variable substitution with {{variableName}} syntax
 
 **The Three Modes:**
 
@@ -305,12 +319,14 @@ client.email.addHtmlTemplate('order-update', `
 
 ---
 
-### 7. Optional Instructions per Email Session
+### 7. Optional Instructions per Email Session - **COMPLETED Oct 31, 2025**
 **Why:** Allow per-email customization of AI behavior without changing system prompt
 
 **Implementation:**
-- ❌ Add optional `instructions` field to `handleWebhook()` or `triggerAutoReply()`
-- ❌ Pass instructions to agent via context
+- ✅ Added optional `instructions` field to `handleWebhook()`
+- ✅ Added optional `autoReply` flag to `handleWebhook()`
+- ✅ Instructions passed to agent via enhanced prompt in `triggerAutoReply()`
+- ✅ Logging added for tracking when additional instructions are used
 
 **Design:**
 ```typescript
@@ -398,14 +414,14 @@ if (config.businessHours?.enabled) {
 
 ### Immediate (Priority 1)
 1. ✅ Remove redundant user message in auto-reply - **COMPLETED Oct 31, 2025**
-2. ❌ Make `addToAllowlist()` public
-3. ❌ Add out-of-office detection
-4. ❌ Add soft rate limiting
+2. ✅ Make `addToAllowlist()` public - **COMPLETED Oct 31, 2025**
+3. ✅ Add out-of-office detection - **COMPLETED Oct 31, 2025**
+4. ✅ Add soft rate limiting - **COMPLETED Oct 31, 2025**
 
 ### Short-term (Priority 2)
-5. ❌ Add CC/BCC handling with archive CC
-6. ❌ Add HTML template system
-7. ❌ Add optional instructions parameter
+5. ✅ Add CC/BCC handling with archive CC - **COMPLETED Oct 31, 2025**
+6. ✅ Add HTML template system - **COMPLETED Oct 31, 2025**
+7. ✅ Add optional instructions parameter - **COMPLETED Oct 31, 2025**
 
 ### Long-term (Priority 3)
 8. ❌ Add business hours configuration
@@ -417,15 +433,15 @@ if (config.businessHours?.enabled) {
 ## 🎯 Recommended Implementation Order
 
 1. ✅ **Remove redundant user message** (30 min) - **COMPLETED** - Cleaner conversation flow
-2. **Expose allowlist API** (30 min) - High value, easy win
-3. **Out-of-office detection** (30 min) - Critical to prevent loops
-4. **Rate limiting** (1 hour) - Critical to prevent abuse
-5. **CC/BCC handling** (1 hour) - Improves functionality
-6. **HTML templates** (2 hours) - Makes emails professional
-7. **Optional instructions** (30 min) - Adds flexibility
-8. **Business hours** (2 hours) - Nice polish
+2. ✅ **Expose allowlist API** (30 min) - **COMPLETED** - High value, easy win
+3. ✅ **Out-of-office detection** (30 min) - **COMPLETED** - Critical to prevent loops
+4. ✅ **Rate limiting** (1 hour) - **COMPLETED** - Critical to prevent abuse
+5. ✅ **CC/BCC handling** (1 hour) - **COMPLETED** - Improves functionality
+6. ✅ **HTML templates** (2 hours) - **COMPLETED** - Makes emails professional
+7. ✅ **Optional instructions** (30 min) - **COMPLETED** - Adds flexibility
+8. **Business hours** (2 hours) - Nice polish (Priority 3, not yet implemented)
 
-**Total estimated time for Priority 1-2:** ~5.5-7.5 hours remaining
+**All Priority 1-2 items completed!** - Oct 31, 2025
 
 ---
 
@@ -441,10 +457,13 @@ if (config.businessHours?.enabled) {
 - ✅ Clean conversation history (no redundant instruction messages)
 - ✅ System prompt-driven email behavior
 
-### What's Missing for Production
-- ⚠️ Out-of-office detection (could cause loops)
-- ⚠️ Rate limiting (could cause spam)
-- ⚠️ Allowlist management API (users can't manage manually)
+### Production-Ready Features (Completed Oct 31, 2025)
+- ✅ Out-of-office detection (prevents loops)
+- ✅ Rate limiting (prevents spam - 10 emails/hour per conversation)
+- ✅ Allowlist management API (public methods for manual management)
+- ✅ CC/BCC support (including archive CC)
+- ✅ HTML template system (3 modes: text, html, template)
+- ✅ Optional instructions per email (per-session customization)
 
 ### What's Nice to Have
 - HTML templates for professional emails
