@@ -301,14 +301,37 @@ export class EmailResource extends BaseResource<EmailSession> {
       throw new Error(`Unsupported email provider for webhooks: ${context.provider}. Only Postmark is supported.`);
     }
 
+    // Parse headers first to extract the actual Message-ID
+    const headers = context.payload.Headers ? this.parsePostmarkHeaders(context.payload.Headers) : {};
+
+    // CRITICAL: Extract the actual Message-ID from email headers
+    // Postmark's MessageID field is a simplified UUID, but the actual Message-ID header
+    // contains the full Message-ID as sent by the email client (e.g., Outlook, Gmail)
+    // This is essential for proper email threading
+    let actualMessageId = context.payload.MessageID;
+
+    if (headers['message-id']) {
+      // Extract Message-ID from headers and clean it
+      actualMessageId = this.cleanMessageId(headers['message-id']);
+      logger.debug('[EmailResource] Using actual Message-ID from headers', {
+        postmarkMessageId: context.payload.MessageID,
+        actualMessageId,
+        headerValue: headers['message-id']
+      });
+    } else {
+      logger.warn('[EmailResource] No Message-ID header found, using Postmark MessageID', {
+        postmarkMessageId: context.payload.MessageID
+      });
+    }
+
     return {
-      id: context.payload.MessageID,
+      id: actualMessageId,
       from: context.payload.From || context.payload.FromFull?.Email,
       to: context.payload.To || (context.payload.ToFull ? context.payload.ToFull.map((t: any) => t.Email) : []),
       subject: context.payload.Subject,
       text: context.payload.TextBody,
       html: context.payload.HtmlBody,
-      headers: context.payload.Headers ? this.parsePostmarkHeaders(context.payload.Headers) : {},
+      headers,
       attachments: context.payload.Attachments ? this.parsePostmarkAttachments(context.payload.Attachments) : [],
       receivedAt: context.payload.Date || new Date().toISOString(),
 
@@ -478,20 +501,22 @@ export class EmailResource extends BaseResource<EmailSession> {
   /**
    * Format message ID to standard email format with angle brackets and domain
    * Ensures Message-IDs are in proper format: <uuid@domain.com>
-   * Note: Uses 'mtasv.net' by default as this is the domain Postmark uses in actual email headers
+   * Note: If messageId already contains @, we preserve it as-is (it's the actual Message-ID from the email)
+   * Only adds domain for simplified UUIDs (from Postmark's MessageID field)
    */
   private formatMessageId(messageId: string, domain: string = 'mtasv.net'): string {
-    // Already in proper format
+    // Already in proper format with angle brackets
     if (messageId.startsWith('<') && messageId.endsWith('>')) {
       return messageId;
     }
 
-    // Has @ but missing angle brackets
+    // Has @ but missing angle brackets - this is the actual Message-ID, just wrap it
     if (messageId.includes('@')) {
       return `<${messageId}>`;
     }
 
     // Just a UUID - add domain and angle brackets
+    // This only happens for old messages or if Message-ID header is missing
     return `<${messageId}@${domain}>`;
   }
 

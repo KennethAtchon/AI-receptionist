@@ -161,10 +161,12 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
       });
 
       // Note: Postmark returns MessageID as UUID only (e.g., "249f3e6e-251c-48c0-948b-130b94baf4da")
-      // but actually sends it as <uuid@mtasv.net> in the email headers
+      // This is Postmark's internal tracking ID. When Postmark sends the email, it generates
+      // a proper Message-ID header in the format <uuid@mtasv.net> which is what recipients see.
+      // For threading, always use the actual Message-ID from email headers, not this UUID.
       logger.info('[PostmarkProvider] Email sent successfully', {
-        messageId: response.MessageID,
-        messageIdFormatted: `<${response.MessageID}@mtasv.net>`, // How it appears in actual email headers
+        messageId: response.MessageID, // Postmark's internal tracking ID
+        messageIdInEmailHeaders: `<${response.MessageID}@mtasv.net>`, // Actual Message-ID header that Postmark adds
         to: toAddresses,
         from: fromAddress,
         subject: params.subject,
@@ -192,6 +194,11 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
 
   /**
    * Parse Postmark inbound webhook payload
+   *
+   * IMPORTANT: Extracts the actual Message-ID from Headers array, not Postmark's MessageID field.
+   * Postmark's MessageID is a simplified UUID for internal tracking, but the actual Message-ID
+   * header contains the full Message-ID as sent by the email client (Outlook, Gmail, etc.).
+   * This is critical for proper email threading.
    */
   parseInboundEmail(payload: PostmarkInboundEmail): {
     from: string;
@@ -207,17 +214,25 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
       contentType: string;
     }>;
   } {
+    // Parse headers first
+    const headers = payload.Headers.reduce((acc, h) => {
+      acc[h.Name.toLowerCase()] = h.Value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    // Extract actual Message-ID from headers, fallback to Postmark's MessageID
+    const actualMessageId = headers['message-id']
+      ? headers['message-id'].replace(/^<|>$/g, '').trim()
+      : payload.MessageID;
+
     return {
       from: payload.From,
       to: payload.ToFull.map(t => t.Email),
       subject: payload.Subject,
       text: payload.TextBody,
       html: payload.HtmlBody,
-      messageId: payload.MessageID,
-      headers: payload.Headers.reduce((acc, h) => {
-        acc[h.Name.toLowerCase()] = h.Value;
-        return acc;
-      }, {} as Record<string, string>),
+      messageId: actualMessageId,
+      headers,
       attachments: payload.Attachments?.map(att => ({
         filename: att.Name,
         content: att.Content,
