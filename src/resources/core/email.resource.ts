@@ -666,11 +666,11 @@ export class EmailResource extends BaseResource<EmailSession> {
     });
 
     // Use Agent to compose and send reply
+    // Empty input: email content already stored in conversation history by storeInboundEmail()
+    // System prompt instructs AI to use send_email tool for email responses
     // toolParams will override AI's parameters when the send_email tool is called
     const agentResponse = await this.processWithAgent(
-      `A customer email was received from ${email.from} with the subject "${email.subject}".
-      Respond to this customer email.
-      Use the send_email tool to send your response.`,
+      '', // Empty - email content already in conversation history
       {
         conversationId,
         toolHint: 'send_email',

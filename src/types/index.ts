@@ -305,8 +305,8 @@ export interface WebhookConfig {
 export interface AIReceptionistConfig {
   // Core agent configuration (Six-Pillar Architecture)
   agent: {
-    // Identity - Who the agent is
-    identity: AgentIdentityConfig;
+    // Identity - Who the agent is (optional if customSystemPrompt is provided)
+    identity?: AgentIdentityConfig;
 
     // Personality - How the agent behaves (optional, has defaults)
     personality?: AgentPersonalityConfig;
@@ -322,6 +322,10 @@ export interface AIReceptionistConfig {
 
     // Voice configuration for TTS (optional)
     voice?: VoiceConfig;
+
+    // Custom system prompt - Bypasses all SystemPromptBuilder features
+    // WARNING: You are responsible for providing a complete, well-formatted system prompt
+    customSystemPrompt?: string;
   };
 
   // AI model configuration

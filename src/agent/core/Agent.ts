@@ -52,6 +52,7 @@ export class Agent {
   private readonly promptBuilder: SystemPromptBuilder;
   private readonly promptOptimizer: PromptOptimizer;
   private cachedSystemPrompt: string | null = null;
+  private readonly customSystemPrompt?: string; // User-provided raw system prompt
 
   // ==================== STATE ====================
   private state: AgentStatus;
@@ -74,8 +75,12 @@ export class Agent {
    * Private constructor - use Agent.builder() to create instances
    */
   private constructor(config: AgentConfiguration) {
-    // Initialize identity
-    this.identity = new IdentityImpl(config.identity);
+    // Initialize identity (use default if custom system prompt is provided without identity)
+    this.identity = new IdentityImpl(config.identity || {
+      name: 'Custom Agent',
+      role: 'AI Assistant',
+      authorityLevel: 'standard'
+    } as any);
 
     // Initialize personality
     this.personality = new PersonalityEngineImpl(config.personality || {});
@@ -107,6 +112,9 @@ export class Agent {
     this.aiProvider = config.aiProvider;
     this.toolRegistry = (config as any).toolRegistry;
     this.conversationService = (config as any).conversationService;
+
+    // Set custom system prompt if provided
+    this.customSystemPrompt = config.customSystemPrompt;
 
     // Initialize state
     this.state = AgentStatus.INITIALIZING;
@@ -220,19 +228,21 @@ export class Agent {
       this.tracer.log('response', response);
 
       // 5. Update memory - Store user and assistant messages separately
-      // Store user message
-      await this.memory.store({
-        id: `${interactionId}-user`,
-        content: request.input,
-        timestamp: new Date(),
-        type: 'conversation',
-        role: 'user',
-        channel: request.channel,
-        sessionMetadata: {
-          conversationId: request.context.conversationId
-        },
-        importance: 5
-      });
+      // Store user message (skip if input is empty - indicates content already in history)
+      if (request.input && request.input.trim().length > 0) {
+        await this.memory.store({
+          id: `${interactionId}-user`,
+          content: request.input,
+          timestamp: new Date(),
+          type: 'conversation',
+          role: 'user',
+          channel: request.channel,
+          sessionMetadata: {
+            conversationId: request.context.conversationId
+          },
+          importance: 5
+        });
+      }
 
       // Store assistant response
       await this.memory.store({
@@ -298,6 +308,18 @@ export class Agent {
       ...(conversationHistory.contextMessages || []),
       ...messages
     ];
+
+    // Log conversation history being passed to AI
+    this.logger.info('[Agent] Conversation history passed to AI', {
+      conversationId: request.context.conversationId,
+      messageCount: fullHistory.length,
+      contextMessageCount: conversationHistory.contextMessages?.length || 0,
+      messages: fullHistory.map(m => ({
+        role: m.role,
+        contentPreview: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : ''),
+        contentLength: m.content.length
+      }))
+    });
 
     const aiResponse = await this.aiProvider.chat({
       conversationId: request.context.conversationId,
@@ -394,6 +416,25 @@ export class Agent {
    * Rebuild system prompt (can be called to refresh)
    */
   public async rebuildSystemPrompt(): Promise<void> {
+    // If custom system prompt is provided, use it directly (no building)
+    if (this.customSystemPrompt) {
+      this.cachedSystemPrompt = this.customSystemPrompt;
+
+      this.logger.info('[Agent] Using custom system prompt', {
+        length: this.cachedSystemPrompt.length,
+        source: 'user-provided',
+        preview: this.cachedSystemPrompt.substring(0, 500) + (this.cachedSystemPrompt.length > 500 ? '...' : '')
+      });
+
+      // Log full custom system prompt at debug level
+      this.logger.debug('[Agent] Full custom system prompt', {
+        systemPrompt: this.cachedSystemPrompt
+      });
+
+      return;
+    }
+
+    // Otherwise, build system prompt using SystemPromptBuilder
     this.cachedSystemPrompt = await this.promptBuilder.build({
       identity: this.identity,
       personality: this.personality,
@@ -401,9 +442,16 @@ export class Agent {
       goals: this.goals.getCurrent()
     });
 
-    this.logger.debug('System prompt rebuilt', {
+    this.logger.info('[Agent] System prompt built', {
       length: this.cachedSystemPrompt.length,
-      sections: this.promptBuilder.getSections()
+      source: 'SystemPromptBuilder',
+      sections: this.promptBuilder.getSections(),
+      preview: this.cachedSystemPrompt.substring(0, 500) + (this.cachedSystemPrompt.length > 500 ? '...' : '')
+    });
+
+    // Log full system prompt at debug level for detailed inspection
+    this.logger.debug('[Agent] Full system prompt', {
+      systemPrompt: this.cachedSystemPrompt
     });
   }
 

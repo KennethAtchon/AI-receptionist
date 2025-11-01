@@ -107,15 +107,16 @@ export class AIReceptionist {
     };
 
     // Validate required config
-    if (!config.agent?.identity) {
-      throw new Error('Agent identity configuration is required');
+    if (!config.agent?.identity && !config.agent?.customSystemPrompt) {
+      throw new Error('Agent identity configuration is required unless using customSystemPrompt');
     }
     if (!config.model) {
       throw new Error('Model configuration is required');
     }
 
     if (config.debug) {
-      logger.info('[AIReceptionist] Created instance for agent', { name: config.agent.identity.name });
+      const agentName = config.agent.identity?.name || 'Custom Agent';
+      logger.info('[AIReceptionist] Created instance for agent', { name: agentName });
     }
   }
 
@@ -135,7 +136,8 @@ export class AIReceptionist {
       return;
     }
 
-    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity.name}`);
+    const agentName = this.config.agent.identity?.name || 'Custom Agent';
+    logger.info(`[AIReceptionist] Initializing agent: ${agentName}`);
 
     // 1. Initialize provider registry and register all providers
     this.providerRegistry = await initializeProviders(this.config);
@@ -148,8 +150,20 @@ export class AIReceptionist {
     // 3. Create and initialize the Agent (Six-Pillar Architecture)
     const aiProvider = await getAIProvider(this.providerRegistry);
 
-    this.agent = AgentBuilder.create()
-      .withIdentity(this.config.agent.identity)
+    const builder = AgentBuilder.create();
+
+    // If custom system prompt is provided, use it
+    if (this.config.agent.customSystemPrompt) {
+      builder.withCustomSystemPrompt(this.config.agent.customSystemPrompt);
+    }
+
+    // Add identity if provided (required unless customSystemPrompt is set)
+    if (this.config.agent.identity) {
+      builder.withIdentity(this.config.agent.identity);
+    }
+
+    // Add optional configuration
+    this.agent = builder
       .withPersonality(this.config.agent.personality || {})
       .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
       .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
@@ -230,15 +244,15 @@ export class AIReceptionist {
     const clonedConfig: AIReceptionistConfig = {
       // Merge agent config (deep merge for six pillars)
       agent: {
-        identity: {
-          ...this.config.agent.identity,
-          ...overrides.agent?.identity
-        },
+        identity: this.config.agent.identity && overrides.agent?.identity
+          ? { ...this.config.agent.identity, ...overrides.agent.identity }
+          : overrides.agent?.identity || this.config.agent.identity,
         personality: overrides.agent?.personality || this.config.agent.personality,
         knowledge: overrides.agent?.knowledge || this.config.agent.knowledge,
         goals: overrides.agent?.goals || this.config.agent.goals,
         memory: overrides.agent?.memory || this.config.agent.memory,
-        voice: overrides.agent?.voice || this.config.agent.voice
+        voice: overrides.agent?.voice || this.config.agent.voice,
+        customSystemPrompt: overrides.agent?.customSystemPrompt || this.config.agent.customSystemPrompt
       },
 
       // Use model from override or original

@@ -1,7 +1,7 @@
 # AI Receptionist Email Feature - TODO List
 
 **Status:** Core features complete, enhancements needed for production
-**Last Updated:** November 1, 2025
+**Last Updated:** October 31, 2025
 
 ---
 
@@ -28,85 +28,18 @@
 - ✅ Attachment support (outbound)
 - ✅ Threading headers preserved
 
+### System Prompt & Conversation Flow
+- ✅ Removed redundant user message in auto-reply - **COMPLETED Oct 31, 2025**
+- ✅ Empty input passed to processWithAgent (email already in history)
+- ✅ System prompt includes email response instructions
+- ✅ Agent skips storing empty user messages
+- ✅ Conversation history logging for debugging
+
 ---
 
 ## 🔨 TODO - Priority 1 (Production Critical)
 
-### 1. Remove Redundant User Message in Auto-Reply
-**Why:** Currently adds instruction as a user message, causing two consecutive user messages. Should move instruction to system prompt instead.
-
-**Current Problem:**
-```typescript
-// In triggerAutoReply() - lines 670-673
-const agentResponse = await this.processWithAgent(
-  `A customer email was received from ${email.from} with the subject "${email.subject}".
-  Respond to this customer email.
-  Use the send_email tool to send your response.`,  // ← This creates a user message!
-  { conversationId, toolHint: 'send_email', ... }
-);
-```
-
-**Results in two user messages in a row:**
-```json
-[
-  { "role": "user", "content": "Hi, I placed an order..." },  // Actual email
-  { "role": "user", "content": "A customer email was received..." }  // Instruction
-]
-```
-
-**Solution:**
-Remove the instruction message entirely and add email response behavior to system prompt instead.
-
-**Implementation:**
-- ❌ Remove instruction text from `triggerAutoReply()`
-- ❌ Add email response instructions to SystemPromptBuilder for email channel
-- ❌ Update email channel guidelines to include: "When a customer sends an email, respond using the send_email tool"
-
-**Code changes:**
-```typescript
-// In triggerAutoReply() - SIMPLIFIED
-const agentResponse = await this.processWithAgent(
-  "",  // ← Empty! Email content already in conversation history
-  {
-    conversationId,
-    toolHint: 'send_email',
-    toolParams: {
-      to: email.from,
-      subject: `Re: ${cleanSubject}`,
-      inReplyTo: formattedInReplyTo,
-      references: references
-    }
-  }
-);
-
-// In SystemPromptBuilder.ts - getChannelGuidelines()
-case 'email':
-  return [
-    'Use proper email structure (greeting, body, closing)',
-    'Can be more detailed than SMS/call',
-    'Include relevant links and attachments',
-    'Professional tone with appropriate signature',
-    'When responding to customer emails, use the send_email tool',  // ← NEW
-    'Always maintain proper email threading'  // ← NEW
-  ];
-```
-
-**Why this is better:**
-- ✅ Only one user message (the actual email content)
-- ✅ No redundant instruction message
-- ✅ System prompt already tells AI to use send_email for emails
-- ✅ Cleaner conversation history
-- ✅ AI behavior guided by system prompt, not meta-messages
-
-**Files to modify:**
-- `src/resources/core/email.resource.ts` - Remove instruction text from triggerAutoReply()
-- `src/agent/prompt/SystemPromptBuilder.ts` - Add email response instruction to email channel guidelines
-
-**Estimated time:** 30 min
-
----
-
-### 2. Expose Allowlist Management API
+### 1. Expose Allowlist Management API
 **Why:** Users need a way to manually manage who can interact with the AI via email
 
 **Implementation:**
@@ -464,34 +397,35 @@ if (config.businessHours?.enabled) {
 ## 📋 Summary of Action Items
 
 ### Immediate (Priority 1)
-1. ✅ Make `addToAllowlist()` public
-2. ✅ Add out-of-office detection
-3. ✅ Add soft rate limiting
+1. ✅ Remove redundant user message in auto-reply - **COMPLETED Oct 31, 2025**
+2. ❌ Make `addToAllowlist()` public
+3. ❌ Add out-of-office detection
+4. ❌ Add soft rate limiting
 
 ### Short-term (Priority 2)
-4. ✅ Add CC/BCC handling with archive CC
-5. ✅ Verify Reply-To header usage (may already be done)
-6. ✅ Add HTML template system
-7. ✅ Add optional instructions parameter
+5. ❌ Add CC/BCC handling with archive CC
+6. ❌ Add HTML template system
+7. ❌ Add optional instructions parameter
 
 ### Long-term (Priority 3)
-8. ✅ Add business hours configuration
+8. ❌ Add business hours configuration
 9. ❌ Skip signature management (not needed)
-10. ✅ Add metrics and analytics
+10. ❌ Add metrics and analytics
 
 ---
 
 ## 🎯 Recommended Implementation Order
 
-1. **Out-of-office detection** (30 min) - Critical to prevent loops
-2. **Rate limiting** (1 hour) - Critical to prevent abuse
-3. **Expose allowlist API** (1 hour) - High value, easy win
-4. **CC/BCC handling** (1 hour) - Improves functionality
-5. **HTML templates** (2 hours) - Makes emails professional
-6. **Optional instructions** (30 min) - Adds flexibility
-7. **Business hours** (2 hours) - Nice polish
+1. ✅ **Remove redundant user message** (30 min) - **COMPLETED** - Cleaner conversation flow
+2. **Expose allowlist API** (30 min) - High value, easy win
+3. **Out-of-office detection** (30 min) - Critical to prevent loops
+4. **Rate limiting** (1 hour) - Critical to prevent abuse
+5. **CC/BCC handling** (1 hour) - Improves functionality
+6. **HTML templates** (2 hours) - Makes emails professional
+7. **Optional instructions** (30 min) - Adds flexibility
+8. **Business hours** (2 hours) - Nice polish
 
-**Total estimated time for Priority 1-2:** ~6-8 hours
+**Total estimated time for Priority 1-2:** ~5.5-7.5 hours remaining
 
 ---
 
@@ -504,6 +438,8 @@ if (config.businessHours?.enabled) {
 - ✅ Safeguards against forwarded emails
 - ✅ Unlimited conversation length
 - ✅ Attachment support
+- ✅ Clean conversation history (no redundant instruction messages)
+- ✅ System prompt-driven email behavior
 
 ### What's Missing for Production
 - ⚠️ Out-of-office detection (could cause loops)

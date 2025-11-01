@@ -414,7 +414,7 @@ export interface AgentResponse {
 // ==================== AGENT CONFIGURATION ====================
 
 export interface AgentConfiguration {
-  identity: IdentityConfig;
+  identity?: IdentityConfig; // Optional if customSystemPrompt is provided
   personality?: PersonalityConfig;
   knowledge?: KnowledgeConfig;
   memory?: MemoryConfig;
@@ -422,6 +422,7 @@ export interface AgentConfiguration {
   tools?: any[];
   aiProvider: any; // IAIProvider
   observability?: ObservabilityConfig;
+  customSystemPrompt?: string; // Optional: Bypass SystemPromptBuilder and use raw custom prompt
 }
 
 export interface AgentState {

@@ -500,7 +500,9 @@ export class SystemPromptBuilder {
           'HTML formatting is available - use it for clarity',
           'Can be more detailed than SMS/call',
           'Include relevant links and attachments',
-          'Professional tone with appropriate signature'
+          'Professional tone with appropriate signature',
+          'When responding to customer emails, use the send_email tool',
+          'Always maintain proper email threading with In-Reply-To and References headers'
         ];
       default:
         return [

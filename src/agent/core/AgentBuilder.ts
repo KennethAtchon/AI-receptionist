@@ -117,6 +117,20 @@ export class AgentBuilder {
   }
 
   /**
+   * Set a custom system prompt (OPTIONAL)
+   * WARNING: This bypasses the entire SystemPromptBuilder and all the structured
+   * prompt building features. You are responsible for providing a complete,
+   * well-formatted system prompt. No automatic identity, personality, knowledge,
+   * goals, or channel-specific guidelines will be added.
+   *
+   * @param customPrompt - Raw system prompt string
+   */
+  public withCustomSystemPrompt(customPrompt: string): this {
+    this.config.customSystemPrompt = customPrompt;
+    return this;
+  }
+
+  /**
    * Create a new builder instance
    */
   public static create(): AgentBuilder {
@@ -137,15 +151,17 @@ export class AgentBuilder {
   private validate(): void {
     const errors: string[] = [];
 
-    if (!this.config.identity) {
-      errors.push('Agent identity is required. Use .withIdentity()');
+    // If using custom system prompt, identity is optional
+    // Otherwise, identity is required for SystemPromptBuilder
+    if (!this.config.customSystemPrompt && !this.config.identity) {
+      errors.push('Agent identity is required. Use .withIdentity() or provide a custom system prompt with .withCustomSystemPrompt()');
     }
 
     if (!this.config.aiProvider) {
       errors.push('AI provider is required. Use .withProvider()');
     }
 
-    // Validate identity fields
+    // Validate identity fields (only if identity is provided)
     if (this.config.identity) {
       if (!this.config.identity.name) {
         errors.push('Identity.name is required');
