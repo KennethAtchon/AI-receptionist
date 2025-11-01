@@ -478,8 +478,9 @@ export class EmailResource extends BaseResource<EmailSession> {
   /**
    * Format message ID to standard email format with angle brackets and domain
    * Ensures Message-IDs are in proper format: <uuid@domain.com>
+   * Note: Uses 'mtasv.net' by default as this is the domain Postmark uses in actual email headers
    */
-  private formatMessageId(messageId: string, domain: string = 'inbound.loctelli.com'): string {
+  private formatMessageId(messageId: string, domain: string = 'mtasv.net'): string {
     // Already in proper format
     if (messageId.startsWith('<') && messageId.endsWith('>')) {
       return messageId;
