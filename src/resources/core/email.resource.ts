@@ -74,18 +74,20 @@ export class EmailResource extends BaseResource<EmailSession> {
 
 
   /**
-   * Override base processWithAgent to inject email-specific instructions
+   * Process email request with agent, including email-specific instructions in system prompt
    */
-  protected async processWithAgent(input: string, context: any): Promise<any> {
-    // Inject email content mode instructions into the input
+  private async processEmailWithAgent(input: string = '', context: any): Promise<any> {
+    // Inject email content mode instructions into system prompt
     const emailInstructions = this.content.getEmailContentInstructions();
-    const enhancedInput = emailInstructions ? `${emailInstructions}\n\n${input}` : input;
 
     return await this.agent.process({
       id: `${this.channel}-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      input: enhancedInput,
+      input,
       channel: this.channel,
-      context
+      context: {
+        ...context,
+        systemPromptEnhancement: emailInstructions
+      }
     });
   }
 
@@ -100,7 +102,7 @@ export class EmailResource extends BaseResource<EmailSession> {
     const conversationId = await this.createSession(options.metadata);
 
     // Use Agent to send email via tools
-    const agentResponse = await this.processWithAgent(
+    const agentResponse = await this.processEmailWithAgent(
       `Send email to ${options.to} with subject "${options.subject}"`,
       {
         conversationId,
@@ -206,7 +208,7 @@ export class EmailResource extends BaseResource<EmailSession> {
 
     const conversationId = await this.createSession(options.metadata);
 
-    const agentResponse = await this.processWithAgent(
+    const agentResponse = await this.processEmailWithAgent(
       `Generate an email with this prompt: ${options.prompt}. Context: ${options.context || 'none'}. Tone: ${options.tone || 'professional'}`,
       {
         conversationId,
@@ -240,7 +242,7 @@ export class EmailResource extends BaseResource<EmailSession> {
     }
 
     // Use Agent to compose reply
-    const agentResponse = await this.processWithAgent(
+    const agentResponse = await this.processEmailWithAgent(
       options.prompt || 'Compose a professional reply to the previous email',
       {
         conversationId,
@@ -367,20 +369,12 @@ export class EmailResource extends BaseResource<EmailSession> {
       hasAdditionalInstructions: !!additionalInstructions
     });
 
-    // Build prompt with optional additional instructions
-    let prompt = ''; // Empty by default - email content already in conversation history
-
-    if (additionalInstructions) {
-      prompt = `\n\nAdditional instructions for this email:\n${additionalInstructions}`;
-      logger.info('[EmailResource] Using additional instructions for auto-reply');
-    }
-
     // Use Agent to compose and send reply
     // Email content already stored in conversation history by storeInboundEmail()
-    // System prompt instructs AI to use send_email tool for email responses
+    // System prompt contains email instructions via systemPromptEnhancement
     // toolParams will override AI's parameters when the send_email tool is called
-    const agentResponse = await this.processWithAgent(
-      prompt,
+    const agentResponse = await this.processEmailWithAgent(
+      additionalInstructions || '', // Optional additional instructions, empty by default
       {
         conversationId,
         toolHint: 'send_email',

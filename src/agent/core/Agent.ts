@@ -212,7 +212,7 @@ export class Agent {
       this.tracer.log('conversation_history_retrieval', conversationHistory);
 
       // 3. Build system prompt (static, no memory)
-      const systemPrompt = request.channel
+      let systemPrompt = request.channel
         ? await this.promptBuilder.build({
             identity: this.identity,
             personality: this.personality,
@@ -222,6 +222,11 @@ export class Agent {
             businessContext: request.context.businessContext
           })
         : this.cachedSystemPrompt!;
+
+      // Append system prompt enhancement if provided
+      if (request.context.systemPromptEnhancement) {
+        systemPrompt = `${systemPrompt}\n\n${request.context.systemPromptEnhancement}`;
+      }
 
       // 4. Execute with AI provider
       const response = await this.execute(request, systemPrompt, conversationHistory);
