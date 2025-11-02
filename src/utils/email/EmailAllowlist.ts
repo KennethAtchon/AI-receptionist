@@ -1,10 +1,11 @@
 /**
  * Email Allowlist Utility
  * Manages persistent allowlist for email auto-replies
+ * Uses unified allowlist table with type='email'
  */
 
-import { emailAllowlist } from '../../agent/storage/schema';
-import { eq } from 'drizzle-orm';
+import { allowlist } from '../../agent/storage/schema';
+import { eq, and } from 'drizzle-orm';
 import { logger } from '../logger';
 
 export class EmailAllowlist {
@@ -32,8 +33,11 @@ export class EmailAllowlist {
     if (!this.db) return;
 
     try {
-      const result = await this.db.select().from(emailAllowlist);
-      this.cache = new Set(result.map((row: any) => row.email.toLowerCase()));
+      const result = await this.db
+        .select()
+        .from(allowlist)
+        .where(eq(allowlist.type, 'email'));
+      this.cache = new Set(result.map((row: any) => row.identifier.toLowerCase()));
       logger.info(`[EmailAllowlist] Loaded ${this.cache.size} emails from database`);
     } catch (error) {
       logger.error('[EmailAllowlist] Error loading from database', error as Error);
@@ -52,8 +56,9 @@ export class EmailAllowlist {
     // Persist to database
     if (this.db) {
       try {
-        await this.db.insert(emailAllowlist).values({
-          email: normalizedEmail,
+        await this.db.insert(allowlist).values({
+          identifier: normalizedEmail,
+          type: 'email',
           addedBy
         }).onConflictDoNothing(); // Ignore if already exists
 
@@ -84,7 +89,12 @@ export class EmailAllowlist {
     // Remove from database
     if (this.db) {
       try {
-        await this.db.delete(emailAllowlist).where(eq(emailAllowlist.email, normalizedEmail));
+        await this.db.delete(allowlist).where(
+          and(
+            eq(allowlist.identifier, normalizedEmail),
+            eq(allowlist.type, 'email')
+          )
+        );
         logger.info(`[EmailAllowlist] Removed ${normalizedEmail}`);
       } catch (error) {
         logger.error(`[EmailAllowlist] Error removing ${normalizedEmail}`, error as Error);
@@ -114,7 +124,7 @@ export class EmailAllowlist {
 
     if (this.db) {
       try {
-        await this.db.delete(emailAllowlist);
+        await this.db.delete(allowlist).where(eq(allowlist.type, 'email'));
         logger.info('[EmailAllowlist] Cleared all emails');
       } catch (error) {
         logger.error('[EmailAllowlist] Error clearing', error as Error);

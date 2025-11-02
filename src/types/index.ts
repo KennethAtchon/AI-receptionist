@@ -519,8 +519,20 @@ export interface TextResponse {
 }
 
 // ============================================================================
+// SMS Types
+// ============================================================================
+
+export type {
+  InboundSMSPayload,
+  SMSMedia,
+  OutboundSMSOptions,
+  SMSSessionMetadata,
+  SMSAutoReplyReport
+} from './sms.types';
+
+// ============================================================================
 // Processor Types (Deprecated - Using Agent/Tool system instead)
 // ============================================================================
 
 // Note: Processors have been replaced by the Agent + Tool architecture
-// These types are kept for backward compatibility but are no longer actively used
+// These types are kept for backward compatibility but are not actively used

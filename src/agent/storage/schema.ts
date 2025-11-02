@@ -103,18 +103,22 @@ export const callLogs = pgTable('ai_receptionist_call_logs', {
 }));
 
 /**
- * Email allowlist table for auto-reply control
- * Stores emails that are permitted to receive auto-replies
+ * Unified allowlist table for auto-reply control
+ * Stores emails and phone numbers that are permitted to receive auto-replies
  */
-export const emailAllowlist = pgTable('ai_receptionist_email_allowlist', {
+export const allowlist = pgTable('ai_receptionist_allowlist', {
   id: uuid('id').primaryKey().defaultRandom(),
-  email: text('email').notNull().unique(),
+  identifier: text('identifier').notNull(), // email or phone number
+  type: text('type').notNull(), // 'email' | 'sms'
   addedAt: timestamp('added_at').defaultNow().notNull(),
-  addedBy: text('added_by') // 'system' | 'manual' | 'conversation_init'
+  addedBy: text('added_by') // 'system' | 'manual' | 'conversation_init' | 'opt_in'
 }, (table) => ({
-  // Indexes for email allowlist table
-  emailAllowlistEmailIdx: index('email_allowlist_email_idx').on(table.email),
-  emailAllowlistAddedAtIdx: index('email_allowlist_added_at_idx').on(table.addedAt),
+  // Indexes for allowlist table
+  allowlistIdentifierTypeIdx: index('allowlist_identifier_type_idx').on(table.identifier, table.type),
+  allowlistTypeIdx: index('allowlist_type_idx').on(table.type),
+  allowlistAddedAtIdx: index('allowlist_added_at_idx').on(table.addedAt),
+  // Unique constraint on identifier + type combination
+  allowlistUniqueIdx: index('allowlist_unique_idx').on(table.identifier, table.type),
 }));
 
 // Type exports for use in code
@@ -124,5 +128,5 @@ export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
 export type CallLog = typeof callLogs.$inferSelect;
 export type NewCallLog = typeof callLogs.$inferInsert;
-export type EmailAllowlist = typeof emailAllowlist.$inferSelect;
-export type NewEmailAllowlist = typeof emailAllowlist.$inferInsert;
+export type Allowlist = typeof allowlist.$inferSelect;
+export type NewAllowlist = typeof allowlist.$inferInsert;

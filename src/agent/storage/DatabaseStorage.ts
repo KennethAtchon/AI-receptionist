@@ -9,7 +9,7 @@ import type { Memory, IStorage, MemorySearchQuery } from '../types';
 import { eq, and, gte, lte, inArray, desc, asc, sql, or } from 'drizzle-orm';
 // Removed strict PgDatabase import to avoid cross-package type coupling
 // import type { PgDatabase } from 'drizzle-orm/pg-core';
-import { memory } from './schema';
+import { memory, allowlist } from './schema';
 
 // Relaxed DB typing to avoid version/copy mismatches of drizzle types across packages
 // and to support different drizzle drivers (node-postgres, http, etc.)
@@ -107,18 +107,21 @@ export class DatabaseStorage implements IStorage {
       await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_outcome_idx ON ai_receptionist_call_logs (outcome)`);
       await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_created_at_idx ON ai_receptionist_call_logs (created_at)`);
 
-      // ai_receptionist_email_allowlist
+      // ai_receptionist_allowlist (unified email and SMS allowlist)
       await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS ai_receptionist_email_allowlist (
+        CREATE TABLE IF NOT EXISTS ai_receptionist_allowlist (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          email TEXT NOT NULL UNIQUE,
+          identifier TEXT NOT NULL,
+          type TEXT NOT NULL,
           added_at TIMESTAMP DEFAULT NOW() NOT NULL,
-          added_by TEXT
+          added_by TEXT,
+          UNIQUE(identifier, type)
         )
       `);
 
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS email_allowlist_email_idx ON ai_receptionist_email_allowlist (email)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS email_allowlist_added_at_idx ON ai_receptionist_email_allowlist (added_at)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS allowlist_identifier_type_idx ON ai_receptionist_allowlist (identifier, type)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS allowlist_type_idx ON ai_receptionist_allowlist (type)`);
+      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS allowlist_added_at_idx ON ai_receptionist_allowlist (added_at)`);
     } catch (error) {
       console.warn('Auto-migration failed; ensure database role has CREATE privileges. Error:', error);
     }
@@ -328,5 +331,91 @@ export class DatabaseStorage implements IStorage {
    */
   async clear(): Promise<void> {
     await this.db.delete(this.table);
+  }
+
+  // ============================================================================
+  // Unified Allowlist Methods
+  // ============================================================================
+
+  /**
+   * Get all allowlisted emails
+   */
+  async getAllAllowlistedEmails(): Promise<{ email: string }[]> {
+    const results = await this.db
+      .select({ email: allowlist.identifier })
+      .from(allowlist)
+      .where(eq(allowlist.type, 'email'));
+    return results;
+  }
+
+  /**
+   * Add email to allowlist
+   */
+  async addToEmailAllowlist(email: string, addedBy: string = 'manual'): Promise<void> {
+    await this.db.insert(allowlist).values({
+      identifier: email,
+      type: 'email',
+      addedBy
+    }).onConflictDoNothing(); // Ignore if already exists
+  }
+
+  /**
+   * Remove email from allowlist
+   */
+  async removeFromEmailAllowlist(email: string): Promise<void> {
+    await this.db.delete(allowlist).where(
+      and(
+        eq(allowlist.identifier, email),
+        eq(allowlist.type, 'email')
+      )
+    );
+  }
+
+  /**
+   * Clear email allowlist
+   */
+  async clearEmailAllowlist(): Promise<void> {
+    await this.db.delete(allowlist).where(eq(allowlist.type, 'email'));
+  }
+
+  /**
+   * Get all allowlisted phone numbers
+   */
+  async getAllAllowlistedPhoneNumbers(): Promise<{ phoneNumber: string }[]> {
+    const results = await this.db
+      .select({ phoneNumber: allowlist.identifier })
+      .from(allowlist)
+      .where(eq(allowlist.type, 'sms'));
+    return results;
+  }
+
+  /**
+   * Add phone number to allowlist
+   */
+  async addToPhoneAllowlist(phoneNumber: string, addedBy: string = 'manual'): Promise<void> {
+    await this.db.insert(allowlist).values({
+      identifier: phoneNumber,
+      type: 'sms',
+      addedBy
+    }).onConflictDoNothing(); // Ignore if already exists
+  }
+
+  /**
+   * Remove phone number from allowlist
+   */
+  async removeFromPhoneAllowlist(phoneNumber: string): Promise<void> {
+    await this.db.delete(allowlist).where(
+      and(
+        eq(allowlist.identifier, phoneNumber),
+        eq(allowlist.type, 'sms')
+      )
+    );
+  }
+
+  /**
+   * Clear SMS allowlist
+   */
+  async clearPhoneAllowlist(): Promise<void> {
+    await this.db.delete(allowlist).where(eq(allowlist.type, 'sms'));
   }
 }
