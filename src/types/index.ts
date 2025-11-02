@@ -531,6 +531,25 @@ export type {
 } from './sms.types';
 
 // ============================================================================
+// Voice Types
+// ============================================================================
+
+export type {
+  InboundCallPayload,
+  CallStatus,
+  OutboundCallOptions,
+  CallSessionMetadata,
+  CallOutcome,
+  MediaStreamEvent,
+  TwiMLConfig,
+  VoiceType,
+  SpamDetectionReport,
+  IVRMenu,
+  IVROption,
+  IVRAction
+} from './voice.types';
+
+// ============================================================================
 // Processor Types (Deprecated - Using Agent/Tool system instead)
 // ============================================================================
 
