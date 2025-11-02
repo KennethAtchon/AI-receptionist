@@ -119,7 +119,7 @@ export class VoiceResource extends BaseResource<VoiceSession> {
 
   /**
    * Handle incoming call webhook (Twilio)
-   * Implements spam detection and rate limiting
+   * Implements spam detection, rate limiting, and AI-generated greetings
    */
   async handleWebhook(context: WebhookContext): Promise<any> {
     logger.info('[VoiceResource] Handling inbound call webhook', {
@@ -190,8 +190,35 @@ export class VoiceResource extends BaseResource<VoiceSession> {
       // Store call start
       await CallStorage.storeCallStart(call, finalConversationId, this.agent.getMemory());
 
-      // Generate TwiML response
-      const greeting = this.twimlConfig.greeting || 'Hello, how can I help you today?';
+      // Generate AI-powered greeting
+      let greeting: string;
+
+      try {
+        // Use AI to generate personalized greeting based on conversation history
+        const agentResponse = await this.processWithAgent(
+          '', // Empty input - AI will generate greeting based on context
+          {
+            conversationId: finalConversationId,
+            channel: 'call',
+            callSid: call.callSid,
+            from: call.from,
+            isNewConversation,
+            mode: 'initial-greeting'
+          }
+        );
+
+        greeting = agentResponse.content;
+
+        logger.info('[VoiceResource] AI-generated greeting', {
+          conversationId: finalConversationId,
+          isNewConversation,
+          greetingLength: greeting.length
+        });
+      } catch (error) {
+        // Fallback to static greeting if AI fails
+        logger.error('[VoiceResource] Failed to generate AI greeting, using fallback', error as Error);
+        greeting = this.twimlConfig.greeting || 'Hello, how can I help you today?';
+      }
 
       // If recording is enabled, use media stream for real-time AI
       if (this.recordCalls) {
