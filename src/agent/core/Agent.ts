@@ -570,11 +570,38 @@ export class Agent {
 
   /**
    * Dispose of agent resources
+   *
+   * Clears all internal state and references to enable proper garbage collection.
+   * After calling dispose(), the agent should not be used.
    */
   public async dispose(): Promise<void> {
+    // Mark as disposed first
     this.state = AgentStatus.DISPOSED;
+
+    // Clean up memory and knowledge
     await this.memory.dispose();
     await this.knowledge.dispose();
-    this.logger.info('Agent disposed');
+
+    // Clear tracer data (interaction history)
+    this.tracer.clear();
+
+    // Clear cached data
+    this.cachedSystemPrompt = null;
+
+    // Clear references to shared resources
+    // This helps garbage collection even though these are shared objects
+    this.aiProvider = null as any;
+    this.toolRegistry = null;
+    this.conversationService = null;
+
+    // Clear performance metrics
+    this.performanceMetrics = {
+      totalInteractions: 0,
+      averageResponseTime: 0,
+      successRate: 0,
+      errorRate: 0
+    };
+
+    this.logger.info('Agent disposed - all references cleared');
   }
 }

@@ -6,3 +6,5 @@ curl https://api.loctelli.com/ai-receptionist/health
 curl https://api.loctelli.com/ai-receptionist/version
 
 curl https://api.loctelli.com/ai-receptionist/webhooks/email
+
+curl https://api.loctelli.com/ai-receptionist/webhooks/voice
