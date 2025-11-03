@@ -8,6 +8,7 @@ import type { VoiceResource } from './core/voice.resource';
 import type { SMSResource } from './core/sms.resource';
 import type { EmailResource } from './core/email.resource';
 import type { TextResource } from './core/text.resource';
+import type { WebhookConfig } from '../types';
 import { logger } from '../utils/logger';
 
 export interface InitializedResources {
@@ -17,22 +18,34 @@ export interface InitializedResources {
   text?: TextResource;
 }
 
+export interface ResourceContext {
+  agent: Agent;
+  webhookConfig?: WebhookConfig;
+}
+
 /**
- * Initialize all available resources based on configured providers
+ * Initialize all available resources
+ * Resources receive a context object with agent and optional webhook config
  */
-export function initializeResources(agent: Agent): InitializedResources {
+export function initializeResources(context: ResourceContext): InitializedResources {
   const resources: InitializedResources = {};
 
-  // Initialize all resources (they only need the Agent)
+  // Initialize all resources
   const { VoiceResource } = require('./core/voice.resource');
   const { SMSResource } = require('./core/sms.resource');
   const { EmailResource } = require('./core/email.resource');
   const { TextResource } = require('./core/text.resource');
 
-  resources.voice = new VoiceResource(agent);
-  resources.sms = new SMSResource(agent);
-  resources.email = new EmailResource(agent);
-  resources.text = new TextResource(agent);
+  // Build voice-specific config from webhook config if provided
+  const voiceConfig = context.webhookConfig ? {
+    webhookBaseUrl: context.webhookConfig.baseUrl,
+    webhookPath: context.webhookConfig.endpoints.voice || '/webhooks/voice'
+  } : undefined;
+
+  resources.voice = new VoiceResource(context.agent, voiceConfig);
+  resources.sms = new SMSResource(context.agent);
+  resources.email = new EmailResource(context.agent);
+  resources.text = new TextResource(context.agent);
 
   // Log summary
   const availableChannels = [

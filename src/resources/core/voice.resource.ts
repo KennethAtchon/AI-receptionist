@@ -49,6 +49,8 @@ export interface VoiceResourceConfig {
     language?: string;
     greeting?: string;
   };
+  webhookBaseUrl?: string; // Base URL for webhook callbacks (e.g., 'https://api.loctelli.com')
+  webhookPath?: string; // Path for voice webhook (e.g., '/ai-receptionist/webhooks/voice')
 }
 
 export class VoiceResource extends BaseResource<VoiceSession> {
@@ -57,6 +59,8 @@ export class VoiceResource extends BaseResource<VoiceSession> {
   private recordCalls: boolean;
   private transcribeCalls: boolean;
   private twimlConfig: any;
+  private webhookBaseUrl: string;
+  private webhookPath: string;
 
   constructor(agent: Agent, config?: VoiceResourceConfig) {
     super(agent, 'call');
@@ -68,12 +72,16 @@ export class VoiceResource extends BaseResource<VoiceSession> {
     this.recordCalls = config?.recordCalls || false;
     this.transcribeCalls = config?.transcribeCalls || false;
     this.twimlConfig = config?.twimlConfig || {};
+    this.webhookBaseUrl = config?.webhookBaseUrl || process.env.BASE_URL || '';
+    this.webhookPath = config?.webhookPath || '/webhooks/voice';
 
     logger.info('[VoiceResource] Initialized with config', {
       spamDetection: this.spamDetectionEnabled,
       recordCalls: this.recordCalls,
       transcribeCalls: this.transcribeCalls,
-      rateLimit: config?.rateLimitConfig
+      rateLimit: config?.rateLimitConfig,
+      webhookBaseUrl: this.webhookBaseUrl,
+      webhookPath: this.webhookPath
     });
   }
 
@@ -231,9 +239,14 @@ export class VoiceResource extends BaseResource<VoiceSession> {
       }
 
       // Otherwise, use gather for speech input
+      // Build full webhook URL for continue callback
+      const continueUrl = this.webhookBaseUrl
+        ? `${this.webhookBaseUrl}${this.webhookPath}/continue`
+        : `${this.webhookPath}/continue`;
+
       return TwiMLGenerator.generateGather(
         greeting,
-        '/webhook/call/continue',
+        continueUrl,
         {
           voice: this.twimlConfig.voice,
           language: this.twimlConfig.language,

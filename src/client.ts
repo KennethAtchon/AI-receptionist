@@ -190,7 +190,10 @@ export class AIReceptionist {
     this.webhookRouter = new WebhookRouter(this);
 
     // 6. Initialize resources (session managers)
-    const resources = initializeResources(this.agent);
+    const resources = initializeResources({
+      agent: this.agent,
+      webhookConfig: this.config.webhooks
+    });
 
     // Assign resources
     (this as any).voice = resources.voice;
