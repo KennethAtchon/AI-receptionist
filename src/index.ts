@@ -13,6 +13,13 @@
 export { AIReceptionist } from './client';
 
 // ============================================================================
+// Factory Pattern (Server Environments)
+// ============================================================================
+
+export { AIReceptionistFactory } from './factory';
+export type { FactoryConfig, AgentInstanceConfig, AgentInstance } from './factory';
+
+// ============================================================================
 // Agent System (Five-Pillar Architecture)
 // ============================================================================
 
@@ -20,8 +27,6 @@ export { Agent } from './agent/core/Agent';
 export { AgentBuilder } from './agent/core/AgentBuilder';
 export { SystemPromptBuilder } from './agent/prompt/SystemPromptBuilder';
 export { PromptOptimizer, PromptTooLargeError } from './agent/prompt/PromptOptimizer';
-export { AgentLogger, FileLogger } from './agent/observability/AgentLogger';
-export { InteractionTracer } from './agent/observability/InteractionTracer';
 export { InputValidator } from './agent/security';
 export type { SecurityResult } from './agent/security';
 

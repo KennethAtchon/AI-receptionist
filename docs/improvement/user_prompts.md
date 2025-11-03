@@ -1,2 +1,5 @@
-Need to look at optimization the package to work with servers like loctelli (Objects vs static), how to build an sdk that works for servers? what pattern should it be like should the server have to change the sdk or only needs to set it up once and change throughout? What would happen if server needs to handle multiple requests concurrently? need to make sdk parallelizable
-Need a way to send bulk-emails with postmark
+Add better documents
+Update all docs to follow modern patterns
+
+Postmark Provider does alot of things for its consumers, should we change twilio provider to be like this? or add a TwilioHelper (idk naming) file in provider that can be like postmark provider (and do the same thing for postmark provider), this way we can make all the usage happen in one file, and one file is only a thinly wrapper for the actual api, is this design actually good?
+Comment from me: Just keep it in the same file, move the twilio stuff to provider helper function.

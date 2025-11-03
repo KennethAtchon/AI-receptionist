@@ -37,8 +37,14 @@ export class MemoryManagerImpl implements IMemoryManager {
     this.shortTerm = new ShortTermMemory(config.contextWindow || 20);
 
     // Initialize long-term memory if enabled
-    if (config.longTermEnabled && config.longTermStorage) {
-      this.longTerm = new LongTermMemory(config.longTermStorage);
+    if (config.longTermEnabled) {
+      if (config.sharedLongTermMemory) {
+        // Use shared LongTermMemory instance (factory pattern)
+        this.longTerm = config.sharedLongTermMemory;
+      } else if (config.longTermStorage) {
+        // Create per-agent LongTermMemory (legacy pattern)
+        this.longTerm = new LongTermMemory(config.longTermStorage);
+      }
     }
 
     // Initialize vector memory if enabled

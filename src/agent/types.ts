@@ -311,7 +311,8 @@ export interface MemoryConfig {
 
   // Long-term config
   longTermEnabled?: boolean;
-  longTermStorage?: IStorage; // Generic storage interface
+  longTermStorage?: IStorage; // Generic storage interface (per-agent, legacy)
+  sharedLongTermMemory?: any; // Shared LongTermMemory instance (factory pattern) - `any` to avoid circular dependency
 
   // Vector config
   vectorEnabled?: boolean;

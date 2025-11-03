@@ -35,10 +35,9 @@ import { MemoryManagerImpl } from '../memory/MemoryManager';
 import { GoalSystemImpl } from '../goals/GoalSystem';
 import { SystemPromptBuilder } from '../prompt/SystemPromptBuilder';
 import { PromptOptimizer } from '../prompt/PromptOptimizer';
-import { AgentLogger } from '../observability/AgentLogger';
-import { InteractionTracer } from '../observability/InteractionTracer';
 import { AgentBuilder } from './AgentBuilder';
 import { InputValidator } from '../security/InputValidator';
+import { logger } from '../../utils/logger';
 
 export class Agent {
   // ==================== CORE COMPONENTS (The 5 Pillars) ====================
@@ -63,9 +62,8 @@ export class Agent {
   private toolRegistry?: any; // ToolRegistry - source of truth for tools
   private conversationService?: any; // ConversationService
 
-  // ==================== OBSERVABILITY ====================
-  private readonly logger: AgentLogger;
-  private readonly tracer: InteractionTracer;
+  // ==================== AGENT ID ====================
+  public readonly id: string;
 
   // ==================== SECURITY ====================
   private readonly inputValidator: InputValidator;
@@ -99,10 +97,8 @@ export class Agent {
     this.promptBuilder = new SystemPromptBuilder();
     this.promptOptimizer = new PromptOptimizer();
 
-    // Initialize observability
-    const agentId = `agent-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    this.logger = new AgentLogger(agentId, this.identity.name);
-    this.tracer = new InteractionTracer();
+    // Initialize agent ID
+    this.id = `agent-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     // Initialize security
     this.inputValidator = new InputValidator();
@@ -137,7 +133,7 @@ export class Agent {
    * Initialize the agent and all its subsystems
    */
   public async initialize(): Promise<void> {
-    this.logger.info('Initializing agent', { identity: this.identity.summary() });
+    logger.info('Initializing agent', { agentId: this.id, identity: this.identity.summary() });
 
     try {
       // Initialize memory systems
@@ -151,10 +147,10 @@ export class Agent {
       await this.rebuildSystemPrompt();
 
       this.state = AgentStatus.READY;
-      this.logger.info('Agent initialized successfully');
+      logger.info('Agent initialized successfully', { agentId: this.id });
     } catch (error) {
       this.state = AgentStatus.ERROR;
-      this.logger.error('Failed to initialize agent', { error });
+      logger.error('Failed to initialize agent', error as Error, { agentId: this.id });
       throw error;
     }
   }
@@ -164,7 +160,6 @@ export class Agent {
    */
   public async process(request: AgentRequest): Promise<AgentResponse> {
     const interactionId = request.id;
-    this.tracer.startInteraction(interactionId);
     this.state = AgentStatus.PROCESSING;
 
     const startTime = Date.now();
@@ -175,7 +170,8 @@ export class Agent {
         const securityCheck = this.inputValidator.validate(request.input);
 
         if (!securityCheck.isSecure) {
-          this.logger.warn('Security check failed', {
+          logger.warn('Security check failed', {
+            agentId: this.id,
             detectedPatterns: securityCheck.detectedPatterns,
             riskLevel: securityCheck.riskLevel,
             conversationId: request.context.conversationId
@@ -195,7 +191,8 @@ export class Agent {
           }
 
           // For medium risk, log but continue with sanitized content
-          this.logger.info('Processing with sanitized content', {
+          logger.info('Processing with sanitized content', {
+            agentId: this.id,
             riskLevel: securityCheck.riskLevel
           });
         }
@@ -209,7 +206,6 @@ export class Agent {
         conversationId: request.context.conversationId,
         channel: request.channel
       });
-      this.tracer.log('conversation_history_retrieval', conversationHistory);
 
       // 3. Build system prompt (static, no memory)
       let systemPrompt = request.channel
@@ -230,7 +226,6 @@ export class Agent {
 
       // 4. Execute with AI provider
       const response = await this.execute(request, systemPrompt, conversationHistory);
-      this.tracer.log('response', response);
 
       // 5. Update memory - Store user and assistant messages separately
       // Store user message (skip if input is empty - indicates content already in history)
@@ -273,12 +268,11 @@ export class Agent {
       return response;
 
     } catch (error) {
-      this.logger.error('Error processing request', { error, request });
+      logger.error('Error processing request', error as Error, { agentId: this.id, request });
       this.updatePerformanceMetrics(Date.now() - startTime, false);
       this.state = AgentStatus.ERROR;
       return this.handleError(error as Error, request);
     } finally {
-      this.tracer.endInteraction();
       this.state = AgentStatus.READY;
     }
   }
@@ -300,12 +294,13 @@ export class Agent {
     if (messages.length > 20) {
       try {
         messages = await this.promptOptimizer.compressChatHistory(messages, 4000);
-        this.logger.info('[Agent] Compressed conversation history', {
+        logger.info('[Agent] Compressed conversation history', {
+          agentId: this.id,
           originalCount: conversationHistory.messages.length,
           compressedCount: messages.length
         });
       } catch (error) {
-        this.logger.warn('[Agent] Failed to compress conversation history, using original', { error });
+        logger.warn('[Agent] Failed to compress conversation history, using original', { agentId: this.id, error });
       }
     }
 
@@ -315,7 +310,8 @@ export class Agent {
     ];
 
     // Log conversation history being passed to AI
-    this.logger.info('[Agent] Conversation history passed to AI', {
+    logger.info('[Agent] Conversation history passed to AI', {
+      agentId: this.id,
       conversationId: request.context.conversationId,
       messageCount: fullHistory.length,
       contextMessageCount: conversationHistory.contextMessages?.length || 0,
@@ -366,7 +362,7 @@ export class Agent {
     const results: Array<{ toolName: string; result: any }> = [];
 
     for (const toolCall of toolCalls) {
-      this.logger.info(`[Agent] Executing tool '${toolCall.name}'`);
+      logger.info(`[Agent] Executing tool '${toolCall.name}'`, { agentId: this.id });
       try {
         // Merge provided toolParams with AI-generated parameters
         // toolParams take precedence over AI's parameters
@@ -374,13 +370,13 @@ export class Agent {
           ...toolCall.parameters,
           ...context.toolParams
         } : toolCall.parameters;
-        
+
         const result = await this.toolRegistry.execute(toolCall.name, mergedParameters, context);
-        this.logger.info(`[Agent] Tool '${toolCall.name}' executed`, { success: result.success, error: result.error });
+        logger.info(`[Agent] Tool '${toolCall.name}' executed`, { agentId: this.id, success: result.success, error: result.error });
         results.push({ toolName: toolCall.name, result });
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        this.logger.error(`[Agent] Tool '${toolCall.name}' threw error: ${errorMsg}`, { error, stack: error instanceof Error ? error.stack : undefined });
+        logger.error(`[Agent] Tool '${toolCall.name}' threw error: ${errorMsg}`, error as Error, { agentId: this.id });
         throw error; // Re-throw to be caught by parent handler
       }
     }
@@ -425,14 +421,16 @@ export class Agent {
     if (this.customSystemPrompt) {
       this.cachedSystemPrompt = this.customSystemPrompt;
 
-      this.logger.info('[Agent] Using custom system prompt', {
+      logger.info('[Agent] Using custom system prompt', {
+        agentId: this.id,
         length: this.cachedSystemPrompt.length,
         source: 'user-provided',
         preview: this.cachedSystemPrompt.substring(0, 500) + (this.cachedSystemPrompt.length > 500 ? '...' : '')
       });
 
       // Log full custom system prompt at debug level
-      this.logger.debug('[Agent] Full custom system prompt', {
+      logger.debug('[Agent] Full custom system prompt', {
+        agentId: this.id,
         systemPrompt: this.cachedSystemPrompt
       });
 
@@ -447,7 +445,8 @@ export class Agent {
       goals: this.goals.getCurrent()
     });
 
-    this.logger.info('[Agent] System prompt built', {
+    logger.info('[Agent] System prompt built', {
+      agentId: this.id,
       length: this.cachedSystemPrompt.length,
       source: 'SystemPromptBuilder',
       sections: this.promptBuilder.getSections(),
@@ -455,7 +454,8 @@ export class Agent {
     });
 
     // Log full system prompt at debug level for detailed inspection
-    this.logger.debug('[Agent] Full system prompt', {
+    logger.debug('[Agent] Full system prompt', {
+      agentId: this.id,
       systemPrompt: this.cachedSystemPrompt
     });
   }
@@ -517,7 +517,7 @@ export class Agent {
    * Error handling with graceful degradation
    */
   private async handleError(error: Error, request: AgentRequest): Promise<AgentResponse> {
-    this.logger.error('Agent error', { error, request });
+    logger.error('Agent error', error, { agentId: this.id, request });
 
     // Try to generate a graceful error response
     const fallbackPrompt = this.promptBuilder.buildErrorRecoveryPrompt(error, request);
@@ -582,9 +582,6 @@ export class Agent {
     await this.memory.dispose();
     await this.knowledge.dispose();
 
-    // Clear tracer data (interaction history)
-    this.tracer.clear();
-
     // Clear cached data
     this.cachedSystemPrompt = null;
 
@@ -602,6 +599,6 @@ export class Agent {
       errorRate: 0
     };
 
-    this.logger.info('Agent disposed - all references cleared');
+    logger.info('Agent disposed - all references cleared', { agentId: this.id });
   }
 }

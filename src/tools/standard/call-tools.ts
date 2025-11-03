@@ -47,7 +47,7 @@ export function buildInitiateCallTool(config?: CallToolsConfig): ITool {
         const client = twilioProvider.createClient();
         const twilioConfig = twilioProvider.getConfig();
 
-        // Create webhook URL for call handling
+        // TODO Need to make it configable, so we can use it in the webhook URL for call handling
         const webhookUrl = `${process.env.BASE_URL || 'https://your-app.com'}/webhooks/voice/inbound`;
 
         // Make the call using Twilio directly
