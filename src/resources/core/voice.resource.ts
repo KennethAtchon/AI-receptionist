@@ -198,41 +198,48 @@ export class VoiceResource extends BaseResource<VoiceSession> {
       // Store call start
       await CallStorage.storeCallStart(call, finalConversationId, this.agent.getMemory());
 
-      // Generate AI-powered greeting
-      let greeting: string;
+      // Determine user input from speech result or empty for initial greeting
+      const userInput = call.speechResult || '';
+      const isContinue = !!call.speechResult;
+
+      // Generate AI response
+      let response: string;
 
       try {
-        // Use AI to generate personalized greeting based on conversation history
+        // Use AI to process user input or generate initial greeting
         const agentResponse = await this.processWithAgent(
-          '', // Empty input - AI will generate greeting based on context
+          userInput,
           {
             conversationId: finalConversationId,
             channel: 'call',
             callSid: call.callSid,
             from: call.from,
-            isNewConversation,
-            mode: 'initial-greeting'
+            isNewConversation: !isContinue && isNewConversation,
+            mode: isContinue ? 'conversation' : 'initial-greeting'
           }
         );
 
-        greeting = agentResponse.content;
+        response = agentResponse.content;
 
-        logger.info('[VoiceResource] AI-generated greeting', {
+        logger.info('[VoiceResource] AI-generated response', {
           conversationId: finalConversationId,
-          isNewConversation,
-          greetingLength: greeting.length
+          isNewConversation: !isContinue && isNewConversation,
+          isContinue,
+          userInput: userInput ? `"${userInput}"` : '(empty - initial greeting)',
+          responseLength: response.length,
+          responsePreview: response.substring(0, 100) + (response.length > 100 ? '...' : '')
         });
       } catch (error) {
-        // Fallback to static greeting if AI fails
-        logger.error('[VoiceResource] Failed to generate AI greeting, using fallback', error as Error);
-        greeting = this.twimlConfig.greeting || 'Hello, how can I help you today?';
+        // Fallback to static response if AI fails
+        logger.error('[VoiceResource] Failed to generate AI response, using fallback', error as Error);
+        response = this.twimlConfig.greeting || 'Hello, how can I help you today?';
       }
 
       // If recording is enabled, use media stream for real-time AI
       if (this.recordCalls) {
         const websocketUrl = `wss://${process.env.BASE_URL || 'your-app.com'}/voice/stream`;
         return TwiMLGenerator.generateMediaStream(websocketUrl, {
-          greeting,
+          greeting: response,
           voice: this.twimlConfig.voice,
           language: this.twimlConfig.language
         });
@@ -245,7 +252,7 @@ export class VoiceResource extends BaseResource<VoiceSession> {
         : `${this.webhookPath}/continue`;
 
       return TwiMLGenerator.generateGather(
-        greeting,
+        response,
         continueUrl,
         {
           voice: this.twimlConfig.voice,

@@ -65,7 +65,19 @@ export class OpenAIProvider extends BaseConfigurableProvider implements IAIProvi
         max_tokens: this.currentConfig.maxTokens,
       });
 
-      return this.parseResponse(response);
+      const parsedResponse = this.parseResponse(response);
+
+      // Log AI response
+      logger.info('[OpenAIProvider] AI response received', {
+        conversationId: options.conversationId,
+        hasToolCalls: !!parsedResponse.toolCalls && parsedResponse.toolCalls.length > 0,
+        toolCallCount: parsedResponse.toolCalls?.length || 0,
+        contentLength: parsedResponse.content.length,
+        contentPreview: parsedResponse.content.substring(0, 150) + (parsedResponse.content.length > 150 ? '...' : ''),
+        finishReason: parsedResponse.finishReason
+      });
+
+      return parsedResponse;
     } catch (error) {
       logger.error('[OpenAIProvider] Chat error:', error instanceof Error ? error : new Error(String(error)));
       throw error;

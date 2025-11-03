@@ -187,7 +187,20 @@ export class OpenRouterProvider extends BaseConfigurableProvider implements IAIP
         max_tokens: this.currentConfig.maxTokens,
       });
 
-      return this.parseResponse(response);
+      const parsedResponse = this.parseResponse(response);
+
+      // Log AI response
+      logger.info('[OpenRouterProvider] AI response received', {
+        conversationId: options.conversationId,
+        model: this.currentModel,
+        hasToolCalls: !!parsedResponse.toolCalls && parsedResponse.toolCalls.length > 0,
+        toolCallCount: parsedResponse.toolCalls?.length || 0,
+        contentLength: parsedResponse.content.length,
+        contentPreview: parsedResponse.content.substring(0, 150) + (parsedResponse.content.length > 150 ? '...' : ''),
+        finishReason: parsedResponse.finishReason
+      });
+
+      return parsedResponse;
     } catch (error) {
       logger.error('[OpenRouterProvider] Chat error:', error instanceof Error ? error : new Error(String(error)));
       throw error;

@@ -14,7 +14,8 @@ export class CallPayloadParser {
     logger.info('[CallPayloadParser] Parsing payload', {
       CallSid: payload.CallSid,
       From: payload.From,
-      CallStatus: payload.CallStatus
+      CallStatus: payload.CallStatus,
+      SpeechResult: payload.SpeechResult || undefined
     });
 
     const parsed: InboundCallPayload = {
@@ -53,6 +54,13 @@ export class CallPayloadParser {
     // Parse forwarded from
     if (payload.ForwardedFrom) {
       parsed.forwardedFrom = payload.ForwardedFrom;
+    }
+
+    // Parse speech recognition results (from Twilio Gather)
+    if (payload.SpeechResult) {
+      parsed.speechResult = payload.SpeechResult;
+      parsed.confidence = payload.Confidence;
+      parsed.language = payload.Language;
     }
 
     return parsed;

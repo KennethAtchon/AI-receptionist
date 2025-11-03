@@ -34,6 +34,11 @@ export interface InboundCallPayload {
   forwardedFrom?: string;       // If call was forwarded
   callerCountry?: string;
   apiVersion?: string;
+
+  // Speech recognition (Twilio Gather)
+  speechResult?: string;        // Transcribed speech from user
+  confidence?: string;          // Speech recognition confidence (0-1)
+  language?: string;            // Detected language code
 }
 
 export type CallStatus =
