@@ -362,6 +362,122 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
 }
 
 /**
+ * Tool: Send Bulk Emails
+ * Send multiple emails at once using Postmark's batch API
+ */
+export function buildBulkEmailTool(config?: EmailToolsConfig): ITool {
+  return new ToolBuilder()
+    .withName('send_bulk_emails')
+    .withDescription('Send multiple emails at once (up to 500 per batch). Use for newsletters, campaigns, or batch notifications.')
+    .withParameters({
+      type: 'object',
+      properties: {
+        emails: {
+          type: 'array',
+          description: 'Array of email messages to send',
+          items: {
+            type: 'object',
+            properties: {
+              to: {
+                type: 'string',
+                description: 'Recipient email address'
+              },
+              subject: {
+                type: 'string',
+                description: 'Email subject line'
+              },
+              body: {
+                type: 'string',
+                description: 'Email body (HTML or plain text)'
+              },
+              tag: {
+                type: 'string',
+                description: 'Optional tag for tracking (e.g., "newsletter", "campaign")'
+              },
+              metadata: {
+                type: 'object',
+                description: 'Optional metadata for tracking'
+              }
+            },
+            required: ['to', 'subject', 'body']
+          }
+        }
+      },
+      required: ['emails']
+    })
+    .default(async (params, ctx) => {
+      logger.info('[BulkEmailTool] Sending bulk emails');
+
+      if (!config?.providerRegistry) {
+        return {
+          success: false,
+          error: 'Email provider not configured',
+          response: { text: 'Email functionality is not configured.' }
+        };
+      }
+
+      try {
+        // Get postmark provider
+        let emailProvider: any;
+        if (config.providerRegistry.has('postmark')) {
+          emailProvider = await config.providerRegistry.get('postmark');
+        } else {
+          throw new Error('Postmark email provider not configured');
+        }
+
+        // Check if provider has sendBulk method
+        if (!emailProvider.sendBulk) {
+          throw new Error('Email provider does not support bulk sending');
+        }
+
+        // Convert tool input to provider format
+        const messages = params.emails.map((email: any) => ({
+          to: email.to,
+          subject: email.subject,
+          htmlBody: email.body.includes('<') ? email.body : undefined,
+          textBody: email.body.includes('<') ? undefined : email.body,
+          tag: email.tag,
+          metadata: email.metadata
+        }));
+
+        // Send bulk emails
+        const results = await emailProvider.sendBulk(messages);
+
+        const successful = results.filter((r: any) => r.success).length;
+        const failed = results.filter((r: any) => !r.success).length;
+
+        return {
+          success: true,
+          data: {
+            total: results.length,
+            successful,
+            failed,
+            results: results.map((r: any) => ({
+              to: r.to,
+              success: r.success,
+              messageId: r.messageId,
+              error: r.success ? undefined : r.message
+            }))
+          },
+          response: {
+            text: `Sent ${successful}/${results.length} emails successfully`
+          }
+        };
+      } catch (error) {
+        logger.error('[BulkEmailTool] Failed', error as Error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to send bulk emails',
+          response: {
+            text: 'Failed to send bulk emails. Please try again.'
+          }
+        };
+      }
+    })
+    .build();
+}
+
+/**
  * Register all email tools
  */
 export async function setupEmailTools(
@@ -369,5 +485,6 @@ export async function setupEmailTools(
   config?: EmailToolsConfig
 ): Promise<void> {
   registry.register(buildSendEmailTool(config));
+  registry.register(buildBulkEmailTool(config));
   logger.info('[EmailTools] Registered email tools with provider registry');
 }

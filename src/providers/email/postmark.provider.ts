@@ -7,6 +7,7 @@
 import { BaseProvider } from '../base.provider';
 import type { IEmailProvider, EmailParams, EmailResult } from './email-provider.interface';
 import { logger } from '../../utils/logger';
+import type { MessageSendingResponse } from 'postmark/dist/client/models/message/Message';
 
 export interface PostmarkConfig {
   apiKey: string;
@@ -20,6 +21,31 @@ export interface PostmarkConfig {
   // Webhook secret for verifying inbound webhook signatures (optional)
   // Note: The webhook URL is configured in Postmark's dashboard, not here
   webhookSecret?: string;
+}
+
+/**
+ * Bulk email message format
+ */
+export interface BulkEmailMessage {
+  to: string;
+  subject: string;
+  htmlBody?: string;
+  textBody?: string;
+  tag?: string;
+  metadata?: Record<string, string>;
+  from?: string; // Optional override
+  replyTo?: string;
+}
+
+/**
+ * Bulk email result format
+ */
+export interface BulkEmailResult {
+  to: string;
+  messageId?: string;
+  errorCode?: number;
+  message?: string;
+  success: boolean;
 }
 
 /**
@@ -277,6 +303,99 @@ export class PostmarkProvider extends BaseProvider implements IEmailProvider {
    */
   getConfig(): PostmarkConfig {
     return this.config;
+  }
+
+  /**
+   * Send batch emails (up to 500 per request)
+   * Uses Postmark's sendEmailBatch endpoint
+   */
+  async sendBulk(messages: BulkEmailMessage[]): Promise<BulkEmailResult[]> {
+    this.ensureInitialized();
+
+    // Validate batch size (Postmark limit: 500)
+    if (messages.length > 500) {
+      throw new Error('Postmark batch limit is 500 emails per request');
+    }
+
+    try {
+      // Convert to Postmark format
+      const batch = messages.map(msg => ({
+        From: msg.from || `${this.config.fromName || 'No Reply'} <${this.config.fromEmail}>`,
+        To: msg.to,
+        Subject: msg.subject,
+        HtmlBody: msg.htmlBody,
+        TextBody: msg.textBody,
+        Tag: msg.tag,
+        Metadata: msg.metadata,
+        ReplyTo: msg.replyTo,
+        MessageStream: 'outbound'
+      }));
+
+      logger.info('[PostmarkProvider] Sending bulk emails', {
+        count: messages.length,
+        to: messages.map(m => m.to)
+      });
+
+      // Send batch
+      const results: MessageSendingResponse[] = await this.postmarkClient.sendEmailBatch(batch);
+
+      logger.info('[PostmarkProvider] Bulk emails sent', {
+        count: results.length,
+        successful: results.filter((r: MessageSendingResponse) => r.ErrorCode === 0).length,
+        failed: results.filter((r: MessageSendingResponse) => r.ErrorCode !== 0).length
+      });
+
+      // Convert to unified format
+      return results.map((result: MessageSendingResponse, index: number) => ({
+        to: messages[index].to,
+        messageId: result.MessageID,
+        errorCode: result.ErrorCode,
+        message: result.Message,
+        success: result.ErrorCode === 0
+      }));
+    } catch (error: any) {
+      logger.error('[PostmarkProvider] Failed to send bulk emails:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send batch emails in chunks (for > 500 emails)
+   * Automatically handles rate limiting between chunks
+   */
+  async sendBulkChunked(
+    messages: BulkEmailMessage[],
+    chunkSize = 500
+  ): Promise<BulkEmailResult[]> {
+    this.ensureInitialized();
+
+    const results: BulkEmailResult[] = [];
+
+    logger.info('[PostmarkProvider] Sending chunked bulk emails', {
+      totalCount: messages.length,
+      chunkSize,
+      chunks: Math.ceil(messages.length / chunkSize)
+    });
+
+    for (let i = 0; i < messages.length; i += chunkSize) {
+      const chunk = messages.slice(i, i + chunkSize);
+      const chunkResults = await this.sendBulk(chunk);
+      results.push(...chunkResults);
+
+      // Rate limiting: wait between chunks
+      if (i + chunkSize < messages.length) {
+        logger.info('[PostmarkProvider] Waiting 1s before next chunk...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    logger.info('[PostmarkProvider] Chunked bulk emails completed', {
+      total: results.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length
+    });
+
+    return results;
   }
 
   async dispose(): Promise<void> {

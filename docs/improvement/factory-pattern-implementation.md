@@ -20,7 +20,7 @@ Implement a factory pattern for the AI Receptionist SDK to enable efficient conc
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Application Startup (Once)                                   │
+│ Application Startup (Once)                                  │
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ AIReceptionistFactory.create()                          │ │
 │ │  - Initialize Twilio client (shared)                    │ │

@@ -53,7 +53,7 @@ export { GoogleProvider } from './providers/api/google.provider';
 
 // Email Providers
 export { PostmarkProvider, EmailRouter } from './providers';
-export type { IEmailProvider, PostmarkInboundEmail } from './providers';
+export type { IEmailProvider, PostmarkInboundEmail, BulkEmailMessage, BulkEmailResult } from './providers';
 
 // ============================================================================
 // Services (Business Logic Layer) - REMOVED

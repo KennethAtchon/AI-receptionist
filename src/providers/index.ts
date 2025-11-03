@@ -14,7 +14,7 @@ export { GoogleProvider } from './api/google.provider';
 export type { IEmailProvider } from './email/email-provider.interface';
 export { EmailRouter } from './email/email-router';
 export { PostmarkProvider } from './email/postmark.provider';
-export type { PostmarkConfig, PostmarkInboundEmail } from './email/postmark.provider';
+export type { PostmarkConfig, PostmarkInboundEmail, BulkEmailMessage, BulkEmailResult } from './email/postmark.provider';
 
 // Email Validator
 export { PostmarkValidator } from './validation/postmark-validator';

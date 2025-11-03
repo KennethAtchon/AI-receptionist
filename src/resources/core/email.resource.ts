@@ -195,6 +195,64 @@ export class EmailResource extends BaseResource<EmailSession> {
   }
 
   /**
+   * Send bulk emails
+   * Uses Agent to send multiple emails at once via send_bulk_emails tool
+   *
+   * @example
+   * ```typescript
+   * const results = await client.email.sendBulk({
+   *   emails: [
+   *     { to: 'user1@example.com', subject: 'Hello', body: 'Hi there!' },
+   *     { to: 'user2@example.com', subject: 'Hello', body: 'Hi there!' }
+   *   ]
+   * });
+   * ```
+   */
+  async sendBulk(options: {
+    emails: Array<{
+      to: string;
+      subject: string;
+      body: string;
+      tag?: string;
+      metadata?: Record<string, string>;
+    }>;
+    chunkSize?: number;
+  }): Promise<Array<{
+    to: string;
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  }>> {
+    logger.info(`[EmailResource] Sending bulk emails (${options.emails.length} emails)`);
+
+    // Create conversation session
+    const conversationId = await this.createSession({
+      bulkEmailCount: options.emails.length
+    });
+
+    // Use Agent to send bulk emails via tool
+    const agentResponse = await this.processEmailWithAgent(
+      `Send ${options.emails.length} emails in bulk`,
+      {
+        conversationId,
+        toolHint: 'send_bulk_emails',
+        toolParams: {
+          emails: options.emails
+        }
+      }
+    );
+
+    // Extract results from tool execution
+    const toolResult = agentResponse.metadata?.toolResults?.[0]?.result;
+
+    if (!toolResult?.success) {
+      throw new Error(toolResult?.error || 'Failed to send bulk emails');
+    }
+
+    return toolResult.data.results;
+  }
+
+  /**
    * AI-powered email generation
    * Uses Agent to compose email based on prompt
    */

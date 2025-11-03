@@ -114,3 +114,42 @@ export interface StoreOutboundEmailOptions {
   inReplyTo?: string;
   references?: string;
 }
+
+/**
+ * Bulk email message format
+ */
+export interface BulkEmailMessage {
+  to: string;
+  subject: string;
+  htmlBody?: string;
+  textBody?: string;
+  tag?: string;
+  metadata?: Record<string, string>;
+  from?: string;
+  replyTo?: string;
+}
+
+/**
+ * Bulk email result format
+ */
+export interface BulkEmailResult {
+  to: string;
+  messageId?: string;
+  errorCode?: number;
+  message?: string;
+  success: boolean;
+}
+
+/**
+ * Options for sending bulk emails
+ */
+export interface BulkEmailOptions {
+  emails: Array<{
+    to: string;
+    subject: string;
+    body: string;
+    tag?: string;
+    metadata?: Record<string, string>;
+  }>;
+  chunkSize?: number; // For auto-chunking
+}

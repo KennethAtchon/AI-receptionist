@@ -519,6 +519,21 @@ export interface TextResponse {
 }
 
 // ============================================================================
+// Email Types (Extended)
+// ============================================================================
+
+export type {
+  EmailAttachment,
+  InboundEmailPayload,
+  EmailWebhookOptions,
+  EmailWebhookResult,
+  StoreOutboundEmailOptions,
+  BulkEmailMessage,
+  BulkEmailResult,
+  BulkEmailOptions
+} from './email.types';
+
+// ============================================================================
 // SMS Types
 // ============================================================================
 
