@@ -322,9 +322,6 @@ export interface AIReceptionistConfig {
     // Memory - What the agent remembers (optional, has defaults)
     memory?: AgentMemoryConfig;
 
-    // Voice configuration for TTS (optional)
-    voice?: VoiceConfig;
-
     // Custom system prompt - Bypasses all SystemPromptBuilder features
     // WARNING: You are responsible for providing a complete, well-formatted system prompt
     customSystemPrompt?: string;
@@ -341,6 +338,9 @@ export interface AIReceptionistConfig {
 
   // Webhook configuration (optional - enables webhook-driven mode)
   webhooks?: WebhookConfig;
+
+  // Voice/TTS configuration (optional)
+  voice?: VoiceConfig;
 
   // Optional features
   notifications?: NotificationConfig;

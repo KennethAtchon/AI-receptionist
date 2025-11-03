@@ -21,6 +21,7 @@ export interface InitializedResources {
 export interface ResourceContext {
   agent: Agent;
   webhookConfig?: WebhookConfig;
+  voiceConfig?: any; // Voice settings from agent config
 }
 
 /**
@@ -37,10 +38,14 @@ export function initializeResources(context: ResourceContext): InitializedResour
   const { TextResource } = require('./core/text.resource');
 
   // Build voice-specific config from webhook config if provided
-  const voiceConfig = context.webhookConfig ? {
-    webhookBaseUrl: context.webhookConfig.baseUrl,
-    webhookPath: context.webhookConfig.endpoints.voice || '/webhooks/voice'
-  } : undefined;
+  const voiceConfig = {
+    webhookBaseUrl: context.webhookConfig?.baseUrl,
+    webhookPath: context.webhookConfig?.endpoints.voice || '/webhooks/voice',
+    twimlConfig: context.voiceConfig ? {
+      voice: context.voiceConfig.voiceId,
+      language: 'en-US'
+    } : undefined
+  };
 
   resources.voice = new VoiceResource(context.agent, voiceConfig);
   resources.sms = new SMSResource(context.agent);

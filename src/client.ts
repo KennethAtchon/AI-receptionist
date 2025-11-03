@@ -192,7 +192,8 @@ export class AIReceptionist {
     // 6. Initialize resources (session managers)
     const resources = initializeResources({
       agent: this.agent,
-      webhookConfig: this.config.webhooks
+      webhookConfig: this.config.webhooks,
+      voiceConfig: this.config.voice
     });
 
     // Assign resources
@@ -254,7 +255,6 @@ export class AIReceptionist {
         knowledge: overrides.agent?.knowledge || this.config.agent.knowledge,
         goals: overrides.agent?.goals || this.config.agent.goals,
         memory: overrides.agent?.memory || this.config.agent.memory,
-        voice: overrides.agent?.voice || this.config.agent.voice,
         customSystemPrompt: overrides.agent?.customSystemPrompt || this.config.agent.customSystemPrompt
       },
 
@@ -266,6 +266,9 @@ export class AIReceptionist {
 
       // Reuse providers (shared resources)
       providers: this.config.providers,
+
+      // Voice config
+      voice: overrides.voice || this.config.voice,
 
       // Other config
       notifications: overrides.notifications || this.config.notifications,
