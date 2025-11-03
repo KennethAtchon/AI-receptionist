@@ -42,28 +42,26 @@ export function buildInitiateCallTool(config?: CallToolsConfig): ITool {
       }
 
       try {
-        // Get Twilio provider directly
+        // Get Twilio provider and use helper method
         const twilioProvider = await config.providerRegistry.get<TwilioProvider>('twilio');
-        const client = twilioProvider.createClient();
-        const twilioConfig = twilioProvider.getConfig();
 
-        // TODO Need to make it configable, so we can use it in the webhook URL for call handling
-        const webhookUrl = `${process.env.BASE_URL || 'https://your-app.com'}/webhooks/voice/inbound`;
-
-        // Make the call using Twilio directly
-        const call = await client.calls.create({
-          to: params.to,
-          from: twilioConfig.phoneNumber,
-          url: webhookUrl,
-          method: 'POST'
+        // Make the call using provider helper method (provider uses its own webhook config)
+        const result = await twilioProvider.makeCall({
+          to: params.to
         });
 
-        logger.info('[InitiateCallTool] Call created', { callSid: call.sid });
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error,
+            response: { text: 'Failed to initiate call.' }
+          };
+        }
 
         return {
           success: true,
-          data: { callSid: call.sid, status: 'initiated' },
-          response: { text: `Call initiated to ${params.to}. Call SID: ${call.sid}` }
+          data: { callSid: result.callSid, status: result.status },
+          response: { text: `Call initiated to ${params.to}. Call SID: ${result.callSid}` }
         };
       } catch (error) {
         logger.error('[InitiateCallTool] Failed', error as Error);
@@ -104,14 +102,19 @@ export function buildEndCallTool(config?: CallToolsConfig): ITool {
       }
 
       try {
-        // Get Twilio provider directly
+        // Get Twilio provider and use helper method
         const twilioProvider = await config.providerRegistry.get<TwilioProvider>('twilio');
-        const client = twilioProvider.createClient();
 
-        // End the call using Twilio directly
-        await client.calls(params.callSid).update({ status: 'completed' });
+        // End the call using provider helper method
+        const result = await twilioProvider.endCall(params.callSid);
 
-        logger.info('[EndCallTool] Call ended', { callSid: params.callSid });
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error,
+            response: { text: 'Failed to end call.' }
+          };
+        }
 
         return {
           success: true,

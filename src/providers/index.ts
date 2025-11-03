@@ -8,6 +8,7 @@ export type { IConfigurableProvider } from './configurable.provider';
 
 // Core Providers (Communication, Calendar, etc.)
 export { TwilioProvider } from './api/twilio.provider';
+export type { SMSParams, SMSResult, CallParams, CallResult } from './api/twilio.provider';
 export { GoogleProvider } from './api/google.provider';
 
 // Email Providers

@@ -191,6 +191,12 @@ export interface TwilioConfig {
   accountSid: string;
   authToken: string;
   phoneNumber: string;
+  // Webhook configuration (Twilio-specific)
+  webhookBaseUrl?: string; // Base URL for webhooks (e.g., 'https://your-app.com')
+  voiceWebhookPath?: string; // Voice webhook path (e.g., '/webhooks/voice/inbound')
+  smsWebhookPath?: string; // SMS webhook path (e.g., '/webhooks/sms/inbound')
+  // Voice/TTS configuration (Twilio-specific)
+  voice?: VoiceConfig;
 }
 
 // ============================================================================
@@ -335,12 +341,6 @@ export interface AIReceptionistConfig {
 
   // Provider configuration
   providers?: ProviderConfig;
-
-  // Webhook configuration (optional - enables webhook-driven mode)
-  webhooks?: WebhookConfig;
-
-  // Voice/TTS configuration (optional)
-  voice?: VoiceConfig;
 
   // Optional features
   notifications?: NotificationConfig;

@@ -71,9 +71,34 @@ export class VoiceResource extends BaseResource<VoiceSession> {
     this.spamDetectionEnabled = config?.spamDetection !== false; // Default: true
     this.recordCalls = config?.recordCalls || false;
     this.transcribeCalls = config?.transcribeCalls || false;
-    this.twimlConfig = config?.twimlConfig || {};
-    this.webhookBaseUrl = config?.webhookBaseUrl || process.env.BASE_URL || '';
-    this.webhookPath = config?.webhookPath || '/webhooks/voice';
+
+    // Get webhook URL from TwilioProvider if available
+    let twilioProvider: any;
+    let twilioConfig: any;
+    try {
+      const providerRegistry = (agent as any).providerRegistry;
+      if (providerRegistry?.has('twilio')) {
+        twilioProvider = providerRegistry.getSync('twilio');
+        twilioConfig = twilioProvider?.getConfig();
+      }
+    } catch (error) {
+      // Provider not available, use defaults
+    }
+
+    // Use TwilioProvider methods if available, otherwise fall back to config/env
+    this.twimlConfig = twilioConfig?.voice || config?.twimlConfig || {};
+
+    // Try to get webhook URL from provider, otherwise construct from config
+    if (twilioProvider) {
+      const fullWebhookUrl = twilioProvider.getVoiceWebhookUrl();
+      // Parse back to base + path for backward compat
+      const urlMatch = fullWebhookUrl.match(/^(https?:\/\/[^\/]+)(.*)$/);
+      this.webhookBaseUrl = urlMatch ? urlMatch[1] : (config?.webhookBaseUrl || process.env.BASE_URL || '');
+      this.webhookPath = urlMatch ? urlMatch[2] : (config?.webhookPath || '/webhooks/voice');
+    } else {
+      this.webhookBaseUrl = config?.webhookBaseUrl || process.env.BASE_URL || '';
+      this.webhookPath = config?.webhookPath || '/webhooks/voice';
+    }
 
     logger.info('[VoiceResource] Initialized with config', {
       spamDetection: this.spamDetectionEnabled,
@@ -81,7 +106,8 @@ export class VoiceResource extends BaseResource<VoiceSession> {
       transcribeCalls: this.transcribeCalls,
       rateLimit: config?.rateLimitConfig,
       webhookBaseUrl: this.webhookBaseUrl,
-      webhookPath: this.webhookPath
+      webhookPath: this.webhookPath,
+      usedTwilioConfig: !!twilioConfig
     });
   }
 

@@ -42,24 +42,27 @@ export function buildSendSMSTool(config?: MessagingToolsConfig): ITool {
       }
 
       try {
-        // Get Twilio provider directly
+        // Get Twilio provider and use helper method
         const twilioProvider = await config.providerRegistry.get<TwilioProvider>('twilio');
-        const client = twilioProvider.createClient();
-        const twilioConfig = twilioProvider.getConfig();
 
-        // Send SMS using Twilio directly
-        const message = await client.messages.create({
+        // Send SMS using provider helper method
+        const result = await twilioProvider.sendSMS({
           to: params.to,
-          from: twilioConfig.phoneNumber,
-          body: params.message
+          message: params.message
         });
 
-        logger.info('[SendSMSTool] SMS sent', { messageSid: message.sid });
+        if (!result.success) {
+          return {
+            success: false,
+            error: result.error,
+            response: { text: 'Failed to send SMS.' }
+          };
+        }
 
         return {
           success: true,
-          data: { messageSid: message.sid, status: 'sent' },
-          response: { text: `SMS sent to ${params.to}. Message SID: ${message.sid}` }
+          data: { messageSid: result.messageSid, status: result.status },
+          response: { text: `SMS sent to ${params.to}. Message SID: ${result.messageSid}` }
         };
       } catch (error) {
         logger.error('[SendSMSTool] Failed', error as Error);

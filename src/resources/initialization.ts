@@ -20,8 +20,6 @@ export interface InitializedResources {
 
 export interface ResourceContext {
   agent: Agent;
-  webhookConfig?: WebhookConfig;
-  voiceConfig?: any; // Voice settings from agent config
 }
 
 /**
@@ -37,17 +35,8 @@ export function initializeResources(context: ResourceContext): InitializedResour
   const { EmailResource } = require('./core/email.resource');
   const { TextResource } = require('./core/text.resource');
 
-  // Build voice-specific config from webhook config if provided
-  const voiceConfig = {
-    webhookBaseUrl: context.webhookConfig?.baseUrl,
-    webhookPath: context.webhookConfig?.endpoints.voice || '/webhooks/voice',
-    twimlConfig: context.voiceConfig ? {
-      voice: context.voiceConfig.voiceId,
-      language: 'en-US'
-    } : undefined
-  };
-
-  resources.voice = new VoiceResource(context.agent, voiceConfig);
+  // VoiceResource will get TwilioConfig directly from provider registry
+  resources.voice = new VoiceResource(context.agent);
   resources.sms = new SMSResource(context.agent);
   resources.email = new EmailResource(context.agent);
   resources.text = new TextResource(context.agent);

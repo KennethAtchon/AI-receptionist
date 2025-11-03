@@ -191,9 +191,7 @@ export class AIReceptionist {
 
     // 6. Initialize resources (session managers)
     const resources = initializeResources({
-      agent: this.agent,
-      webhookConfig: this.config.webhooks,
-      voiceConfig: this.config.voice
+      agent: this.agent
     });
 
     // Assign resources
@@ -266,9 +264,6 @@ export class AIReceptionist {
 
       // Reuse providers (shared resources)
       providers: this.config.providers,
-
-      // Voice config
-      voice: overrides.voice || this.config.voice,
 
       // Other config
       notifications: overrides.notifications || this.config.notifications,
@@ -390,8 +385,10 @@ export class AIReceptionist {
   ): Promise<import('./sessions/types').Session> {
     this.ensureInitialized();
 
-    if (!this.config.webhooks) {
-      throw new Error('Webhook configuration is required to use setSession(). Add webhooks config to AIReceptionistConfig.');
+    // Get webhook config from TwilioConfig
+    const twilioConfig = this.config.providers?.communication?.twilio;
+    if (!twilioConfig?.webhookBaseUrl) {
+      throw new Error('Webhook configuration is required to use setSession(). Add webhookBaseUrl to TwilioConfig in providers.communication.twilio.');
     }
 
     logger.info(`[AIReceptionist] Setting up ${type} session`, { identifier });
@@ -474,19 +471,19 @@ export class AIReceptionist {
     identifier: string,
     sessionId: string
   ): Promise<void> {
-    if (!this.config.webhooks) {
+    // Get webhook config from TwilioConfig
+    const twilioConfig = this.config.providers?.communication?.twilio;
+    if (!twilioConfig?.webhookBaseUrl) {
       return;
     }
 
-    const { baseUrl, endpoints } = this.config.webhooks;
+    const baseUrl = twilioConfig.webhookBaseUrl;
 
     try {
       switch (type) {
         case 'voice': {
-          if (!endpoints.voice) {
-            throw new Error('Voice webhook endpoint not configured');
-          }
-          const webhookUrl = `${baseUrl}${endpoints.voice}`;
+          const voicePath = twilioConfig.voiceWebhookPath || '/webhooks/voice';
+          const webhookUrl = `${baseUrl}${voicePath}`;
           // TODO: Configure Twilio webhook for voice
           // await this.configureTwilioVoiceWebhook(identifier, webhookUrl);
           logger.info(`[AIReceptionist] Voice webhook configured`, { webhookUrl });
@@ -494,10 +491,8 @@ export class AIReceptionist {
         }
 
         case 'sms': {
-          if (!endpoints.sms) {
-            throw new Error('SMS webhook endpoint not configured');
-          }
-          const webhookUrl = `${baseUrl}${endpoints.sms}`;
+          const smsPath = twilioConfig.smsWebhookPath || '/webhooks/sms';
+          const webhookUrl = `${baseUrl}${smsPath}`;
           // TODO: Configure Twilio webhook for SMS
           // await this.configureTwilioSMSWebhook(identifier, webhookUrl);
           logger.info(`[AIReceptionist] SMS webhook configured`, { webhookUrl });
@@ -505,13 +500,9 @@ export class AIReceptionist {
         }
 
         case 'email': {
-          if (!endpoints.email) {
-            throw new Error('Email webhook endpoint not configured');
-          }
-          const webhookUrl = `${baseUrl}${endpoints.email}`;
-          // TODO: Configure Postmark inbound webhook
-          // await this.configurePostmarkWebhook(identifier, webhookUrl);
-          logger.info(`[AIReceptionist] Email webhook configured`, { webhookUrl });
+          // Email webhooks would come from PostmarkConfig, not TwilioConfig
+          // For now, just log - email provider handles its own webhook config
+          logger.info(`[AIReceptionist] Email webhook handled by email provider`);
           break;
         }
       }

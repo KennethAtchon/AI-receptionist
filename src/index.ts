@@ -52,6 +52,7 @@ export { Tools } from './tools';
 // ============================================================================
 
 export { TwilioProvider } from './providers/api/twilio.provider';
+export type { SMSParams, SMSResult, CallParams, CallResult } from './providers/api/twilio.provider';
 export { OpenAIProvider } from './providers/ai/openai.provider';
 export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
 export { GoogleProvider } from './providers/api/google.provider';
