@@ -10,6 +10,8 @@ import type { ITool } from '../../types';
 import type { ProviderRegistry } from '../../providers/core/provider-registry';
 import { GoogleProvider } from '../../providers/api/google.provider';
 import * as GoogleCalendar from '../../providers/google/google.calendar';
+import * as GoogleSheet from '../../providers/google/google.sheet';
+import * as GoogleDrive from '../../providers/google/google.drive';
 
 export interface GoogleServicesToolsConfig {
     providerRegistry: ProviderRegistry;
@@ -284,6 +286,276 @@ export function buildCheckAvailabilityTool(config?: GoogleServicesToolsConfig): 
 }
 
 /**
+ * Tool: Google Sheets Operations
+ * CRUD operations on Google Spreadsheets
+ */
+export function buildGoogleSheetsTool(config?: GoogleServicesToolsConfig): ITool {
+    return new ToolBuilder()
+    .withName('manage_google_sheets')
+    .withDescription('Perform CRUD operations on Google Spreadsheets. Can create, read, update, append, and delete spreadsheets. The AI can decide what data to store in spreadsheets.')
+    .withParameters({
+        type: 'object',
+        properties: {
+            operation: {
+                type: 'string',
+                enum: ['create', 'read', 'update', 'append', 'delete'],
+                description: 'Operation to perform: create (new spreadsheet), read (read data), update (overwrite cells), append (add rows), delete (remove spreadsheet)'
+            },
+            spreadsheetId: {
+                type: 'string',
+                description: 'Spreadsheet ID (required for read, update, append, delete operations)'
+            },
+            title: {
+                type: 'string',
+                description: 'Title for new spreadsheet (required for create operation)'
+            },
+            range: {
+                type: 'string',
+                description: 'Cell range (e.g., "A1:B10" or "Sheet1!A1:B10"). Required for read, update, append operations'
+            },
+            values: {
+                type: 'array',
+                items: {
+                    type: 'array',
+                    items: {
+                        type: ['string', 'number', 'boolean', 'null']
+                    }
+                },
+                description: '2D array of values to write. Each inner array is a row. Required for update and append operations'
+            },
+            sheetName: {
+                type: 'string',
+                description: 'Optional: Name of the sheet to work with. If not provided, uses the first sheet'
+            }
+        },
+        required: ['operation']
+    })
+    .default(async (params, ctx) => {
+        logger.info('[GoogleSheetsTool] Managing Google Sheets', { operation: params.operation });
+
+        if (!config?.providerRegistry || !config.providerRegistry.has('google')) {
+            return {
+                success: false,
+                error: 'Google provider not configured',
+                response: { text: 'Google provider is not configured'}
+            };
+        }
+
+        try {
+            const provider = await config.providerRegistry.get<GoogleProvider>('google');
+            const sheetsClient = provider.getSheetsClient();
+            const driveClient = provider.getDriveClient();
+
+            const { operation, spreadsheetId, title, range, values, sheetName } = params;
+
+            switch (operation) {
+                case 'create': {
+                    if (!title) {
+                        return {
+                            success: false,
+                            error: 'Title is required for create operation',
+                            response: { text: 'Title is required to create a new spreadsheet' }
+                        };
+                    }
+
+                    const result = await GoogleSheet.createSpreadsheet(sheetsClient, { title });
+                    return result;
+                }
+
+                case 'read': {
+                    if (!spreadsheetId) {
+                        return {
+                            success: false,
+                            error: 'spreadsheetId is required for read operation',
+                            response: { text: 'Spreadsheet ID is required to read data' }
+                        };
+                    }
+
+                    const result = await GoogleSheet.readSpreadsheet(sheetsClient, {
+                        spreadsheetId,
+                        range,
+                        sheetName
+                    });
+                    return result;
+                }
+
+                case 'update': {
+                    if (!spreadsheetId || !range || !values) {
+                        return {
+                            success: false,
+                            error: 'spreadsheetId, range, and values are required for update operation',
+                            response: { text: 'Spreadsheet ID, range, and values are required to update data' }
+                        };
+                    }
+
+                    const result = await GoogleSheet.updateSpreadsheet(sheetsClient, {
+                        spreadsheetId,
+                        range,
+                        values,
+                        sheetName
+                    });
+                    return result;
+                }
+
+                case 'append': {
+                    if (!spreadsheetId || !range || !values) {
+                        return {
+                            success: false,
+                            error: 'spreadsheetId, range, and values are required for append operation',
+                            response: { text: 'Spreadsheet ID, range, and values are required to append data' }
+                        };
+                    }
+
+                    const result = await GoogleSheet.appendSpreadsheet(sheetsClient, {
+                        spreadsheetId,
+                        range,
+                        values,
+                        sheetName
+                    });
+                    return result;
+                }
+
+                case 'delete': {
+                    if (!spreadsheetId) {
+                        return {
+                            success: false,
+                            error: 'spreadsheetId is required for delete operation',
+                            response: { text: 'Spreadsheet ID is required to delete a spreadsheet' }
+                        };
+                    }
+
+                    const result = await GoogleSheet.deleteSpreadsheet(driveClient, {
+                        spreadsheetId
+                    });
+                    return result;
+                }
+
+                default:
+                    return {
+                        success: false,
+                        error: 'Invalid operation',
+                        response: { text: `Invalid operation: ${operation}. Use: create, read, update, append, or delete` }
+                    };
+            }
+        } catch (error) {
+            logger.error('[GoogleSheetsTool] Error managing Google Sheets', error as Error);
+
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to manage Google Sheets',
+                response: {
+                    text: `Failed to manage Google Sheets: ${error instanceof Error ? error.message : 'Unknown error'}`
+                }
+            };
+        }
+    })
+    .build();
+}
+
+/**
+ * Tool: Google Drive Operations
+ * Create files and folders in Google Drive
+ */
+export function buildGoogleDriveTool(config?: GoogleServicesToolsConfig): ITool {
+    return new ToolBuilder()
+    .withName('manage_google_drive')
+    .withDescription('Create files and folders in Google Drive. Can create text files, documents, or folders. The AI can decide what content to store in files.')
+    .withParameters({
+        type: 'object',
+        properties: {
+            operation: {
+                type: 'string',
+                enum: ['create_file', 'create_folder'],
+                description: 'Operation to perform: create_file (create a new file), create_folder (create a new folder)'
+            },
+            name: {
+                type: 'string',
+                description: 'Name of the file or folder to create'
+            },
+            content: {
+                type: 'string',
+                description: 'Content for the file (required for create_file operation)'
+            },
+            mimeType: {
+                type: 'string',
+                description: 'MIME type of the file (e.g., "text/plain", "text/markdown", "application/json"). Defaults to "text/plain"'
+            },
+            folderId: {
+                type: 'string',
+                description: 'Optional: ID of the parent folder to create the file/folder in'
+            },
+            description: {
+                type: 'string',
+                description: 'Optional: Description of the file or folder'
+            }
+        },
+        required: ['operation', 'name']
+    })
+    .default(async (params, ctx) => {
+        logger.info('[GoogleDriveTool] Managing Google Drive', { operation: params.operation });
+
+        if (!config?.providerRegistry || !config.providerRegistry.has('google')) {
+            return {
+                success: false,
+                error: 'Google provider not configured',
+                response: { text: 'Google provider is not configured'}
+            };
+        }
+
+        try {
+            const provider = await config.providerRegistry.get<GoogleProvider>('google');
+            const driveClient = provider.getDriveClient();
+
+            const { operation, name, content, mimeType, folderId, description } = params;
+
+            switch (operation) {
+                case 'create_file': {
+                    if (!content) {
+                        return {
+                            success: false,
+                            error: 'Content is required for create_file operation',
+                            response: { text: 'Content is required to create a file' }
+                        };
+                    }
+
+                    const result = await GoogleDrive.createDriveFile(driveClient, {
+                        name,
+                        content,
+                        mimeType,
+                        folderId,
+                        description
+                    });
+                    return result;
+                }
+
+                case 'create_folder': {
+                    const result = await GoogleDrive.createDriveFolder(driveClient, name, folderId, description);
+                    return result;
+                }
+
+                default:
+                    return {
+                        success: false,
+                        error: 'Invalid operation',
+                        response: { text: `Invalid operation: ${operation}. Use: create_file or create_folder` }
+                    };
+            }
+        } catch (error) {
+            logger.error('[GoogleDriveTool] Error managing Google Drive', error as Error);
+
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to manage Google Drive',
+                response: {
+                    text: `Failed to manage Google Drive: ${error instanceof Error ? error.message : 'Unknown error'}`
+                }
+            };
+        }
+    })
+    .build();
+}
+
+/**
  * Register all google tools
  */
 export async function setupGoogleTools(
@@ -292,6 +564,8 @@ export async function setupGoogleTools(
   ): Promise<void> {
     registry.register(buildCreateCalendarMeetingTool(config));
     registry.register(buildCheckAvailabilityTool(config));
+    registry.register(buildGoogleSheetsTool(config));
+    registry.register(buildGoogleDriveTool(config));
     logger.info('[GoogleTools] Registered google tools with provider registry');
   }
   

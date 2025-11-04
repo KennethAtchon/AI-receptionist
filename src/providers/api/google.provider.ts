@@ -2,6 +2,237 @@
  * Google Provider - ULTRA-PURE API Wrapper
  * Just wraps the Google APIs SDK and returns it
  * Processor handles all initialization and logic
+ * 
+ * ============================================================================
+ * GOOGLE CLOUD CONSOLE SETUP GUIDE
+ * ============================================================================
+ * 
+ * To use this provider, you need to set up authentication in Google Cloud Console.
+ * This provider supports three authentication methods:
+ * 
+ * 1. SERVICE ACCOUNT (Recommended for server-side applications)
+ * 2. OAuth2 (For user-facing applications)
+ * 3. API Key (Limited functionality, read-only typically)
+ * 
+ * ----------------------------------------------------------------------------
+ * STEP 1: CREATE A GOOGLE CLOUD PROJECT
+ * ----------------------------------------------------------------------------
+ * 1. Go to https://console.cloud.google.com/
+ * 2. Click "Select a project" → "New Project"
+ * 3. Enter a project name and click "Create"
+ * 4. Wait for the project to be created
+ * 
+ * ----------------------------------------------------------------------------
+ * STEP 2: ENABLE REQUIRED APIs
+ * ----------------------------------------------------------------------------
+ * 1. Go to "APIs & Services" → "Library"
+ * 2. Enable the following APIs (search and enable each):
+ *    - Google Calendar API
+ *    - Google Sheets API
+ *    - Google Drive API
+ * 3. Wait a few minutes for APIs to be enabled
+ * 
+ * ----------------------------------------------------------------------------
+ * STEP 3A: SET UP SERVICE ACCOUNT (Recommended)
+ * ----------------------------------------------------------------------------
+ * Best for: Server-side applications, automated systems, background jobs
+ * 
+ * 1. Go to "APIs & Services" → "Credentials"
+ * 2. Click "Create Credentials" → "Service Account"
+ * 3. Enter a service account name (e.g., "ai-receptionist-service")
+ * 4. Click "Create and Continue"
+ * 5. Skip optional steps and click "Done"
+ * 6. Click on the created service account
+ * 7. Go to "Keys" tab → "Add Key" → "Create new key"
+ * 8. Select "JSON" format and click "Create"
+ * 9. The JSON file will download automatically
+ * 
+ * Configuration:
+ * ```typescript
+ * {
+ *   providers: {
+ *     calendar: {
+ *       google: {
+ *         calendarId: 'primary',
+ *         credentials: {
+ *           // Copy from downloaded JSON file:
+ *           client_email: 'your-service-account@project.iam.gserviceaccount.com',
+ *           private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n',
+ *           project_id: 'your-project-id',
+ *           // ... other fields from JSON
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * ```
+ * 
+ * Note: For Service Account to access user calendars:
+ * - Share the calendar with the service account email
+ * - Or use domain-wide delegation (advanced)
+ * 
+ * ----------------------------------------------------------------------------
+ * STEP 3B: SET UP OAuth2 (For User Applications)
+ * ----------------------------------------------------------------------------
+ * Best for: User-facing applications, web apps, mobile apps
+ * 
+ * 1. Go to "APIs & Services" → "Credentials"
+ * 2. Click "Create Credentials" → "OAuth client ID"
+ * 3. If prompted, configure the OAuth consent screen first:
+ *    a. Choose "External" (unless you have Google Workspace)
+ *    b. Fill in app name, user support email, developer contact
+ *    c. Add scopes:
+ *       - https://www.googleapis.com/auth/calendar
+ *       - https://www.googleapis.com/auth/spreadsheets
+ *       - https://www.googleapis.com/auth/drive.file
+ *    d. Add test users (if in testing mode)
+ *    e. Save and continue through all steps
+ * 4. Back in Credentials, click "Create Credentials" → "OAuth client ID"
+ * 5. Choose application type:
+ *    - "Web application" for server-side
+ *    - "Desktop app" for local development
+ * 6. Enter a name (e.g., "AI Receptionist")
+ * 7. For web apps, add authorized redirect URIs:
+ *    - http://localhost:3000/oauth/callback (development)
+ *    - https://yourdomain.com/oauth/callback (production)
+ * 8. Click "Create"
+ * 9. Copy the Client ID and Client Secret
+ * 
+ * 10. To get a refresh token (one-time setup):
+ *     a. Visit: https://developers.google.com/oauthplayground/
+ *     b. Click the gear icon (⚙️) → Check "Use your own OAuth credentials"
+ *     c. Enter your Client ID and Client Secret
+ *     d. In left panel, find and select:
+ *        - Google Calendar API v3 → https://www.googleapis.com/auth/calendar
+ *        - Google Sheets API v4 → https://www.googleapis.com/auth/spreadsheets
+ *        - Google Drive API v3 → https://www.googleapis.com/auth/drive.file
+ *     e. Click "Authorize APIs"
+ *     f. Sign in with the Google account you want to use
+ *     g. Grant permissions
+ *     h. Click "Exchange authorization code for tokens"
+ *     i. Copy the "Refresh token"
+ * 
+ * Configuration:
+ * ```typescript
+ * {
+ *   providers: {
+ *     calendar: {
+ *       google: {
+ *         calendarId: 'primary',
+ *         credentials: {
+ *           client_id: 'your-client-id.apps.googleusercontent.com',
+ *           client_secret: 'your-client-secret',
+ *           refresh_token: 'your-refresh-token',
+ *           redirect_uri: 'http://localhost:3000/oauth/callback' // Optional
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * ```
+ * 
+ * ----------------------------------------------------------------------------
+ * STEP 3C: SET UP API KEY (Limited - Not Recommended)
+ * ----------------------------------------------------------------------------
+ * Best for: Public read-only access only
+ * 
+ * 1. Go to "APIs & Services" → "Credentials"
+ * 2. Click "Create Credentials" → "API key"
+ * 3. Copy the API key
+ * 4. (Recommended) Restrict the API key:
+ *    - Click on the API key to edit
+ *    - Under "API restrictions", select "Restrict key"
+ *    - Select only: Calendar API, Sheets API, Drive API
+ *    - Save
+ * 
+ * Configuration:
+ * ```typescript
+ * {
+ *   providers: {
+ *     calendar: {
+ *       google: {
+ *         calendarId: 'primary',
+ *         apiKey: 'your-api-key'
+ *       }
+ *     }
+ *   }
+ * }
+ * ```
+ * 
+ * WARNING: API keys have very limited functionality and typically cannot
+ * perform write operations. Use Service Account or OAuth2 for full access.
+ * 
+ * ----------------------------------------------------------------------------
+ * REQUIRED SCOPES
+ * ----------------------------------------------------------------------------
+ * The provider requires these OAuth scopes:
+ * - https://www.googleapis.com/auth/calendar
+ *   (Google Calendar: create, read, update, delete events)
+ * - https://www.googleapis.com/auth/spreadsheets
+ *   (Google Sheets: full access to spreadsheets)
+ * - https://www.googleapis.com/auth/drive.file
+ *   (Google Drive: create files and folders)
+ * 
+ * These are automatically included when using Service Account or OAuth2.
+ * 
+ * ----------------------------------------------------------------------------
+ * TROUBLESHOOTING
+ * ----------------------------------------------------------------------------
+ * 
+ * Error: "Request had insufficient authentication scopes"
+ * → Solution: Ensure all required APIs are enabled and scopes are correct
+ * 
+ * Error: "Calendar not found" or "Access denied"
+ * → Solution (Service Account): Share the calendar with service account email
+ * → Solution (OAuth2): Ensure you granted permissions during OAuth flow
+ * 
+ * Error: "API key not valid" or "API key expired"
+ * → Solution: Regenerate the API key or use Service Account/OAuth2 instead
+ * 
+ * Error: "Refresh token expired" (OAuth2)
+ * → Solution: Re-run the OAuth flow to get a new refresh token
+ * 
+ * Service Account can't access calendars:
+ * → Solution: Share the calendar with the service account email address
+ * → Go to Google Calendar → Settings → Share with specific people
+ * → Add the service account email with "Make changes to events" permission
+ * 
+ * ----------------------------------------------------------------------------
+ * SECURITY BEST PRACTICES
+ * ----------------------------------------------------------------------------
+ * 1. Never commit credentials to version control
+ * 2. Store credentials in environment variables
+ * 3. Use different credentials for development/production
+ * 4. Regularly rotate Service Account keys
+ * 5. Restrict API keys to specific APIs and IPs
+ * 6. Use least-privilege principle (minimal required scopes)
+ * 7. Monitor API usage in Google Cloud Console
+ * 
+ * ----------------------------------------------------------------------------
+ * EXAMPLE: Loading Credentials from Environment Variables
+ * ----------------------------------------------------------------------------
+ * ```typescript
+ * import { GoogleProvider } from '@ai-receptionist/sdk';
+ * 
+ * // Service Account from JSON string
+ * const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+ * 
+ * // Or OAuth2 from individual env vars
+ * const oauth2 = {
+ *   client_id: process.env.GOOGLE_CLIENT_ID!,
+ *   client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+ *   refresh_token: process.env.GOOGLE_REFRESH_TOKEN!
+ * };
+ * 
+ * const provider = new GoogleProvider({
+ *   calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+ *   credentials: serviceAccount // or oauth2
+ * });
+ * 
+ * await provider.initialize();
+ * ```
+ * 
+ * ============================================================================
  */
 
 import { BaseProvider } from '../base.provider';
@@ -29,6 +260,8 @@ export class GoogleProvider extends BaseProvider {
   private googleApis: any = null;
   private auth: any = null;
   private calendar: any = null;
+  private sheets: any = null;
+  private drive: any = null;
 
   constructor(private config: GoogleConfig) {
     super();
@@ -46,6 +279,12 @@ export class GoogleProvider extends BaseProvider {
       
       // Create calendar client
       this.calendar = this.googleApis.google.calendar({ version: 'v3', auth: this.auth });
+      
+      // Create sheets client
+      this.sheets = this.googleApis.google.sheets({ version: 'v4', auth: this.auth });
+      
+      // Create drive client
+      this.drive = this.googleApis.google.drive({ version: 'v3', auth: this.auth });
       
       this.initialized = true;
       logger.info('[GoogleProvider] SDK loaded and authenticated');
@@ -84,7 +323,11 @@ export class GoogleProvider extends BaseProvider {
         this.auth = new google.auth.JWT({
           email: this.config.credentials.client_email,
           key: this.config.credentials.private_key,
-          scopes: ['https://www.googleapis.com/auth/calendar']
+          scopes: [
+            'https://www.googleapis.com/auth/calendar',
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive.file'
+          ]
         });
       } else if (this.isOAuth2Credentials(this.config.credentials)) {
         // OAuth2 authentication
@@ -112,7 +355,12 @@ export class GoogleProvider extends BaseProvider {
       // For API key, we create a minimal auth client
       // Note: This may not work for write operations - OAuth2 or Service Account is recommended
       this.auth = new google.auth.GoogleAuth({
-        apiKey: this.config.apiKey
+        apiKey: this.config.apiKey,
+        scopes: [
+          'https://www.googleapis.com/auth/calendar',
+          'https://www.googleapis.com/auth/spreadsheets',
+          'https://www.googleapis.com/auth/drive.file'
+        ]
       });
     } else {
       throw new Error('No authentication method provided. Need either credentials or apiKey');
@@ -156,6 +404,28 @@ export class GoogleProvider extends BaseProvider {
   }
 
   /**
+   * Get the authenticated sheets client
+   */
+  getSheetsClient(): any {
+    this.ensureInitialized();
+    if (!this.sheets) {
+      this.sheets = this.googleApis.google.sheets({ version: 'v4', auth: this.auth });
+    }
+    return this.sheets;
+  }
+
+  /**
+   * Get the authenticated drive client
+   */
+  getDriveClient(): any {
+    this.ensureInitialized();
+    if (!this.drive) {
+      this.drive = this.googleApis.google.drive({ version: 'v3', auth: this.auth });
+    }
+    return this.drive;
+  }
+
+  /**
    * Get config (credentials, etc.)
    * Processor will use this to set up auth
    */
@@ -168,6 +438,8 @@ export class GoogleProvider extends BaseProvider {
     this.googleApis = null;
     this.auth = null;
     this.calendar = null;
+    this.sheets = null;
+    this.drive = null;
     this.initialized = false;
   }
 
