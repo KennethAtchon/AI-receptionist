@@ -145,8 +145,8 @@ export interface ExecutionContext {
 
 export interface JSONSchema {
   type: string;
-  properties?: Record<string, any>;
-  required?: string[];
+  properties?: Record<string, any>; // { name : { type: 'DATA_TYPE', description: 'READABLE_DESC'  } 
+  required?: string[]; // [ name, desc, product] - which properties need to be passed in
   [key: string]: any;
 }
 
@@ -278,10 +278,57 @@ export interface IAIProvider extends IProvider {
 // Calendar Provider Types
 // ============================================================================
 
+/**
+ * Service Account credentials for Google Calendar API
+ * Used for server-to-server authentication
+ */
+export interface GoogleServiceAccountCredentials {
+  client_email: string;
+  private_key: string;
+  project_id?: string;
+  client_id?: string;
+  auth_uri?: string;
+  token_uri?: string;
+  auth_provider_x509_cert_url?: string;
+  client_x509_cert_url?: string;
+}
+
+/**
+ * OAuth2 credentials for Google Calendar API
+ * Used for user authentication with refresh tokens
+ */
+export interface GoogleOAuth2Credentials {
+  client_id: string;
+  client_secret: string;
+  refresh_token?: string;
+  redirect_uri?: string;
+  access_token?: string;
+  expiry_date?: number;
+}
+
+/**
+ * Google Calendar API configuration
+ * Supports authentication via Service Account, OAuth2, or API Key
+ */
 export interface GoogleConfig {
-  apiKey: string;
+  /**
+   * API Key for Google Calendar API (optional)
+   * Note: API keys have limited functionality - use credentials for write operations
+   * Either apiKey or credentials must be provided
+   */
+  apiKey?: string;
+  
+  /**
+   * Calendar ID to use (e.g., 'primary' or email address)
+   */
   calendarId: string;
-  credentials?: any;
+  
+  /**
+   * Authentication credentials (optional)
+   * Either Service Account or OAuth2 credentials
+   * Either apiKey or credentials must be provided
+   */
+  credentials?: GoogleServiceAccountCredentials | GoogleOAuth2Credentials;
 }
 
 export interface CalendarEvent {

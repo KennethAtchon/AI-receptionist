@@ -21,6 +21,9 @@ export type { MessagingToolsConfig } from './messaging-tools';
 export { setupCalendarTools } from './calendar-tools';
 export type { CalendarToolsConfig } from './calendar-tools';
 
+export { setupGoogleTools } from './google-tools';
+export type { GoogleServicesToolsConfig } from './google-tools';
+
 /**
  * Setup simple test tools - no provider configuration needed
  * These are basic tools to verify AI can use tools correctly
