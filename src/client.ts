@@ -6,7 +6,8 @@
 import type { AIReceptionistConfig } from './types';
 import { ToolRegistry } from './tools/registry';
 import { ToolStore } from './tools/tool-store';
-import { logger } from './utils/logger';
+import { logger, configureLogger, LogLevel } from './utils/logger';
+
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
 import { ProviderRegistry } from './providers/core/provider-registry';
@@ -19,7 +20,6 @@ import { WebhookRouter } from './webhooks/webhook-router';
 import { SessionManager } from './sessions';
 
 // Type-only imports for tree-shaking
-import type { OpenAIProvider, OpenRouterProvider } from './providers';
 import type { VoiceResource } from './resources/core/voice.resource';
 import type { SMSResource } from './resources/core/sms.resource';
 import type { EmailResource } from './resources/core/email.resource';
@@ -106,6 +106,17 @@ export class AIReceptionist {
       providers: config.providers || {}
     };
 
+    // Initialize logger from config if provided
+    if (config.logger) {
+      const loggerConfig: import('./utils/logger').LoggerConfig = {
+        level: config.logger.level ? this.mapLogLevel(config.logger.level) : undefined,
+        prefix: config.logger.prefix,
+        enableTimestamps: config.logger.enableTimestamps,
+        enableColors: true, // Keep colors enabled by default
+      };
+      configureLogger(loggerConfig);
+    }
+
     // Validate required config
     if (!config.agent?.identity && !config.agent?.customSystemPrompt) {
       throw new Error('Agent identity configuration is required unless using customSystemPrompt');
@@ -117,6 +128,23 @@ export class AIReceptionist {
     if (config.debug) {
       const agentName = config.agent.identity?.name || 'Custom Agent';
       logger.info('[AIReceptionist] Created instance for agent', { name: agentName });
+    }
+  }
+
+  private mapLogLevel(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE'): LogLevel {
+    switch (level) {
+      case 'DEBUG':
+        return LogLevel.DEBUG;
+      case 'INFO':
+        return LogLevel.INFO;
+      case 'WARN':
+        return LogLevel.WARN;
+      case 'ERROR':
+        return LogLevel.ERROR;
+      case 'NONE':
+        return LogLevel.NONE;
+      default:
+        return LogLevel.INFO;
     }
   }
 

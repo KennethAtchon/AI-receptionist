@@ -166,9 +166,11 @@ export class TwilioProvider extends BaseProvider {
    * Constructs full webhook URL from config
    */
   getVoiceWebhookUrl(): string {
-    const baseUrl = this.config.webhookBaseUrl || process.env.BASE_URL || 'https://your-app.com';
+    if (!this.config.webhookBaseUrl) {
+      throw new Error('webhookBaseUrl is required in TwilioConfig');
+    }
     const path = this.config.voiceWebhookPath || '/webhooks/voice/inbound';
-    return `${baseUrl}${path}`;
+    return `${this.config.webhookBaseUrl}${path}`;
   }
 
   /**
@@ -176,9 +178,11 @@ export class TwilioProvider extends BaseProvider {
    * Constructs full webhook URL from config
    */
   getSMSWebhookUrl(): string {
-    const baseUrl = this.config.webhookBaseUrl || process.env.BASE_URL || 'https://your-app.com';
+    if (!this.config.webhookBaseUrl) {
+      throw new Error('webhookBaseUrl is required in TwilioConfig');
+    }
     const path = this.config.smsWebhookPath || '/webhooks/sms/inbound';
-    return `${baseUrl}${path}`;
+    return `${this.config.webhookBaseUrl}${path}`;
   }
 
   /**

@@ -250,6 +250,7 @@ export interface AIModelConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  httpReferer?: string; // For OpenRouter: HTTP-Referer header (optional)
 }
 
 export interface ChatOptions {
@@ -392,6 +393,18 @@ export interface AIReceptionistConfig {
   // Optional features
   debug?: boolean;
 
+  // Logger configuration
+  logger?: LoggerConfig;
+}
+
+// ============================================================================
+// Logger Configuration
+// ============================================================================
+
+export interface LoggerConfig {
+  level?: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE';
+  prefix?: string;
+  enableTimestamps?: boolean;
 }
 
 export interface ToolConfig {

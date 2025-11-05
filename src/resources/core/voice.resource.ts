@@ -93,10 +93,20 @@ export class VoiceResource extends BaseResource<VoiceSession> {
       const fullWebhookUrl = twilioProvider.getVoiceWebhookUrl();
       // Parse back to base + path for backward compat
       const urlMatch = fullWebhookUrl.match(/^(https?:\/\/[^\/]+)(.*)$/);
-      this.webhookBaseUrl = urlMatch ? urlMatch[1] : (config?.webhookBaseUrl || process.env.BASE_URL || '');
-      this.webhookPath = urlMatch ? urlMatch[2] : (config?.webhookPath || '/webhooks/voice');
+      if (urlMatch) {
+        this.webhookBaseUrl = urlMatch[1];
+        this.webhookPath = urlMatch[2];
+      } else if (config?.webhookBaseUrl) {
+        this.webhookBaseUrl = config.webhookBaseUrl;
+        this.webhookPath = config?.webhookPath || '/webhooks/voice';
+      } else {
+        throw new Error('webhookBaseUrl must be provided in VoiceConfig or TwilioConfig');
+      }
     } else {
-      this.webhookBaseUrl = config?.webhookBaseUrl || process.env.BASE_URL || '';
+      if (!config?.webhookBaseUrl) {
+        throw new Error('webhookBaseUrl must be provided in VoiceConfig when Twilio provider is not configured');
+      }
+      this.webhookBaseUrl = config.webhookBaseUrl;
       this.webhookPath = config?.webhookPath || '/webhooks/voice';
     }
 
@@ -130,7 +140,7 @@ export class VoiceResource extends BaseResource<VoiceSession> {
         toolParams: {
           to: options.to,
           greeting: options.greeting,
-          webhookUrl: `${process.env.BASE_URL || 'https://your-app.com'}/webhooks/voice/inbound`
+          webhookUrl: `${this.webhookBaseUrl}/webhooks/voice/inbound`
         }
       }
     );
@@ -263,7 +273,7 @@ export class VoiceResource extends BaseResource<VoiceSession> {
 
       // If recording is enabled, use media stream for real-time AI
       if (this.recordCalls) {
-        const websocketUrl = `wss://${process.env.BASE_URL || 'your-app.com'}/voice/stream`;
+        const websocketUrl = `wss://${this.webhookBaseUrl.replace(/^https?:\/\//, '')}/voice/stream`;
         return TwiMLGenerator.generateMediaStream(websocketUrl, {
           greeting: response,
           voice: this.twimlConfig.voice,

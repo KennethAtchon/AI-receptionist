@@ -28,7 +28,7 @@ export interface ILogger {
  * Logger configuration options
  */
 export interface LoggerConfig {
-  level?: LogLevel;
+  level?: LogLevel | 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE';
   enableTimestamps?: boolean;
   enableColors?: boolean;
   prefix?: string;
@@ -47,15 +47,17 @@ export class Logger implements ILogger {
   private _isProcessing: boolean = false;
 
   constructor(config: LoggerConfig = {}) {
-    this._level = config.level ?? this.getDefaultLogLevel();
+    this._level = this.parseLogLevel(config.level) ?? LogLevel.INFO;
     this._enableTimestamps = config.enableTimestamps ?? true;
     this._enableColors = config.enableColors ?? true;
     this._prefix = config.prefix ?? '[AIReceptionist]';
   }
 
-  private getDefaultLogLevel(): LogLevel {
-    const envLevel = process.env.AI_RECEPTIONIST_LOG_LEVEL?.toUpperCase();
-    switch (envLevel) {
+  private parseLogLevel(level?: LogLevel | string): LogLevel | undefined {
+    if (level === undefined) return undefined;
+    if (typeof level === 'number') return level;
+    const upper = level.toUpperCase();
+    switch (upper) {
       case 'DEBUG':
         return LogLevel.DEBUG;
       case 'INFO':
@@ -67,7 +69,7 @@ export class Logger implements ILogger {
       case 'NONE':
         return LogLevel.NONE;
       default:
-        return process.env.NODE_ENV === 'production' ? LogLevel.INFO : LogLevel.DEBUG;
+        return undefined;
     }
   }
 
@@ -173,7 +175,7 @@ export class Logger implements ILogger {
 
 /**
  * Global logger instance
- * Can be configured via environment variables or programmatically
+ * Can be configured programmatically via configureLogger()
  */
 let globalLogger: ILogger = new Logger();
 

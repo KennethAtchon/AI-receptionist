@@ -85,7 +85,7 @@ export class OpenRouterProvider extends BaseConfigurableProvider implements IAIP
       apiKey: this.currentConfig.apiKey,
       baseURL: OpenRouterProvider.BASE_URL,
       defaultHeaders: {
-        'HTTP-Referer': process.env.APP_URL || OpenRouterProvider.DEFAULT_REFERER,
+        'HTTP-Referer': this.currentConfig.httpReferer || OpenRouterProvider.DEFAULT_REFERER,
         'X-Title': OpenRouterProvider.SDK_TITLE,
       },
       maxRetries: 3,
