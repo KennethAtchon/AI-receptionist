@@ -19,6 +19,7 @@ import { createToolInfrastructure, registerAllTools } from './tools/initializati
 import { initializeResources } from './resources/initialization';
 import { WebhookRouter } from './webhooks/webhook-router';
 import { SessionManager } from './sessions';
+import { SDK_VERSION } from './version';
 
 // Type-only imports for tree-shaking
 import type { VoiceResource } from './resources/core/voice.resource';
@@ -83,13 +84,13 @@ import type { TextResource } from './resources/core/text.resource';
  * ```
  */
 export class AIReceptionist {
-  // Resources (user-facing APIs)
+  // ==================== PUBLIC RESOURCES (User-facing APIs) ====================
   public readonly voice?: VoiceResource;
   public readonly sms?: SMSResource;
   public readonly email?: EmailResource;
   public readonly text?: TextResource;
 
-  // Internal components
+  // ==================== INTERNAL COMPONENTS ====================
   private config: AIReceptionistConfig;
   private agent!: Agent; // The six-pillar agent instance
   private providerRegistry!: ProviderRegistry; // Centralized provider management
@@ -99,6 +100,8 @@ export class AIReceptionist {
   private webhookRouter!: WebhookRouter; // Webhook routing
 
   private initialized = false;
+
+  // ==================== CONSTRUCTION ====================
 
   constructor(config: AIReceptionistConfig) {
     // Ensure providers is an empty object if not provided
@@ -132,22 +135,7 @@ export class AIReceptionist {
     }
   }
 
-  private mapLogLevel(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE'): LogLevel {
-    switch (level) {
-      case 'DEBUG':
-        return LogLevel.DEBUG;
-      case 'INFO':
-        return LogLevel.INFO;
-      case 'WARN':
-        return LogLevel.WARN;
-      case 'ERROR':
-        return LogLevel.ERROR;
-      case 'NONE':
-        return LogLevel.NONE;
-      default:
-        return LogLevel.INFO;
-    }
-  }
+  // ==================== CORE LIFECYCLE METHODS ====================
 
   /**
    * Initialize the SDK
@@ -270,6 +258,132 @@ export class AIReceptionist {
   }
 
   /**
+   * Dispose of all resources
+   */
+  async dispose(): Promise<void> {
+    logger.info('[AIReceptionist] Disposing');
+
+    if (this.agent) {
+      await this.agent.dispose();
+    }
+
+    // Dispose all providers via registry
+    if (this.providerRegistry) {
+      await this.providerRegistry.disposeAll();
+    }
+
+    this.initialized = false;
+  }
+
+  /**
+   * Re-initialize the SDK with updated configuration
+   * Useful when model or provider configs change
+   * 
+   * @example
+   * ```typescript
+   * // Update model config
+   * client.updateConfig({ model: { ...client.getConfig().model, model: 'gpt-4-turbo' } });
+   * 
+   * // Re-initialize to apply changes
+   * await client.reinitialize();
+   * ```
+   */
+  async reinitialize(): Promise<void> {
+    logger.info('[AIReceptionist] Re-initializing...');
+    
+    // Dispose current state
+    await this.dispose();
+    
+    // Reset initialized flag
+    this.initialized = false;
+    
+    // Re-initialize
+    await this.initialize();
+  }
+
+  // ==================== CONFIGURATION METHODS ====================
+
+  /**
+   * Get current configuration (read-only copy)
+   * 
+   * @example
+   * ```typescript
+   * const config = client.getConfig();
+   * console.log(config.model.model); // 'gpt-4'
+   * ```
+   */
+  getConfig(): Readonly<AIReceptionistConfig> {
+    // Return a deep copy to prevent external mutations
+    return JSON.parse(JSON.stringify(this.config)) as AIReceptionistConfig;
+  }
+
+  /**
+   * Update configuration at runtime
+   * Supports updating logger, model, and some provider configs
+   * 
+   * @example
+   * ```typescript
+   * // Update logger level
+   * client.updateConfig({ logger: { level: 'DEBUG' } });
+   * 
+   * // Update model (requires re-initialization of AI provider)
+   * client.updateConfig({ model: { ...client.getConfig().model, model: 'gpt-4-turbo' } });
+   * ```
+   */
+  updateConfig(updates: Partial<AIReceptionistConfig>): void {
+    // Update logger if provided
+    if (updates.logger) {
+      const loggerConfig: import('./utils/logger').LoggerConfig = {
+        level: updates.logger.level ? this.mapLogLevel(updates.logger.level) : undefined,
+        prefix: updates.logger.prefix,
+        enableTimestamps: updates.logger.enableTimestamps,
+        enableColors: true,
+      };
+      configureLogger(loggerConfig);
+      // Update internal config
+      this.config.logger = { ...this.config.logger, ...updates.logger };
+    }
+
+    // Update debug flag
+    if (updates.debug !== undefined) {
+      this.config.debug = updates.debug;
+    }
+
+    // Update model config (note: changing model requires re-initialization of AI provider)
+    if (updates.model) {
+      this.config.model = { ...this.config.model, ...updates.model };
+      logger.warn('[AIReceptionist] Model config updated. AI provider may need re-initialization for changes to take effect.');
+    }
+
+    // Update provider configs (merge, don't replace)
+    if (updates.providers) {
+      this.config.providers = {
+        ...this.config.providers,
+        ...updates.providers,
+        // Deep merge communication providers
+        communication: {
+          ...this.config.providers?.communication,
+          ...updates.providers.communication,
+        },
+        // Deep merge calendar providers
+        calendar: {
+          ...this.config.providers?.calendar,
+          ...updates.providers.calendar,
+        },
+        // Deep merge email providers
+        email: updates.providers.email 
+          ? (this.config.providers?.email 
+              ? { ...this.config.providers.email, ...updates.providers.email }
+              : updates.providers.email)
+          : this.config.providers?.email,
+      };
+      logger.info('[AIReceptionist] Provider config updated. Some providers may need re-initialization.');
+    }
+
+    logger.info('[AIReceptionist] Configuration updated');
+  }
+
+  /**
    * Clone this instance with different agent/tool configuration
    * Providers are shared for efficiency
    *
@@ -385,84 +499,29 @@ export class AIReceptionist {
     return new AIReceptionist(clonedConfig);
   }
 
+  // ==================== PUBLIC ACCESSORS ====================
+
   /**
-   * Update configuration at runtime
-   * Supports updating logger, model, and some provider configs
-   * 
-   * @example
-   * ```typescript
-   * // Update logger level
-   * client.updateConfig({ logger: { level: 'DEBUG' } });
-   * 
-   * // Update model (requires re-initialization of AI provider)
-   * client.updateConfig({ model: { ...client.getConfig().model, model: 'gpt-4-turbo' } });
-   * ```
+   * Get the agent instance
    */
-  updateConfig(updates: Partial<AIReceptionistConfig>): void {
-    // Update logger if provided
-    if (updates.logger) {
-      const loggerConfig: import('./utils/logger').LoggerConfig = {
-        level: updates.logger.level ? this.mapLogLevel(updates.logger.level) : undefined,
-        prefix: updates.logger.prefix,
-        enableTimestamps: updates.logger.enableTimestamps,
-        enableColors: true,
-      };
-      configureLogger(loggerConfig);
-      // Update internal config
-      this.config.logger = { ...this.config.logger, ...updates.logger };
-    }
-
-    // Update debug flag
-    if (updates.debug !== undefined) {
-      this.config.debug = updates.debug;
-    }
-
-    // Update model config (note: changing model requires re-initialization of AI provider)
-    if (updates.model) {
-      this.config.model = { ...this.config.model, ...updates.model };
-      logger.warn('[AIReceptionist] Model config updated. AI provider may need re-initialization for changes to take effect.');
-    }
-
-    // Update provider configs (merge, don't replace)
-    if (updates.providers) {
-      this.config.providers = {
-        ...this.config.providers,
-        ...updates.providers,
-        // Deep merge communication providers
-        communication: {
-          ...this.config.providers?.communication,
-          ...updates.providers.communication,
-        },
-        // Deep merge calendar providers
-        calendar: {
-          ...this.config.providers?.calendar,
-          ...updates.providers.calendar,
-        },
-        // Deep merge email providers
-        email: updates.providers.email 
-          ? (this.config.providers?.email 
-              ? { ...this.config.providers.email, ...updates.providers.email }
-              : updates.providers.email)
-          : this.config.providers?.email,
-      };
-      logger.info('[AIReceptionist] Provider config updated. Some providers may need re-initialization.');
-    }
-
-    logger.info('[AIReceptionist] Configuration updated');
+  public getAgent(): Agent {
+    this.ensureInitialized();
+    return this.agent;
   }
 
   /**
-   * Get current configuration (read-only copy)
-   * 
+   * Get the provider registry for runtime provider management
+   *
    * @example
    * ```typescript
-   * const config = client.getConfig();
-   * console.log(config.model.model); // 'gpt-4'
+   * const registry = client.getProviderRegistry();
+   * const openrouter = await registry.get<OpenRouterProvider>('ai');
+   * openrouter.setModel('anthropic/claude-3-opus');
    * ```
    */
-  getConfig(): Readonly<AIReceptionistConfig> {
-    // Return a deep copy to prevent external mutations
-    return JSON.parse(JSON.stringify(this.config)) as AIReceptionistConfig;
+  public getProviderRegistry(): ProviderRegistry {
+    this.ensureInitialized();
+    return this.providerRegistry;
   }
 
   /**
@@ -489,29 +548,6 @@ export class AIReceptionist {
   }
 
   /**
-   * Get the agent instance
-   */
-  public getAgent(): Agent {
-    this.ensureInitialized();
-    return this.agent;
-  }
-
-  /**
-   * Get the provider registry for runtime provider management
-   *
-   * @example
-   * ```typescript
-   * const registry = client.getProviderRegistry();
-   * const openrouter = await registry.get<OpenRouterProvider>('ai');
-   * openrouter.setModel('anthropic/claude-3-opus');
-   * ```
-   */
-  public getProviderRegistry(): ProviderRegistry {
-    this.ensureInitialized();
-    return this.providerRegistry;
-  }
-
-  /**
    * Get session manager for session lifecycle management
    */
   public getSessionManager(): SessionManager {
@@ -526,6 +562,8 @@ export class AIReceptionist {
     this.ensureInitialized();
     return this.webhookRouter;
   }
+
+  // ==================== WEBHOOK HANDLERS ====================
 
   /**
    * Handle incoming voice webhook (Twilio)
@@ -577,6 +615,8 @@ export class AIReceptionist {
     this.ensureInitialized();
     return await this.webhookRouter.handleEmailWebhook(payload);
   }
+
+  // ==================== UTILITY & MONITORING METHODS ====================
 
   /**
    * Perform health check on all components
@@ -645,32 +685,6 @@ export class AIReceptionist {
   }
 
   /**
-   * Re-initialize the SDK with updated configuration
-   * Useful when model or provider configs change
-   * 
-   * @example
-   * ```typescript
-   * // Update model config
-   * client.updateConfig({ model: { ...client.getConfig().model, model: 'gpt-4-turbo' } });
-   * 
-   * // Re-initialize to apply changes
-   * await client.reinitialize();
-   * ```
-   */
-  async reinitialize(): Promise<void> {
-    logger.info('[AIReceptionist] Re-initializing...');
-    
-    // Dispose current state
-    await this.dispose();
-    
-    // Reset initialized flag
-    this.initialized = false;
-    
-    // Re-initialize
-    await this.initialize();
-  }
-
-  /**
    * Get SDK information and version
    * 
    * @example
@@ -689,7 +703,7 @@ export class AIReceptionist {
     tools: number;
   } {
     return {
-      version: '0.1.13', // Should match package.json
+      version: SDK_VERSION,
       agentName: this.config.agent.identity?.name || 'Custom Agent',
       initialized: this.initialized,
       channels: [
@@ -703,22 +717,23 @@ export class AIReceptionist {
     };
   }
 
-  /**
-   * Dispose of all resources
-   */
-  async dispose(): Promise<void> {
-    logger.info('[AIReceptionist] Disposing');
+  // ==================== PRIVATE HELPER METHODS ====================
 
-    if (this.agent) {
-      await this.agent.dispose();
+  private mapLogLevel(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE'): LogLevel {
+    switch (level) {
+      case 'DEBUG':
+        return LogLevel.DEBUG;
+      case 'INFO':
+        return LogLevel.INFO;
+      case 'WARN':
+        return LogLevel.WARN;
+      case 'ERROR':
+        return LogLevel.ERROR;
+      case 'NONE':
+        return LogLevel.NONE;
+      default:
+        return LogLevel.INFO;
     }
-
-    // Dispose all providers via registry
-    if (this.providerRegistry) {
-      await this.providerRegistry.disposeAll();
-    }
-
-    this.initialized = false;
   }
 
   private ensureInitialized(): void {
