@@ -10,6 +10,7 @@ import { logger, configureLogger, LogLevel } from './utils/logger';
 
 import { Agent } from './agent/core/Agent';
 import { AgentBuilder } from './agent/core/AgentBuilder';
+import { AgentStatus } from './agent/types';
 import { ProviderRegistry } from './providers/core/provider-registry';
 
 // Initialization modules
@@ -157,6 +158,8 @@ export class AIReceptionist {
    * - Agent (six-pillar architecture)
    * - Tools (standard, custom, provider-specific)
    * - Resources (user-facing APIs)
+   *
+   * @throws Error if initialization fails at any step
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -166,78 +169,104 @@ export class AIReceptionist {
 
     logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity?.name || 'Custom Agent'}`);
 
-    // 1. Initialize provider registry and register all providers
-    this.providerRegistry = await initializeProviders(this.config);
+    try {
+      // 1. Initialize provider registry and register all providers
+      try {
+        this.providerRegistry = await initializeProviders(this.config);
+      } catch (error) {
+        throw new Error(`Failed to initialize providers: ${(error as Error).message}`);
+      }
 
-    // 2. Create tool infrastructure (registry + store)
-    const { toolRegistry, toolStore } = createToolInfrastructure();
-    this.toolRegistry = toolRegistry;
-    this.toolStore = toolStore;
+      // 2. Create tool infrastructure (registry + store)
+      const { toolRegistry, toolStore } = createToolInfrastructure();
+      this.toolRegistry = toolRegistry;
+      this.toolStore = toolStore;
 
-    // 3. Create and initialize the Agent (Six-Pillar Architecture)
-    const aiProvider = await getAIProvider(this.providerRegistry);
+      // 3. Create and initialize the Agent (Six-Pillar Architecture)
+      let aiProvider;
+      try {
+        aiProvider = await getAIProvider(this.providerRegistry);
+      } catch (error) {
+        throw new Error(`Failed to get AI provider: ${(error as Error).message}`);
+      }
 
-    const builder = AgentBuilder.create();
+      const builder = AgentBuilder.create();
 
-    // If custom system prompt is provided, use it
-    if (this.config.agent.customSystemPrompt) {
-      builder.withCustomSystemPrompt(this.config.agent.customSystemPrompt);
+      // If custom system prompt is provided, use it
+      if (this.config.agent.customSystemPrompt) {
+        builder.withCustomSystemPrompt(this.config.agent.customSystemPrompt);
+      }
+
+      // Add identity if provided (required unless customSystemPrompt is set)
+      if (this.config.agent.identity) {
+        builder.withIdentity(this.config.agent.identity);
+      }
+
+      // Add optional configuration
+      try {
+        this.agent = builder
+          .withPersonality(this.config.agent.personality || {})
+          .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
+          .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
+          .withMemory(this.config.agent.memory || { contextWindow: 20 })
+          .withAIProvider(aiProvider)
+          .withToolRegistry(this.toolRegistry)
+          .build();
+
+        this.toolStore.setAgent(this.agent);
+        await this.agent.initialize();
+      } catch (error) {
+        throw new Error(`Failed to initialize agent: ${(error as Error).message}`);
+      }
+
+      // 4. Register all tools (tools call providers directly - NO processors)
+      try {
+        await registerAllTools(
+          {
+            config: this.config,
+            agent: this.agent,
+            providerRegistry: this.providerRegistry // Pass registry, not processors
+          },
+          this.toolRegistry
+        );
+      } catch (error) {
+        throw new Error(`Failed to register tools: ${(error as Error).message}`);
+      }
+
+      // 5. Initialize session management
+      this.sessionManager = new SessionManager();
+      this.webhookRouter = new WebhookRouter(this);
+
+      // 6. Initialize resources (session managers)
+      const resources = initializeResources({
+        agent: this.agent
+      });
+
+      // Assign resources (using Object.assign to avoid type casting)
+      Object.assign(this, {
+        voice: resources.voice,
+        sms: resources.sms,
+        email: resources.email,
+        text: resources.text
+      });
+
+      this.initialized = true;
+
+      logger.info(`[AIReceptionist] Initialized successfully`);
+      logger.info(`[AIReceptionist] - Registered providers: ${this.providerRegistry.list().join(', ')}`);
+      logger.info(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);
+      logger.info(`[AIReceptionist] - Available channels: ${[
+        this.voice ? 'voice' : null,
+        this.sms ? 'sms' : null,
+        this.email ? 'email' : null,
+        this.text ? 'text' : null
+      ].filter(Boolean).join(', ')}`);
+    } catch (error) {
+      // Ensure we don't leave partial state if initialization fails
+      this.initialized = false;
+      logger.error('[AIReceptionist] Initialization failed:', error as Error);
+      throw error;
     }
-
-    // Add identity if provided (required unless customSystemPrompt is set)
-    if (this.config.agent.identity) {
-      builder.withIdentity(this.config.agent.identity);
-    }
-
-    // Add optional configuration
-    this.agent = builder
-      .withPersonality(this.config.agent.personality || {})
-      .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
-      .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
-      .withMemory(this.config.agent.memory || { contextWindow: 20 })
-      .withAIProvider(aiProvider)
-      .withToolRegistry(this.toolRegistry)
-      .build();
-
-    this.toolStore.setAgent(this.agent);
-    await this.agent.initialize();
-
-    // 4. Register all tools (tools call providers directly - NO processors)
-    await registerAllTools(
-      {
-        config: this.config,
-        agent: this.agent,
-        providerRegistry: this.providerRegistry // Pass registry, not processors
-      },
-      this.toolRegistry
-    );
-
-    // 5. Initialize session management
-    this.sessionManager = new SessionManager();
-    this.webhookRouter = new WebhookRouter(this);
-
-    // 6. Initialize resources (session managers)
-    const resources = initializeResources({
-      agent: this.agent
-    });
-
-    // Assign resources
-    (this as any).voice = resources.voice;
-    (this as any).sms = resources.sms;
-    (this as any).email = resources.email;
-    (this as any).text = resources.text;
-
-    this.initialized = true;
-
-    logger.info(`[AIReceptionist] Initialized successfully`);
-    logger.info(`[AIReceptionist] - Registered providers: ${this.providerRegistry.list().join(', ')}`);
-    logger.info(`[AIReceptionist] - Registered tools: ${this.toolRegistry.count()}`);
-    logger.info(`[AIReceptionist] - Available channels: ${[
-      this.voice ? 'voice' : null,
-      this.sms ? 'sms' : null,
-      this.email ? 'email' : null,
-      this.text ? 'text' : null
-    ].filter(Boolean).join(', ')}`);
   }
 
   /**
@@ -547,6 +576,131 @@ export class AIReceptionist {
   async handleEmailWebhook(payload: any): Promise<any> {
     this.ensureInitialized();
     return await this.webhookRouter.handleEmailWebhook(payload);
+  }
+
+  /**
+   * Perform health check on all components
+   * Checks agent, providers, and resources
+   * 
+   * @example
+   * ```typescript
+   * const health = await client.healthCheck();
+   * if (!health.healthy) {
+   *   console.error('Health check failed:', health.errors);
+   * }
+   * ```
+   */
+  async healthCheck(): Promise<{
+    healthy: boolean;
+    agent: boolean;
+    providers: Record<string, boolean>;
+    errors: string[];
+  }> {
+    this.ensureInitialized();
+
+    const result = {
+      healthy: true,
+      agent: false,
+      providers: {} as Record<string, boolean>,
+      errors: [] as string[]
+    };
+
+    // Check agent health (check if agent is ready and initialized)
+    try {
+      const status = this.agent.getStatus();
+      result.agent = status === AgentStatus.READY || status === AgentStatus.PROCESSING;
+      if (!result.agent) {
+        result.errors.push(`Agent is not ready (status: ${status})`);
+        result.healthy = false;
+      }
+    } catch (error) {
+      result.agent = false;
+      result.errors.push(`Agent health check error: ${(error as Error).message}`);
+      result.healthy = false;
+    }
+
+    // Check all providers
+    const providerNames = this.providerRegistry.list();
+    for (const name of providerNames) {
+      try {
+        const provider = await this.providerRegistry.get(name);
+        if (provider && typeof provider.healthCheck === 'function') {
+          const isHealthy = await provider.healthCheck();
+          result.providers[name] = isHealthy;
+          if (!isHealthy) {
+            result.errors.push(`Provider '${name}' health check failed`);
+            result.healthy = false;
+          }
+        } else {
+          result.providers[name] = true; // Assume healthy if no health check method
+        }
+      } catch (error) {
+        result.providers[name] = false;
+        result.errors.push(`Provider '${name}' health check error: ${(error as Error).message}`);
+        result.healthy = false;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Re-initialize the SDK with updated configuration
+   * Useful when model or provider configs change
+   * 
+   * @example
+   * ```typescript
+   * // Update model config
+   * client.updateConfig({ model: { ...client.getConfig().model, model: 'gpt-4-turbo' } });
+   * 
+   * // Re-initialize to apply changes
+   * await client.reinitialize();
+   * ```
+   */
+  async reinitialize(): Promise<void> {
+    logger.info('[AIReceptionist] Re-initializing...');
+    
+    // Dispose current state
+    await this.dispose();
+    
+    // Reset initialized flag
+    this.initialized = false;
+    
+    // Re-initialize
+    await this.initialize();
+  }
+
+  /**
+   * Get SDK information and version
+   * 
+   * @example
+   * ```typescript
+   * const info = client.getInfo();
+   * console.log(`SDK Version: ${info.version}`);
+   * console.log(`Agent: ${info.agentName}`);
+   * ```
+   */
+  getInfo(): {
+    version: string;
+    agentName: string;
+    initialized: boolean;
+    channels: string[];
+    providers: string[];
+    tools: number;
+  } {
+    return {
+      version: '0.1.13', // Should match package.json
+      agentName: this.config.agent.identity?.name || 'Custom Agent',
+      initialized: this.initialized,
+      channels: [
+        this.voice ? 'voice' : null,
+        this.sms ? 'sms' : null,
+        this.email ? 'email' : null,
+        this.text ? 'text' : null
+      ].filter(Boolean) as string[],
+      providers: this.initialized ? this.providerRegistry.list() : [],
+      tools: this.initialized ? this.toolRegistry.count() : 0
+    };
   }
 
   /**

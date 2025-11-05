@@ -18,8 +18,7 @@ import type {
   PersonalityConfig,
   KnowledgeConfig,
   MemoryConfig,
-  GoalConfig,
-  ObservabilityConfig
+  GoalConfig
 } from '../types';
 
 import { Agent } from './Agent';
@@ -105,14 +104,6 @@ export class AgentBuilder {
    */
   public withConversationService(service: any): this {
     (this.config as any).conversationService = service;
-    return this;
-  }
-
-  /**
-   * Set observability configuration (OPTIONAL)
-   */
-  public withObservability(config: ObservabilityConfig): this {
-    this.config.observability = config;
     return this;
   }
 

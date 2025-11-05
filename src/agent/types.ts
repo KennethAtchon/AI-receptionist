@@ -416,7 +416,6 @@ export interface AgentConfiguration {
   goals?: GoalConfig;
   tools?: any[];
   aiProvider: any; // IAIProvider
-  observability?: ObservabilityConfig;
   customSystemPrompt?: string; // Optional: Bypass SystemPromptBuilder and use raw custom prompt
 }
 
@@ -425,7 +424,6 @@ export interface AgentState {
   identity: Record<string, unknown>;
   currentGoals: Goal[];
   memoryStats: MemoryStats;
-  performance?: PerformanceMetrics;
 }
 
 // ==================== PROMPT BUILDING ====================
@@ -465,69 +463,6 @@ export interface PromptExample {
 export interface PolicyRule {
   name: string;
   rule: string;
-}
-
-// ==================== OBSERVABILITY ====================
-
-export interface ObservabilityConfig {
-  loggingEnabled?: boolean;
-  tracingEnabled?: boolean;
-  logLevel?: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-}
-
-export interface LogContext {
-  agentId: string;
-  agentName: string;
-  version: string;
-}
-
-export interface TraceStep {
-  step: string;
-  data: any;
-  timestamp: number;
-  duration?: number;
-}
-
-export interface Trace {
-  id: string;
-  steps: TraceStep[];
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-}
-
-export interface InteractionMetrics {
-  duration?: number;
-  stepCount?: number;
-  memoryRetrievalTime?: number;
-  aiResponseTime?: number;
-  toolExecutionTime?: number;
-}
-
-export interface PerformanceMetrics {
-  averageResponseTime: number;
-  successRate: number;
-  errorRate: number;
-  totalInteractions: number;
-}
-
-// ==================== ERROR HANDLING ====================
-
-export interface CircuitBreakerConfig {
-  failureThreshold: number;
-  resetTimeout: number;
-  onOpen?: () => void;
-  onClose?: () => void;
-}
-
-// ==================== SPECIALIZATION ====================
-
-export interface Specialization {
-  domain: string;
-  additionalInstructions: string;
-  defaultCapabilities: string[];
-  requiredKnowledge: string[];
-  complianceRequirements?: string[];
 }
 
 // ==================== TOKENIZATION ====================

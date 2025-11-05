@@ -16,14 +16,12 @@ import type {
   AgentConfiguration,
   AgentRequest,
   AgentResponse,
-  AgentState,
   Identity,
   PersonalityEngine,
   KnowledgeBase,
   MemoryManager,
   GoalSystem,
-  ConversationHistory,
-  PerformanceMetrics
+  ConversationHistory
 } from '../types';
 
 import { AgentStatus } from '../types';
@@ -55,7 +53,6 @@ export class Agent {
 
   // ==================== STATE ====================
   private state: AgentStatus;
-  private performanceMetrics: PerformanceMetrics;
 
   // ==================== EXTERNAL DEPENDENCIES ====================
   private aiProvider: any; // IAIProvider
@@ -114,12 +111,6 @@ export class Agent {
 
     // Initialize state
     this.state = AgentStatus.INITIALIZING;
-    this.performanceMetrics = {
-      averageResponseTime: 0,
-      successRate: 0,
-      errorRate: 0,
-      totalInteractions: 0
-    };
   }
 
   /**
@@ -261,15 +252,11 @@ export class Agent {
       // 6. Track goal progress
       await this.goals.trackProgress(request, response);
 
-      // Update performance metrics
-      this.updatePerformanceMetrics(Date.now() - startTime, true);
-
       this.state = AgentStatus.READY;
       return response;
 
     } catch (error) {
       logger.error('Error processing request', error as Error, { agentId: this.id, request });
-      this.updatePerformanceMetrics(Date.now() - startTime, false);
       this.state = AgentStatus.ERROR;
       return this.handleError(error as Error, request);
     } finally {
@@ -461,16 +448,10 @@ export class Agent {
   }
 
   /**
-   * Get current agent state
+   * Get current agent status
    */
-  public getState(): AgentState {
-    return {
-      status: this.state,
-      identity: this.identity.toJSON(),
-      currentGoals: this.goals.getCurrent(),
-      memoryStats: this.memory.getStats(),
-      performance: this.performanceMetrics
-    };
+  public getStatus(): AgentStatus {
+    return this.state;
   }
 
   /**
@@ -481,36 +462,6 @@ export class Agent {
       throw new Error('System prompt not yet built. Call initialize() first.');
     }
     return this.cachedSystemPrompt;
-  }
-
-  /**
-   * Get performance metrics
-   */
-  public getPerformanceMetrics(): PerformanceMetrics {
-    return { ...this.performanceMetrics };
-  }
-
-  /**
-   * Update performance metrics
-   */
-  private updatePerformanceMetrics(duration: number, success: boolean): void {
-    const total = this.performanceMetrics.totalInteractions;
-    const newTotal = total + 1;
-
-    // Update average response time
-    this.performanceMetrics.averageResponseTime =
-      (this.performanceMetrics.averageResponseTime * total + duration) / newTotal;
-
-    // Update success/error rates
-    if (success) {
-      this.performanceMetrics.successRate =
-        (this.performanceMetrics.successRate * total + 1) / newTotal;
-    } else {
-      this.performanceMetrics.errorRate =
-        (this.performanceMetrics.errorRate * total + 1) / newTotal;
-    }
-
-    this.performanceMetrics.totalInteractions = newTotal;
   }
 
   /**
@@ -590,14 +541,6 @@ export class Agent {
     this.aiProvider = null as any;
     this.toolRegistry = null;
     this.conversationService = null;
-
-    // Clear performance metrics
-    this.performanceMetrics = {
-      totalInteractions: 0,
-      averageResponseTime: 0,
-      successRate: 0,
-      errorRate: 0
-    };
 
     logger.info('Agent disposed - all references cleared', { agentId: this.id });
   }

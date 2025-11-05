@@ -78,13 +78,6 @@ export type {
   PromptSection,
   PromptExample,
 
-  // Observability
-  LogContext,
-  Trace,
-  TraceStep,
-  InteractionMetrics,
-  PerformanceMetrics,
-
   // Common
   Channel
 } from '../agent/types';
