@@ -235,7 +235,6 @@ export interface ConversationHistoryMetadata {
   oldestMessageTimestamp?: Date;
   newestMessageTimestamp?: Date;
   hasLongTermContext: boolean;
-  hasSemanticContext: boolean;
 }
 
 export interface MemorySearchQuery {
@@ -314,10 +313,6 @@ export interface MemoryConfig {
   longTermStorage?: IStorage; // Generic storage interface (per-agent, legacy)
   sharedLongTermMemory?: any; // Shared LongTermMemory instance (factory pattern) - `any` to avoid circular dependency
 
-  // Vector config
-  vectorEnabled?: boolean;
-  vectorStore?: IVectorStore;
-
   // Auto-persistence rules
   autoPersist?: {
     minImportance?: number; // Auto-save if importance >= this
@@ -328,7 +323,6 @@ export interface MemoryConfig {
 export interface MemoryStats {
   shortTermCount: number;
   longTermCount: number;
-  semanticCount: number;
 }
 
 export interface MemoryManager {
@@ -544,15 +538,6 @@ export interface ITokenizer {
 
 // ==================== STORAGE INTERFACES ====================
 
-export interface IVectorStore {
-  upsert(data: { id: string; vector: number[]; metadata: any }): Promise<void>;
-  query(params: { vector: number[]; topK: number; threshold: number }): Promise<any[]>;
-}
-
-export interface SearchOptions {
-  limit: number;
-  threshold: number;
-}
 
 export interface Understanding {
   input: string;

@@ -75,7 +75,6 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
    */
   public async load(): Promise<void> {
     // In the future, this would:
-    // - Load knowledge from vector databases
     // - Initialize RAG systems
     // - Cache frequently accessed knowledge
     // For now, it's a no-op

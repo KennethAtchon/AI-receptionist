@@ -21,14 +21,12 @@ graph TB
         MemoryManager[Memory Manager]
         ShortTerm[Short-Term Memory]
         LongTerm[Long-Term Memory]
-        Vector[Vector Memory]
     end
 
     subgraph "Storage Layer"
         IStorage[IStorage Interface]
         InMemory[In-Memory Storage]
         Database[Database Storage]
-        VectorStore[Vector Store]
     end
 
     subgraph "Database Layer"
@@ -54,10 +52,8 @@ graph TB
     Agent --> MemoryManager
     MemoryManager --> ShortTerm
     MemoryManager --> LongTerm
-    MemoryManager --> Vector
 
     LongTerm --> IStorage
-    Vector --> VectorStore
 
     IStorage --> InMemory
     IStorage --> Database
@@ -186,9 +182,23 @@ export const memory = pgTable('ai_receptionist_memory', {
     callSid?: string;
     messageSid?: string;
     emailId?: string;
+    threadId?: string; // Email thread tracking
+    threadRoot?: string; // First message ID in the email thread
+    inReplyTo?: string; // Parent email ID
+    references?: string; // Full email thread references chain
+    direction?: 'inbound' | 'outbound'; // Email/message direction
+    to?: string; // Recipient (for emails/SMS)
+    from?: string; // Sender (for emails/SMS)
+    subject?: string; // Email subject
     status?: 'active' | 'completed' | 'failed';
-    duration?: number;
-    participants?: string[];
+    duration?: number; // For calls
+    participants?: string[]; // Phone numbers, emails, etc.
+    attachments?: Array<{ // Email/MMS attachments
+      name: string;
+      contentType: string;
+      contentLength: number;
+      contentId?: string;
+    }>;
   }>(),
 
   // Role tracking
@@ -228,7 +238,7 @@ export interface ConversationHistory {
   messages: Message[];
 
   /**
-   * Context messages (long-term/semantic memories as system messages)
+   * Context messages (long-term memories as system messages)
    * These are injected before the conversation messages
    */
   contextMessages?: Message[];
@@ -245,7 +255,6 @@ export interface ConversationHistoryMetadata {
   oldestMessageTimestamp?: Date;
   newestMessageTimestamp?: Date;
   hasLongTermContext: boolean;
-  hasSemanticContext: boolean;
 }
 ```
 
@@ -255,15 +264,30 @@ The `MemorySearchQuery` interface provides flexible search capabilities:
 
 ```typescript
 interface MemorySearchQuery {
-  // Filtering
-  conversationId?: string;
+  // Full-text search
+  keywords?: string[];
+
+  // Filter by type
+  type?: Memory['type'] | Memory['type'][];
+
+  // Filter by channel
   channel?: Channel;
-  type?: string | string[];
-  role?: string;
+
+  // Filter by conversation
+  conversationId?: string;
+
+  // Filter by sessionMetadata fields (JSONB query)
+  sessionMetadata?: Record<string, any>;
+
+  // Filter by date range
   startDate?: Date;
   endDate?: Date;
+
+  // Filter by importance
   minImportance?: number;
-  keywords?: string[];
+
+  // Filter by role
+  role?: 'system' | 'user' | 'assistant' | 'tool';
 
   // Pagination
   limit?: number;
@@ -345,6 +369,25 @@ export class DatabaseStorage implements IStorage {
 - Complex filtering and sorting
 - Batch operations for performance
 - Automatic migrations
+- Unified allowlist management for emails and SMS
+
+#### DatabaseStorage Additional Methods
+
+The `DatabaseStorage` implementation also provides unified allowlist management methods:
+
+```typescript
+// Email allowlist methods
+async getAllAllowlistedEmails(): Promise<{ email: string }[]>;
+async addToEmailAllowlist(email: string, addedBy?: string): Promise<void>;
+async removeFromEmailAllowlist(email: string): Promise<void>;
+async clearEmailAllowlist(): Promise<void>;
+
+// SMS allowlist methods
+async getAllAllowlistedPhoneNumbers(): Promise<{ phoneNumber: string }[]>;
+async addToPhoneAllowlist(phoneNumber: string, addedBy?: string): Promise<void>;
+async removeFromPhoneAllowlist(phoneNumber: string): Promise<void>;
+async clearPhoneAllowlist(): Promise<void>;
+```
 
 ### 6. Memory Manager Integration
 
@@ -354,7 +397,6 @@ The `MemoryManager` coordinates between different memory types and returns struc
 export class MemoryManagerImpl implements IMemoryManager {
   private readonly shortTerm: ShortTermMemory;
   private readonly longTerm?: LongTermMemory;
-  private readonly vector?: VectorMemory;
 
   async store(memory: Memory): Promise<void> {
     // Always store in short-term memory
@@ -406,8 +448,7 @@ export class MemoryManagerImpl implements IMemoryManager {
       metadata: {
         conversationId: context?.conversationId,
         messageCount: messages.length,
-        hasLongTermContext: contextMessages.length > 0,
-        hasSemanticContext: false
+        hasLongTermContext: contextMessages.length > 0
       }
     };
   }
@@ -550,6 +591,36 @@ The system stores different types of memories:
 }
 ```
 
+#### Email Conversation Memories
+```typescript
+{
+  id: "email-123-msg-1",
+  content: "Hello, I'm interested in your services",
+  timestamp: new Date(),
+  type: "conversation",
+  role: "user",
+  channel: "email",
+  sessionMetadata: {
+    conversationId: "conv-123",
+    emailId: "email-123",
+    threadId: "thread-abc",
+    threadRoot: "email-123",
+    inReplyTo: "email-122",
+    references: "<email-123@example.com> <email-122@example.com>",
+    direction: "inbound",
+    to: "agent@example.com",
+    from: "customer@example.com",
+    subject: "Re: Inquiry about services",
+    attachments: [{
+      name: "document.pdf",
+      contentType: "application/pdf",
+      contentLength: 102400,
+      contentId: "doc-123"
+    }]
+  }
+}
+```
+
 #### Decision Memories
 ```typescript
 {
@@ -658,11 +729,45 @@ CREATE TABLE ai_receptionist_call_logs (
 );
 ```
 
+#### Allowlist Table
+Unified allowlist table for auto-reply control. Stores emails and phone numbers that are permitted to receive auto-replies:
+
+```sql
+CREATE TABLE ai_receptionist_allowlist (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  identifier TEXT NOT NULL, -- email or phone number
+  type TEXT NOT NULL, -- 'email' | 'sms'
+  added_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  added_by TEXT, -- 'system' | 'manual' | 'conversation_init' | 'opt_in'
+  UNIQUE(identifier, type)
+);
+```
+
 ## Storage Lifecycle
 
 ### 1. Initialization in Agent
 
-Storage is initialized during agent creation:
+Storage is initialized during agent creation. The `MemoryConfig` interface provides configuration options:
+
+```typescript
+export interface MemoryConfig {
+  // Short-term config
+  contextWindow?: number; // Default: 20 messages
+
+  // Long-term config
+  longTermEnabled?: boolean;
+  longTermStorage?: IStorage; // Generic storage interface (per-agent, legacy)
+  sharedLongTermMemory?: any; // Shared LongTermMemory instance (factory pattern)
+
+  // Auto-persistence rules
+  autoPersist?: {
+    minImportance?: number; // Auto-save if importance >= this
+    types?: Memory['type'][]; // Auto-save these types
+  };
+}
+```
+
+Example initialization:
 
 ```typescript
 // In Agent constructor
@@ -673,7 +778,6 @@ const memoryConfig: MemoryConfig = {
     db: this.database,
     autoMigrate: true
   }),
-  vectorEnabled: false, // Optional
   autoPersist: {
     minImportance: 7,
     types: ['decision', 'tool_execution', 'system']
@@ -793,24 +897,19 @@ const memoryConfig: MemoryConfig = {
 
   // Long-term memory settings
   longTermEnabled: true,
+  // Option 1: Per-agent storage (legacy pattern)
   longTermStorage: new DatabaseStorage({
     db: database,
     autoMigrate: true
   }),
+  // Option 2: Shared storage (factory pattern - recommended for multi-agent scenarios)
+  // sharedLongTermMemory: sharedLongTermMemoryInstance,
 
   // Auto-persistence rules
   autoPersist: {
     minImportance: 6, // Persist memories with importance >= 6
     types: ['decision', 'tool_execution', 'system', 'error']
-  },
-
-  // Vector memory (optional)
-  vectorEnabled: true,
-  vectorStore: new VectorStore({
-    provider: 'pinecone',
-    apiKey: process.env.PINECONE_API_KEY,
-    environment: process.env.PINECONE_ENVIRONMENT
-  })
+  }
 };
 ```
 
@@ -869,6 +968,11 @@ CREATE INDEX memory_timestamp_idx ON ai_receptionist_memory (timestamp);
 
 -- Importance-based queries
 CREATE INDEX memory_importance_idx ON ai_receptionist_memory (importance);
+
+-- Allowlist indexes
+CREATE INDEX allowlist_identifier_type_idx ON ai_receptionist_allowlist (identifier, type);
+CREATE INDEX allowlist_type_idx ON ai_receptionist_allowlist (type);
+CREATE INDEX allowlist_added_at_idx ON ai_receptionist_allowlist (added_at);
 ```
 
 ### Query Optimization

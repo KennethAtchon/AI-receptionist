@@ -4,7 +4,6 @@
  * The Memory pillar encompasses:
  * - Short-term memory (working memory)
  * - Long-term memory (persistent storage)
- * - Vector memory (semantic search)
  */
 
 import type {
@@ -21,13 +20,11 @@ import type {
 
 import { ShortTermMemory } from './ShortTermMemory';
 import { LongTermMemory } from './LongTermMemory';
-import { VectorMemory } from './VectorMemory';
 import { logger } from '../../utils/logger';
 
 export class MemoryManagerImpl implements IMemoryManager {
   private readonly shortTerm: ShortTermMemory;
   private readonly longTerm?: LongTermMemory;
-  private readonly vector?: VectorMemory;
   private readonly config: MemoryConfig;
 
   constructor(config: MemoryConfig) {
@@ -46,11 +43,6 @@ export class MemoryManagerImpl implements IMemoryManager {
         this.longTerm = new LongTermMemory(config.longTermStorage);
       }
     }
-
-    // Initialize vector memory if enabled
-    if (config.vectorEnabled && config.vectorStore) {
-      this.vector = new VectorMemory(config.vectorStore);
-    }
   }
 
   /**
@@ -60,6 +52,12 @@ export class MemoryManagerImpl implements IMemoryManager {
     // Future: Load initial context from storage
   }
 
+  /**
+   * TODO: Refractor this, remove the input (user message) because it is utterly meaningless to retrieve a CONVERSATION HISTORY, make sure there is NO limit. Just retrieve the conversation using the ID, this function should be as simple as that. Just query the long term storage, completely remove short term from here
+   * @param input - The user's message
+   * @param context - convo Id, channel
+   * @returns 
+   */
   public async retrieve(input: string, context?: {
     conversationId?: string;
     channel?: Channel;
@@ -102,33 +100,12 @@ export class MemoryManagerImpl implements IMemoryManager {
       }
     }
 
-    if (this.vector && context?.conversationId) {
-      try {
-        const embedding = await this.generateEmbedding(input);
-        const semanticMemories = await this.vector.similaritySearch(embedding, {
-          limit: 3,
-          threshold: 0.8
-        });
-
-        if (semanticMemories.length > 0) {
-          contextMessages.push({
-            role: 'system',
-            content: this.formatSemanticContext(semanticMemories),
-            timestamp: new Date()
-          });
-        }
-      } catch (error) {
-        logger.warn('[MemoryManager] Vector memory search failed:', { error: error instanceof Error ? error.message : String(error) });
-      }
-    }
-
     const metadata: ConversationHistoryMetadata = {
       conversationId: context?.conversationId,
       messageCount: messages.length,
       oldestMessageTimestamp: messages[0]?.timestamp,
       newestMessageTimestamp: messages[messages.length - 1]?.timestamp,
-      hasLongTermContext: contextMessages.some(m => m.content.includes('Relevant context from past')),
-      hasSemanticContext: contextMessages.some(m => m.content.includes('Similar past interactions'))
+      hasLongTermContext: !!contextMessages.length
     };
 
     return {
@@ -148,16 +125,6 @@ export class MemoryManagerImpl implements IMemoryManager {
     // Decide if important enough for long-term storage
     if (this.shouldPersist(memory) && this.longTerm) {
       await this.longTerm.add(memory);
-
-      // Generate embeddings and store in vector DB
-      if (this.vector) {
-        try {
-          const embedding = await this.generateEmbedding(memory.content);
-          await this.vector.add(embedding, memory);
-        } catch (error) {
-          logger.warn('[MemoryManager] Failed to store vector embedding:', { error: error instanceof Error ? error.message : String(error) });
-        }
-      }
     }
   }
 
@@ -196,6 +163,7 @@ export class MemoryManagerImpl implements IMemoryManager {
   }
 
   /**
+   * Delete this, what the fuck is this?
    * Extract keywords from input (simple implementation)
    */
   private extractKeywords(input: string): string[] {
@@ -206,23 +174,12 @@ export class MemoryManagerImpl implements IMemoryManager {
   }
 
   /**
-   * Generate embedding for text (placeholder)
-   * In production, this would call an embedding model
-   */
-  private async generateEmbedding(text: string): Promise<number[]> {
-    // Placeholder - in production, use OpenAI embeddings or similar
-    // For now, return a dummy embedding
-    return new Array(1536).fill(0).map(() => Math.random());
-  }
-
-  /**
    * Get memory statistics
    */
   public getStats(): MemoryStats {
     return {
       shortTermCount: this.shortTerm.count(),
-      longTermCount: this.longTerm?.count() || 0,
-      semanticCount: 0 // Vector stores don't have a simple count
+      longTermCount: this.longTerm?.count() || 0
     };
   }
 
@@ -462,19 +419,6 @@ export class MemoryManagerImpl implements IMemoryManager {
     for (const memory of memories) {
       const timestamp = memory.timestamp.toLocaleDateString();
       context += `- [${timestamp}] ${memory.content}\n`;
-    }
-    return context.trim();
-  }
-
-  /**
-   * Format semantic memories as context message content
-   */
-  private formatSemanticContext(memories: Memory[]): string {
-    let context = 'Similar past interactions that may be relevant:\n';
-    for (const memory of memories) {
-      const summary = (memory.metadata as any)?.summary || memory.content;
-      const timestamp = memory.timestamp.toLocaleDateString();
-      context += `- [${timestamp}] ${summary}\n`;
     }
     return context.trim();
   }

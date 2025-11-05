@@ -1,5 +1,19 @@
-Add better documents
-Update all docs to follow modern patterns
+Simplfy the session metadata to just:
+sessionMetadata: {
+   conversationId?: string;
+    callSid?: string;
+    messageSid?: string;
+    emailId?: string;
+  inReplyTo?: string;          // REQUIRED for threading (this is enough!)
+  from?: string;               // REQUIRED for participant matching
+  to?: string;                // REQUIRED for participant matching
+  subject?: string;            // REQUIRED for subject matching
+  // Remove references entirely - can rebuild from conversation history
+}
 
-Postmark Provider does alot of things for its consumers, should we change twilio provider to be like this? or add a TwilioHelper (idk naming) file in provider that can be like postmark provider (and do the same thing for postmark provider), this way we can make all the usage happen in one file, and one file is only a thinly wrapper for the actual api, is this design actually good?
-Comment from me: Just keep it in the same file, move the twilio stuff to provider helper function.
+And remove goalAchieved field
+
+Need a mandate that short term memory should only be used, if the information will 100% still be there in a 20 message window
+
+Fix the problem with retrieve() 
+

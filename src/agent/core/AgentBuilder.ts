@@ -184,11 +184,8 @@ export class AgentBuilder {
 
     // Validate memory configuration
     if (this.config.memory) {
-      if (this.config.memory.vectorEnabled && !this.config.memory.vectorStore) {
-        errors.push('Vector store is required when vectorEnabled is true');
-      }
-      if (this.config.memory.longTermEnabled && !this.config.memory.longTermStorage) {
-        errors.push('Long-term storage is required when longTermEnabled is true');
+      if (this.config.memory.longTermEnabled && !this.config.memory.longTermStorage && !this.config.memory.sharedLongTermMemory) {
+        errors.push('Long-term storage or shared long-term memory is required when longTermEnabled is true');
       }
     }
 
