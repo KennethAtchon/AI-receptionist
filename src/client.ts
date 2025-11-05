@@ -262,6 +262,9 @@ export class AIReceptionist {
    *   },
    *   tools: {
    *     defaults: ['ticketing', 'knowledgeBase']
+   *   },
+   *   logger: {
+   *     level: 'DEBUG'
    *   }
    * });
    * await bob.initialize();
@@ -273,31 +276,164 @@ export class AIReceptionist {
     const clonedConfig: AIReceptionistConfig = {
       // Merge agent config (deep merge for six pillars)
       agent: {
-        identity: this.config.agent.identity && overrides.agent?.identity
-          ? { ...this.config.agent.identity, ...overrides.agent.identity }
-          : overrides.agent?.identity || this.config.agent.identity,
-        personality: overrides.agent?.personality || this.config.agent.personality,
-        knowledge: overrides.agent?.knowledge || this.config.agent.knowledge,
-        goals: overrides.agent?.goals || this.config.agent.goals,
-        memory: overrides.agent?.memory || this.config.agent.memory,
-        customSystemPrompt: overrides.agent?.customSystemPrompt || this.config.agent.customSystemPrompt
+        identity: overrides.agent?.identity 
+          ? (this.config.agent.identity 
+              ? { ...this.config.agent.identity, ...overrides.agent.identity }
+              : overrides.agent.identity)
+          : this.config.agent.identity,
+        personality: overrides.agent?.personality 
+          ? (this.config.agent.personality 
+              ? { ...this.config.agent.personality, ...overrides.agent.personality }
+              : overrides.agent.personality)
+          : this.config.agent.personality,
+        knowledge: overrides.agent?.knowledge 
+          ? (this.config.agent.knowledge 
+              ? { ...this.config.agent.knowledge, ...overrides.agent.knowledge }
+              : overrides.agent.knowledge)
+          : this.config.agent.knowledge,
+        goals: overrides.agent?.goals 
+          ? (this.config.agent.goals 
+              ? { ...this.config.agent.goals, ...overrides.agent.goals }
+              : overrides.agent.goals)
+          : this.config.agent.goals,
+        memory: overrides.agent?.memory 
+          ? (this.config.agent.memory 
+              ? { ...this.config.agent.memory, ...overrides.agent.memory }
+              : overrides.agent.memory)
+          : this.config.agent.memory,
+        customSystemPrompt: overrides.agent?.customSystemPrompt !== undefined
+          ? overrides.agent.customSystemPrompt
+          : this.config.agent.customSystemPrompt
       },
 
-      // Use model from override or original
-      model: overrides.model || this.config.model,
+      // Merge model config (not just replace)
+      model: overrides.model 
+        ? { ...this.config.model, ...overrides.model }
+        : this.config.model,
 
-      // Merge tool config
-      tools: overrides.tools || this.config.tools,
+      // Merge tool config (deep merge)
+      tools: overrides.tools 
+        ? (this.config.tools 
+            ? { ...this.config.tools, ...overrides.tools }
+            : overrides.tools)
+        : this.config.tools,
 
-      // Reuse providers (shared resources)
-      providers: this.config.providers,
+      // Merge provider configs (deep merge, but can be overridden)
+      providers: overrides.providers 
+        ? {
+            ...this.config.providers,
+            ...overrides.providers,
+            // Deep merge communication providers
+            communication: {
+              ...this.config.providers?.communication,
+              ...overrides.providers.communication,
+            },
+            // Deep merge calendar providers
+            calendar: {
+              ...this.config.providers?.calendar,
+              ...overrides.providers.calendar,
+            },
+            // Deep merge email providers
+            email: overrides.providers.email 
+              ? (this.config.providers?.email 
+                  ? { ...this.config.providers.email, ...overrides.providers.email }
+                  : overrides.providers.email)
+              : this.config.providers?.email,
+          }
+        : this.config.providers,
+
+      // Merge logger config
+      logger: overrides.logger 
+        ? (this.config.logger 
+            ? { ...this.config.logger, ...overrides.logger }
+            : overrides.logger)
+        : this.config.logger,
 
       // Other config
       debug: overrides.debug !== undefined ? overrides.debug : this.config.debug,
-
     };
 
     return new AIReceptionist(clonedConfig);
+  }
+
+  /**
+   * Update configuration at runtime
+   * Supports updating logger, model, and some provider configs
+   * 
+   * @example
+   * ```typescript
+   * // Update logger level
+   * client.updateConfig({ logger: { level: 'DEBUG' } });
+   * 
+   * // Update model (requires re-initialization of AI provider)
+   * client.updateConfig({ model: { ...client.getConfig().model, model: 'gpt-4-turbo' } });
+   * ```
+   */
+  updateConfig(updates: Partial<AIReceptionistConfig>): void {
+    // Update logger if provided
+    if (updates.logger) {
+      const loggerConfig: import('./utils/logger').LoggerConfig = {
+        level: updates.logger.level ? this.mapLogLevel(updates.logger.level) : undefined,
+        prefix: updates.logger.prefix,
+        enableTimestamps: updates.logger.enableTimestamps,
+        enableColors: true,
+      };
+      configureLogger(loggerConfig);
+      // Update internal config
+      this.config.logger = { ...this.config.logger, ...updates.logger };
+    }
+
+    // Update debug flag
+    if (updates.debug !== undefined) {
+      this.config.debug = updates.debug;
+    }
+
+    // Update model config (note: changing model requires re-initialization of AI provider)
+    if (updates.model) {
+      this.config.model = { ...this.config.model, ...updates.model };
+      logger.warn('[AIReceptionist] Model config updated. AI provider may need re-initialization for changes to take effect.');
+    }
+
+    // Update provider configs (merge, don't replace)
+    if (updates.providers) {
+      this.config.providers = {
+        ...this.config.providers,
+        ...updates.providers,
+        // Deep merge communication providers
+        communication: {
+          ...this.config.providers?.communication,
+          ...updates.providers.communication,
+        },
+        // Deep merge calendar providers
+        calendar: {
+          ...this.config.providers?.calendar,
+          ...updates.providers.calendar,
+        },
+        // Deep merge email providers
+        email: updates.providers.email 
+          ? (this.config.providers?.email 
+              ? { ...this.config.providers.email, ...updates.providers.email }
+              : updates.providers.email)
+          : this.config.providers?.email,
+      };
+      logger.info('[AIReceptionist] Provider config updated. Some providers may need re-initialization.');
+    }
+
+    logger.info('[AIReceptionist] Configuration updated');
+  }
+
+  /**
+   * Get current configuration (read-only copy)
+   * 
+   * @example
+   * ```typescript
+   * const config = client.getConfig();
+   * console.log(config.model.model); // 'gpt-4'
+   * ```
+   */
+  getConfig(): Readonly<AIReceptionistConfig> {
+    // Return a deep copy to prevent external mutations
+    return JSON.parse(JSON.stringify(this.config)) as AIReceptionistConfig;
   }
 
   /**
@@ -411,60 +547,6 @@ export class AIReceptionist {
   async handleEmailWebhook(payload: any): Promise<any> {
     this.ensureInitialized();
     return await this.webhookRouter.handleEmailWebhook(payload);
-  }
-
-  /**
-   * Configure provider webhook URLs in the config
-   * Updates webhook configuration for the specified channel type
-   * @private
-   */
-  async configureProviderWebhook(
-    type: 'voice' | 'sms' | 'email',
-    webhookUrl: string
-  ): Promise<void> {
-    try {
-      // Parse the webhook URL into base URL and path
-      const urlMatch = webhookUrl.match(/^(https?:\/\/[^\/]+)(.*)$/);
-      if (!urlMatch) {
-        throw new Error(`Invalid webhook URL format: ${webhookUrl}`);
-      }
-
-      const baseUrl = urlMatch[1];
-      const path = urlMatch[2] || '/';
-
-      switch (type) {
-        case 'voice': {
-          const twilioConfig = this.config.providers?.communication?.twilio;
-          if (!twilioConfig) {
-            throw new Error('Twilio provider not configured');
-          }
-          twilioConfig.webhookBaseUrl = baseUrl;
-          twilioConfig.voiceWebhookPath = path;
-          logger.info(`[AIReceptionist] Updated voice webhook config`, { baseUrl, path });
-          break;
-        }
-
-        case 'sms': {
-          const twilioConfig = this.config.providers?.communication?.twilio;
-          if (!twilioConfig) {
-            throw new Error('Twilio provider not configured');
-          }
-          twilioConfig.webhookBaseUrl = baseUrl;
-          twilioConfig.smsWebhookPath = path;
-          logger.info(`[AIReceptionist] Updated SMS webhook config`, { baseUrl, path });
-          break;
-        }
-
-        case 'email': {
-          // Email webhooks are handled by Postmark - the SDK doesn't need to configure or know about webhook URLs
-          logger.warn(`[AIReceptionist] Email webhooks are handled by Postmark - the SDK doesn't need to configure or know about webhook URLs`);
-          break;
-        }
-      }
-    } catch (error) {
-      logger.error(`[AIReceptionist] Failed to configure webhook for ${type}`, error as Error);
-      throw error;
-    }
   }
 
   /**
