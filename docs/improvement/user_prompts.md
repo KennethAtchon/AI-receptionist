@@ -17,3 +17,7 @@ Need a mandate that short term memory should only be used, if the information wi
 
 Fix the problem with retrieve() 
 
+The SDK doesn't need to have envs, just source everything from configs, and for logger, we should have basic configs for it, nothing too fancy
+
+
+

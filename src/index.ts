@@ -218,8 +218,6 @@ export type {
   ChatOptions,
   AIResponse,
   CalendarEvent,
-  NotificationConfig,
-  AnalyticsConfig,
   CalendarToolConfig,
   BookingToolConfig,
   CRMToolConfig,

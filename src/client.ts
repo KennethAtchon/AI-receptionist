@@ -136,8 +136,7 @@ export class AIReceptionist {
       return;
     }
 
-    const agentName = this.config.agent.identity?.name || 'Custom Agent';
-    logger.info(`[AIReceptionist] Initializing agent: ${agentName}`);
+    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity?.name || 'Custom Agent'}`);
 
     // 1. Initialize provider registry and register all providers
     this.providerRegistry = await initializeProviders(this.config);
@@ -266,8 +265,6 @@ export class AIReceptionist {
       providers: this.config.providers,
 
       // Other config
-      notifications: overrides.notifications || this.config.notifications,
-      analytics: overrides.analytics || this.config.analytics,
       debug: overrides.debug !== undefined ? overrides.debug : this.config.debug,
 
     };
@@ -338,80 +335,6 @@ export class AIReceptionist {
   }
 
   /**
-   * Get MCP adapter
-   *
-   * Enables Model Context Protocol access to tools.
-   * The MCP adapter provides a thin translation layer that exposes
-   * tools through the MCP protocol without modifying the existing tool system.
-   *
-   * @example
-   * ```typescript
-   * // Access MCP adapter
-   * const mcpAdapter = client.mcp;
-   *
-   * // List available tools via MCP
-   * const toolsList = await mcpAdapter.handleToolsList();
-   * console.log('Available MCP tools:', toolsList.tools);
-   *
-   * // Call a tool via MCP
-   * const result = await mcpAdapter.handleToolCall({
-   *   name: 'calendar_check_availability',
-   *   arguments: { date: '2025-10-19', duration: 60 }
-   * });
-   * ```
-   */
-
-  /**
-   * Set up a session for a specific channel (webhook-driven mode)
-   *
-   * This method creates a session and automatically configures webhooks with the provider.
-   *
-   * @example
-   * ```typescript
-   * // Set up voice session
-   * await client.setSession('voice', '+1234567890');
-   *
-   * // Set up SMS session
-   * await client.setSession('sms', '+1234567890');
-   *
-   * // Set up email session
-   * await client.setSession('email', 'assistant@company.com');
-   * ```
-   */
-  async setSession(
-    type: 'voice' | 'sms' | 'email',
-    identifier: string,
-    metadata?: Record<string, any>
-  ): Promise<import('./sessions/types').Session> {
-    this.ensureInitialized();
-
-    // Get webhook config from TwilioConfig
-    const twilioConfig = this.config.providers?.communication?.twilio;
-    if (!twilioConfig?.webhookBaseUrl) {
-      throw new Error('Webhook configuration is required to use setSession(). Add webhookBaseUrl to TwilioConfig in providers.communication.twilio.');
-    }
-
-    logger.info(`[AIReceptionist] Setting up ${type} session`, { identifier });
-
-    // 1. Create session
-    const session = await this.sessionManager.createSession(type, {
-      identifier,
-      metadata
-    });
-
-    // 2. Configure provider webhooks automatically
-    await this.configureProviderWebhook(type, identifier, session.id);
-
-    logger.info(`[AIReceptionist] Session created and webhooks configured`, {
-      sessionId: session.id,
-      type,
-      identifier
-    });
-
-    return session;
-  }
-
-  /**
    * Handle incoming voice webhook (Twilio)
    *
    * @example
@@ -463,46 +386,50 @@ export class AIReceptionist {
   }
 
   /**
-   * Configure provider webhook for a session
+   * Configure provider webhook URLs in the config
+   * Updates webhook configuration for the specified channel type
    * @private
    */
-  private async configureProviderWebhook(
+  async configureProviderWebhook(
     type: 'voice' | 'sms' | 'email',
-    identifier: string,
-    sessionId: string
+    webhookUrl: string
   ): Promise<void> {
-    // Get webhook config from TwilioConfig
-    const twilioConfig = this.config.providers?.communication?.twilio;
-    if (!twilioConfig?.webhookBaseUrl) {
-      return;
-    }
-
-    const baseUrl = twilioConfig.webhookBaseUrl;
-
     try {
+      // Parse the webhook URL into base URL and path
+      const urlMatch = webhookUrl.match(/^(https?:\/\/[^\/]+)(.*)$/);
+      if (!urlMatch) {
+        throw new Error(`Invalid webhook URL format: ${webhookUrl}`);
+      }
+
+      const baseUrl = urlMatch[1];
+      const path = urlMatch[2] || '/';
+
       switch (type) {
         case 'voice': {
-          const voicePath = twilioConfig.voiceWebhookPath || '/webhooks/voice';
-          const webhookUrl = `${baseUrl}${voicePath}`;
-          // TODO: Configure Twilio webhook for voice
-          // await this.configureTwilioVoiceWebhook(identifier, webhookUrl);
-          logger.info(`[AIReceptionist] Voice webhook configured`, { webhookUrl });
+          const twilioConfig = this.config.providers?.communication?.twilio;
+          if (!twilioConfig) {
+            throw new Error('Twilio provider not configured');
+          }
+          twilioConfig.webhookBaseUrl = baseUrl;
+          twilioConfig.voiceWebhookPath = path;
+          logger.info(`[AIReceptionist] Updated voice webhook config`, { baseUrl, path });
           break;
         }
 
         case 'sms': {
-          const smsPath = twilioConfig.smsWebhookPath || '/webhooks/sms';
-          const webhookUrl = `${baseUrl}${smsPath}`;
-          // TODO: Configure Twilio webhook for SMS
-          // await this.configureTwilioSMSWebhook(identifier, webhookUrl);
-          logger.info(`[AIReceptionist] SMS webhook configured`, { webhookUrl });
+          const twilioConfig = this.config.providers?.communication?.twilio;
+          if (!twilioConfig) {
+            throw new Error('Twilio provider not configured');
+          }
+          twilioConfig.webhookBaseUrl = baseUrl;
+          twilioConfig.smsWebhookPath = path;
+          logger.info(`[AIReceptionist] Updated SMS webhook config`, { baseUrl, path });
           break;
         }
 
         case 'email': {
-          // Email webhooks would come from PostmarkConfig, not TwilioConfig
-          // For now, just log - email provider handles its own webhook config
-          logger.info(`[AIReceptionist] Email webhook handled by email provider`);
+          // Email webhooks are handled by Postmark - the SDK doesn't need to configure or know about webhook URLs
+          logger.warn(`[AIReceptionist] Email webhooks are handled by Postmark - the SDK doesn't need to configure or know about webhook URLs`);
           break;
         }
       }

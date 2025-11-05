@@ -390,8 +390,6 @@ export interface AIReceptionistConfig {
   providers?: ProviderConfig;
 
   // Optional features
-  notifications?: NotificationConfig;
-  analytics?: AnalyticsConfig;
   debug?: boolean;
 
 }
@@ -433,16 +431,6 @@ export interface ProviderConfig {
   custom?: IProvider[];
 }
 
-export interface NotificationConfig {
-  email?: string;
-  webhook?: string;
-}
-
-export interface AnalyticsConfig {
-  enabled: boolean;
-  provider?: 'mixpanel' | 'segment' | 'custom';
-  apiKey?: string;
-}
 
 // ============================================================================
 // Event Types
