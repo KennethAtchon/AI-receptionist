@@ -16,8 +16,7 @@
 
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
-import { BaseConfigurableProvider } from '../../../base/configurable-provider';
-import { IAIProvider } from '../ai-provider.interface';
+import { BaseAIProvider } from '../base/ai-provider.base';
 import { AIModelConfig, ChatOptions, AIResponse, ITool } from '../../../../types';
 import { logger } from '../../../../utils/logger';
 
@@ -61,9 +60,8 @@ export const OPENROUTER_MODELS = {
   },
 } as const;
 
-export class OpenRouterProvider extends BaseConfigurableProvider implements IAIProvider {
+export class OpenRouterProvider extends BaseAIProvider {
   readonly name = 'openrouter';
-  readonly type = 'ai' as const;
 
   private static readonly BASE_URL = 'https://openrouter.ai/api/v1';
   private static readonly DEFAULT_REFERER = 'https://localhost:3000';

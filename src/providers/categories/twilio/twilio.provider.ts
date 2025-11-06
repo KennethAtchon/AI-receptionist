@@ -4,7 +4,7 @@
  * Follows the same pattern as PostmarkProvider
  */
 
-import { BaseProvider } from '../../base/base-provider';
+import { BaseTwilioProvider } from './base/twilio-provider.base';
 import type { TwilioConfig } from '../../../types';
 import { logger } from '../../../utils/logger';
 
@@ -56,9 +56,8 @@ export interface CallResult {
  * Twilio Provider
  * Thin SDK wrapper + helper methods for common operations
  */
-export class TwilioProvider extends BaseProvider {
+export class TwilioProvider extends BaseTwilioProvider {
   readonly name = 'twilio';
-  readonly type = 'api' as const;
 
   private twilioSdk: any = null;
   private twilioClient: any = null;

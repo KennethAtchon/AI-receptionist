@@ -4,7 +4,7 @@
  * Primary email provider for the AI Receptionist SDK
  */
 
-import { BaseProvider } from '../../../base/base-provider';
+import { BaseEmailProvider } from '../base/email-provider.base';
 import type { IEmailProvider, EmailParams, EmailResult } from '../email-provider.interface';
 import { logger } from '../../../../utils/logger';
 import type { MessageSendingResponse } from 'postmark/dist/client/models/message/Message';
@@ -100,9 +100,8 @@ export interface PostmarkInboundEmail {
   }>;
 }
 
-export class PostmarkProvider extends BaseProvider implements IEmailProvider {
+export class PostmarkProvider extends BaseEmailProvider {
   readonly name = 'postmark';
-  readonly type = 'email' as const;
 
   private postmarkClient: any = null;
 

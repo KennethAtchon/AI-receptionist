@@ -5,8 +5,7 @@
 
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
-import { BaseConfigurableProvider } from '../../../base/configurable-provider';
-import { IAIProvider } from '../ai-provider.interface';
+import { BaseAIProvider } from '../base/ai-provider.base';
 import { AIModelConfig, ChatOptions, AIResponse, ITool } from '../../../../types';
 import { logger } from '../../../../utils/logger';
 
@@ -19,9 +18,8 @@ import { logger } from '../../../../utils/logger';
  * - Streaming support (future)
  * - Automatic retry with exponential backoff
  */
-export class OpenAIProvider extends BaseConfigurableProvider implements IAIProvider {
+export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai';
-  readonly type = 'ai' as const;
 
   private client: OpenAI | null = null;
 
