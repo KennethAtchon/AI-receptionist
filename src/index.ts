@@ -34,10 +34,10 @@ export type { SecurityResult } from './agent/security';
 // Resources (User-facing API)
 // ============================================================================
 
-export { VoiceResource } from './resources/core/voice.resource';
-export { SMSResource } from './resources/core/sms.resource';
-export { EmailResource } from './resources/core/email.resource';
-export { TextResource } from './resources/core/text.resource';
+export { VoiceResource } from './resources/voice';
+export { SMSResource } from './resources/sms';
+export { EmailResource } from './resources/email';
+export { TextResource } from './resources/text';
 
 // ============================================================================
 // Tools (Tool System)

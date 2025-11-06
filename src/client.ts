@@ -22,10 +22,10 @@ import { SessionManager } from './sessions';
 import { SDK_VERSION } from './version';
 
 // Type-only imports for tree-shaking
-import type { VoiceResource } from './resources/core/voice.resource';
-import type { SMSResource } from './resources/core/sms.resource';
-import type { EmailResource } from './resources/core/email.resource';
-import type { TextResource } from './resources/core/text.resource';
+import type { VoiceResource } from './resources/voice';
+import type { SMSResource } from './resources/sms';
+import type { EmailResource } from './resources/email';
+import type { TextResource } from './resources/text';
 
 /**
  * AIReceptionist - Agent-centric AI SDK

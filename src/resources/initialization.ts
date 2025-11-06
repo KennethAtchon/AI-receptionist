@@ -4,10 +4,10 @@
  */
 
 import type { Agent } from '../agent/core/Agent';
-import type { VoiceResource } from './core/voice.resource';
-import type { SMSResource } from './core/sms.resource';
-import type { EmailResource } from './core/email.resource';
-import type { TextResource } from './core/text.resource';
+import type { VoiceResource } from './voice/voice.resource';
+import type { SMSResource } from './sms/sms.resource';
+import type { EmailResource } from './email/email.resource';
+import type { TextResource } from './text/text.resource';
 import type { WebhookConfig } from '../types';
 import { logger } from '../utils/logger';
 
@@ -30,10 +30,10 @@ export function initializeResources(context: ResourceContext): InitializedResour
   const resources: InitializedResources = {};
 
   // Initialize all resources
-  const { VoiceResource } = require('./core/voice.resource');
-  const { SMSResource } = require('./core/sms.resource');
-  const { EmailResource } = require('./core/email.resource');
-  const { TextResource } = require('./core/text.resource');
+  const { VoiceResource } = require('./voice/voice.resource');
+  const { SMSResource } = require('./sms/sms.resource');
+  const { EmailResource } = require('./email/email.resource');
+  const { TextResource } = require('./text/text.resource');
 
   // VoiceResource will get TwilioConfig directly from provider registry
   resources.voice = new VoiceResource(context.agent);
