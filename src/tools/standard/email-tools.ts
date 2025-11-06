@@ -8,7 +8,7 @@ import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
 import type { ProviderRegistry } from '../../providers/core/provider-registry';
-import type { IEmailProvider } from '../../providers/email/email-provider.interface';
+import type { IEmailProvider } from '../../providers/categories/email/email-provider.interface';
 
 export interface EmailToolsConfig {
   providerRegistry: ProviderRegistry;

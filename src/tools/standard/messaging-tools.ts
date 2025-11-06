@@ -8,7 +8,7 @@ import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
 import type { ProviderRegistry } from '../../providers/core/provider-registry';
-import type { TwilioProvider } from '../../providers/api/twilio.provider';
+import type { TwilioProvider } from '../../providers/categories/twilio';
 
 export interface MessagingToolsConfig {
   providerRegistry: ProviderRegistry;

@@ -8,10 +8,10 @@ import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
 import type { ITool } from '../../types';
 import type { ProviderRegistry } from '../../providers/core/provider-registry';
-import { GoogleProvider } from '../../providers/api/google.provider';
-import * as GoogleCalendar from '../../providers/google/google.calendar';
-import * as GoogleSheet from '../../providers/google/google.sheet';
-import * as GoogleDrive from '../../providers/google/google.drive';
+import { GoogleProvider } from '../../providers/categories/google';
+import * as GoogleCalendar from '../../providers/categories/google/google.calendar';
+import * as GoogleSheet from '../../providers/categories/google/google.sheet';
+import * as GoogleDrive from '../../providers/categories/google/google.drive';
 
 export interface GoogleServicesToolsConfig {
     providerRegistry: ProviderRegistry;

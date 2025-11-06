@@ -8,7 +8,7 @@
 
 export interface IProvider {
   readonly name: string;
-  readonly type: 'communication' | 'ai' | 'api' | 'calendar' | 'crm' | 'storage' | 'email' | 'custom';
+  readonly type: 'ai' | 'api' | 'email' | 'custom';
   initialize(): Promise<void>;
   dispose(): Promise<void>;
   healthCheck(): Promise<boolean>;
@@ -269,7 +269,7 @@ export interface IAIProvider extends IProvider {
 }
 
 // ============================================================================
-// Calendar Provider Types
+// Google Provider Types
 // ============================================================================
 
 /**

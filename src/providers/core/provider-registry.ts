@@ -56,7 +56,7 @@ export class ProviderRegistry {
    * registry.registerIfConfigured(
    *   'twilio',
    *   async () => {
-   *     const { TwilioProvider } = await import('./providers/twilio');
+   *     const { TwilioProvider } = await import('./categories/twilio');
    *     return new TwilioProvider(config);
    *   },
    *   new TwilioValidator(),

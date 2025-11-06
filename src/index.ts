@@ -51,11 +51,11 @@ export { Tools } from './tools';
 // Providers (External API Adapters)
 // ============================================================================
 
-export { TwilioProvider } from './providers/api/twilio.provider';
-export type { SMSParams, SMSResult, CallParams, CallResult } from './providers/api/twilio.provider';
-export { OpenAIProvider } from './providers/ai/openai.provider';
-export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/ai/openrouter.provider';
-export { GoogleProvider } from './providers/api/google.provider';
+export { TwilioProvider } from './providers/categories/twilio';
+export type { SMSParams, SMSResult, CallParams, CallResult } from './providers/categories/twilio';
+export { OpenAIProvider } from './providers/categories/ai/openai';
+export { OpenRouterProvider, OPENROUTER_MODELS } from './providers/categories/ai/openrouter';
+export { GoogleProvider } from './providers/categories/google';
 
 // Email Providers
 export { PostmarkProvider, EmailRouter } from './providers';

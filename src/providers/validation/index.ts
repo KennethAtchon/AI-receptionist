@@ -1,9 +1,11 @@
 /**
- * Credential Validation Module
- * Exports all validators and validation interfaces
+ * Validation Exports
  */
 
 export type { ICredentialValidator, ValidationResult } from './credential-validator.interface';
-export { TwilioValidator } from './twilio-validator';
-export { OpenAIValidator } from './openai-validator';
-export { GoogleValidator } from './google-validator';
+export { BaseValidator } from './base';
+export { OpenAIValidator } from './openai';
+export { PostmarkValidator } from './postmark';
+export type { PostmarkCredentials } from './postmark';
+export { TwilioValidator } from './twilio';
+export { GoogleValidator } from './google';
