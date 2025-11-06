@@ -303,6 +303,9 @@ export class PersonalityEngineImpl implements PersonalityEngine {
    * Update formality level
    */
   public setFormalityLevel(level: number): void {
+    if (typeof level !== 'number' || isNaN(level)) {
+      throw new Error('Formality level must be a number');
+    }
     this._formalityLevel = Math.max(1, Math.min(10, level)); // Clamp between 1-10
   }
 }

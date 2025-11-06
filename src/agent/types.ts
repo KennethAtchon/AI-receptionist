@@ -52,12 +52,21 @@ export interface Identity {
   certifications: string[];
   summary(): string;
   toJSON(): Record<string, unknown>;
+  getDescription(): string;
+  updateName(name: string): void;
   updateRole(role: string): void;
   updateTitle(title: string): void;
   updateBackstory(backstory: string): void;
+  updateDepartment(department: string): void;
+  updateReportsTo(reportsTo: string): void;
   setAuthorityLevel(level: 'low' | 'medium' | 'high'): void;
+  addEscalationRule(rule: string): void;
+  removeEscalationRule(rule: string): void;
+  setYearsOfExperience(years: number): void;
   addSpecialization(specialization: string): void;
   removeSpecialization(specialization: string): void;
+  addCertification(certification: string): void;
+  removeCertification(certification: string): void;
 }
 
 // ==================== PERSONALITY ====================
@@ -97,9 +106,11 @@ export interface PersonalityEngine {
   stressResponse: string;
   adaptabilityRules: string[];
   getErrorMessage(channel: Channel): string;
+  getDescription(): string;
   toJSON(): Record<string, unknown>;
   addTrait(trait: string | PersonalityTrait): void;
   removeTrait(traitName: string): void;
+  updateTrait(traitName: string, updates: Partial<PersonalityTrait>): void;
   updateCommunicationStyle(style: Partial<CommunicationStyleConfig>): void;
   setFormalityLevel(level: number): void;
 }
@@ -115,7 +126,6 @@ export interface KnowledgeConfig {
   domain: string;
   expertise?: string[];
   languages?: string[] | LanguageConfig;
-  certifications?: string[];
   industries?: string[];
   knownDomains?: string[];
   limitations?: string[];
@@ -126,7 +136,6 @@ export interface KnowledgeBase {
   domain: string;
   expertise: string[];
   languages: LanguageConfig;
-  certifications: string[];
   industries: string[];
   knownDomains: string[];
   limitations: string[];
@@ -134,6 +143,9 @@ export interface KnowledgeBase {
   load(): Promise<void>;
   dispose(): Promise<void>;
   toJSON(): Record<string, unknown>;
+  getDescription(): string;
+  hasKnowledge(domain: string): boolean;
+  isLimitedKnowledge(topic: string): boolean;
   updateDomain(domain: string): void;
   addExpertise(area: string): void;
   removeExpertise(area: string): void;
@@ -141,6 +153,11 @@ export interface KnowledgeBase {
   removeLanguage(language: string): void;
   addIndustry(industry: string): void;
   removeIndustry(industry: string): void;
+  addKnownDomain(domain: string): void;
+  removeKnownDomain(domain: string): void;
+  addLimitation(limitation: string): void;
+  removeLimitation(limitation: string): void;
+  updateUncertaintyThreshold(threshold: string): void;
 }
 
 // ==================== CAPABILITIES ====================
@@ -370,11 +387,28 @@ export interface Goal {
   priority: number;
   metric?: string;
   constraints: string[];
+  completed?: boolean;
+  completedAt?: Date;
+  completionCriteria?: string;
 }
 
 export interface GoalSystem {
   getCurrent(): Goal[];
+  getPrimary(): Goal | undefined;
+  getSecondary(): Goal[];
+  getCompleted(): Goal[];
+  getIncomplete(): Goal[];
+  getDescription(): string;
+  getProgressStats(): {
+    totalInteractions: number;
+    goalContributions: Record<string, number>;
+    completedGoals: number;
+    totalGoals: number;
+  };
   trackProgress(request: AgentRequest, response: AgentResponse): Promise<void>;
+  markGoalCompleted(name: string, completionCriteria?: string): boolean;
+  markGoalIncomplete(name: string): boolean;
+  isGoalCompleted(name: string): boolean;
   toJSON(): Record<string, unknown>;
   addGoal(goal: Goal): void;
   removeGoal(name: string): boolean;

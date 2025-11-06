@@ -14,7 +14,6 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
   private _domain: string;
   private _expertise: string[];
   private _languages: LanguageConfig;
-  private _certifications: string[];
   private _industries: string[];
   private _knownDomains: string[];
   private _limitations: string[];
@@ -24,17 +23,19 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
   public get domain(): string { return this._domain; }
   public get expertise(): string[] { return [...this._expertise]; }
   public get languages(): LanguageConfig { return { ...this._languages }; }
-  public get certifications(): string[] { return [...this._certifications]; }
   public get industries(): string[] { return [...this._industries]; }
   public get knownDomains(): string[] { return [...this._knownDomains]; }
   public get limitations(): string[] { return [...this._limitations]; }
   public get uncertaintyThreshold(): string { return this._uncertaintyThreshold; }
 
   constructor(config: KnowledgeConfig) {
-    this._domain = config.domain;
+    if (!config.domain || config.domain.trim().length === 0) {
+      throw new Error('Knowledge domain is required');
+    }
+
+    this._domain = config.domain.trim();
     this._expertise = config.expertise || [];
     this._languages = this.processLanguages(config.languages);
-    this._certifications = config.certifications || [];
     this._industries = config.industries || [];
     this._knownDomains = config.knownDomains || [this._domain];
     this._limitations = config.limitations || [
@@ -95,7 +96,6 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
       domain: this.domain,
       expertise: this.expertise,
       languages: this.languages,
-      certifications: this.certifications,
       industries: this.industries,
       knownDomains: this.knownDomains,
       limitations: this.limitations,
@@ -129,12 +129,6 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
       description += `- Conversational in: ${this.languages.conversational.join(', ')}\n`;
     }
     description += '\n';
-
-    if (this.certifications.length > 0) {
-      description += `### Certifications\n`;
-      description += this.certifications.map(c => `- ${c}`).join('\n');
-      description += '\n\n';
-    }
 
     description += `### Knowledge Boundaries\n\n`;
     description += `**What you know:**\n`;
@@ -174,10 +168,14 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
    * Update the primary domain
    */
   public updateDomain(domain: string): void {
-    this._domain = domain;
+    if (!domain || domain.trim().length === 0) {
+      throw new Error('Domain cannot be empty');
+    }
+    const trimmedDomain = domain.trim();
+    this._domain = trimmedDomain;
     // Ensure domain is in knownDomains
-    if (!this._knownDomains.includes(domain)) {
-      this._knownDomains.push(domain);
+    if (!this._knownDomains.includes(trimmedDomain)) {
+      this._knownDomains.push(trimmedDomain);
     }
   }
 
@@ -228,22 +226,6 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
     if (this._languages.conversational) {
       this._languages.conversational = this._languages.conversational.filter(l => l !== language);
     }
-  }
-
-  /**
-   * Add certification
-   */
-  public addCertification(certification: string): void {
-    if (!this._certifications.includes(certification)) {
-      this._certifications.push(certification);
-    }
-  }
-
-  /**
-   * Remove certification
-   */
-  public removeCertification(certification: string): void {
-    this._certifications = this._certifications.filter(c => c !== certification);
   }
 
   /**

@@ -57,7 +57,6 @@ export class Agent {
   // ==================== EXTERNAL DEPENDENCIES ====================
   private aiProvider: any; // IAIProvider
   private toolRegistry?: any; // ToolRegistry - source of truth for tools
-  private conversationService?: any; // ConversationService
 
   // ==================== AGENT ID ====================
   public readonly id: string;
@@ -87,8 +86,12 @@ export class Agent {
     // Initialize memory
     this.memory = new MemoryManagerImpl(config.memory || {});
 
-    // Initialize goals
-    this.goals = new GoalSystemImpl(config.goals || { primary: 'Assist users effectively' });
+    // Initialize goals (ensure primary exists)
+    const goalConfig = config.goals || { primary: 'Assist users effectively' };
+    if (!goalConfig.primary || goalConfig.primary.trim().length === 0) {
+      goalConfig.primary = 'Assist users effectively';
+    }
+    this.goals = new GoalSystemImpl(goalConfig);
 
     // Initialize prompt builder and optimizer
     this.promptBuilder = new SystemPromptBuilder();
@@ -104,7 +107,6 @@ export class Agent {
     // Set external dependencies
     this.aiProvider = config.aiProvider;
     this.toolRegistry = (config as any).toolRegistry;
-    this.conversationService = (config as any).conversationService;
 
     // Set custom system prompt if provided
     this.customSystemPrompt = config.customSystemPrompt;
@@ -503,13 +505,6 @@ export class Agent {
     this.toolRegistry = registry;
   }
 
-  /**
-   * Set conversation service (optional)
-   */
-  public setConversationService(service: any): void {
-    this.conversationService = service;
-  }
-
   // ==================== PILLAR UPDATE METHODS ====================
   // Direct access to pillar components for PillarManager
 
@@ -540,7 +535,6 @@ export class Agent {
     // This helps garbage collection even though these are shared objects
     this.aiProvider = null as any;
     this.toolRegistry = null;
-    this.conversationService = null;
 
     logger.info('Agent disposed - all references cleared', { agentId: this.id });
   }

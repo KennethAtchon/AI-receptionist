@@ -39,19 +39,26 @@ export class IdentityImpl implements Identity {
   public get certifications(): string[] { return [...this._certifications]; }
 
   constructor(config: IdentityConfig) {
-    this._name = config.name;
-    this._role = config.role;
-    this._title = config.title || config.role;
-    this._backstory = config.backstory || `I am ${config.name}, working as ${config.role}.`;
-    this._department = config.department;
-    this._reportsTo = config.reportsTo;
+    if (!config.name || config.name.trim().length === 0) {
+      throw new Error('Identity name is required');
+    }
+    if (!config.role || config.role.trim().length === 0) {
+      throw new Error('Identity role is required');
+    }
+
+    this._name = config.name.trim();
+    this._role = config.role.trim();
+    this._title = config.title?.trim() || config.role.trim();
+    this._backstory = config.backstory?.trim() || `I am ${config.name}, working as ${config.role}.`;
+    this._department = config.department?.trim();
+    this._reportsTo = config.reportsTo?.trim();
     this._authorityLevel = config.authorityLevel || 'medium';
     this._escalationRules = config.escalationRules || [
       'Complex technical issues beyond my expertise',
       'Requests requiring management approval',
       'Complaints or sensitive situations'
     ];
-    this._yearsOfExperience = config.yearsOfExperience || 5;
+    this._yearsOfExperience = Math.max(0, config.yearsOfExperience || 5);
     this._specializations = config.specializations || [];
     this._certifications = config.certifications || [];
   }
@@ -127,17 +134,25 @@ export class IdentityImpl implements Identity {
    * Update the agent's name
    */
   public updateName(name: string): void {
-    this._name = name;
+    if (!name || name.trim().length === 0) {
+      throw new Error('Name cannot be empty');
+    }
+    this._name = name.trim();
   }
 
   /**
    * Update the agent's role
    */
   public updateRole(role: string): void {
-    this._role = role;
+    if (!role || role.trim().length === 0) {
+      throw new Error('Role cannot be empty');
+    }
+    // Save old role before updating
+    const oldRole = this._role;
+    this._role = role.trim();
     // Also update title if it was auto-generated from role
-    if (this._title === this._role) {
-      this._title = role;
+    if (this._title === oldRole) {
+      this._title = role.trim();
     }
   }
 
@@ -145,7 +160,10 @@ export class IdentityImpl implements Identity {
    * Update the agent's title
    */
   public updateTitle(title: string): void {
-    this._title = title;
+    if (!title || title.trim().length === 0) {
+      throw new Error('Title cannot be empty');
+    }
+    this._title = title.trim();
   }
 
   /**
