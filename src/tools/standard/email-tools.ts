@@ -6,12 +6,174 @@
 import { ToolBuilder } from '../builder';
 import { ToolRegistry } from '../registry';
 import { logger } from '../../utils/logger';
-import type { ITool } from '../../types';
+import type { ITool, ToolResult, ChannelResponse, ExecutionContext } from '../../types';
 import type { ProviderRegistry } from '../../providers/core/provider-registry';
 import type { IEmailProvider } from '../../providers/categories/email/email-provider.interface';
 
 export interface EmailToolsConfig {
   providerRegistry: ProviderRegistry;
+}
+
+/**
+ * Channel-specific response formatters
+ */
+interface ResponseFormatter {
+  success: (messageId: string, to: string, subject: string) => ChannelResponse;
+  error: (errorMessage: string) => ChannelResponse;
+  notConfigured: () => ChannelResponse;
+}
+
+const responseFormatters: Record<string, ResponseFormatter> = {
+  call: {
+    success: (messageId, to) => ({
+      speak: `I've sent your email to ${to}. You should receive a confirmation shortly.`
+    }),
+    error: () => ({
+      speak: 'I apologize, but I was unable to send the email. Please try again or contact support.'
+    }),
+    notConfigured: () => ({
+      speak: 'I apologize, but email functionality is not configured.'
+    })
+  },
+  sms: {
+    success: (messageId, to) => ({
+      message: `✓ Email sent to ${to}`
+    }),
+    error: () => ({
+      message: 'Failed to send email. Try again.'
+    }),
+    notConfigured: () => ({
+      message: 'Email not configured'
+    })
+  },
+  email: {
+    success: (messageId, to, subject) => ({
+      text: `Email sent successfully to ${to}`,
+      html: `
+        <h3>Email Sent Successfully</h3>
+        <p><strong>To:</strong> ${to}</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <p><strong>Message ID:</strong> ${messageId}</p>
+      `
+    }),
+    error: () => ({
+      text: 'Failed to send email. Please try again.',
+      html: '<p>Failed to send email. Please try again.</p>'
+    }),
+    notConfigured: () => ({
+      text: 'Email functionality is not configured.',
+      html: '<p>Email functionality is not configured.</p>'
+    })
+  },
+  default: {
+    success: (messageId, to) => ({
+      text: `Email sent to ${to}`
+    }),
+    error: () => ({
+      text: 'Failed to send email'
+    }),
+    notConfigured: () => ({
+      text: 'Email functionality is not configured.'
+    })
+  }
+};
+
+/**
+ * Core email sending logic shared across all channel handlers
+ */
+async function sendEmailCore(
+  params: any,
+  config: EmailToolsConfig | undefined,
+  channel: string
+): Promise<ToolResult> {
+  if (!config?.providerRegistry) {
+    const formatter = responseFormatters[channel] || responseFormatters.default;
+    return {
+      success: false,
+      error: 'Email provider not configured',
+      response: formatter.notConfigured()
+    };
+  }
+
+  try {
+    // Get email provider (postmark only)
+    let emailProvider: IEmailProvider;
+    if (params.provider) {
+      emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
+    } else {
+      // Default to postmark
+      if (config.providerRegistry.has('postmark')) {
+        emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
+      } else {
+        throw new Error('Postmark email provider not configured');
+      }
+    }
+
+    const result = await emailProvider.sendEmail({
+      to: params.to,
+      subject: params.subject,
+      text: params.body,
+      html: params.html,
+      cc: params.cc,
+      bcc: params.bcc,
+      attachments: params.attachments,
+      headers: params.inReplyTo ? {
+        'In-Reply-To': params.inReplyTo,
+        'References': params.references || params.inReplyTo
+      } : undefined
+    });
+
+    const formatter = responseFormatters[channel] || responseFormatters.default;
+
+    if (!result.success) {
+      const sanitizedError = sanitizeErrorMessage(result.error?.toString() || 'Unknown error');
+      return {
+        success: false,
+        error: sanitizedError,
+        response: formatter.error(sanitizedError)
+      };
+    }
+
+    return {
+      success: true,
+      data: { messageId: result.messageId },
+      response: formatter.success(result.messageId || '', params.to, params.subject)
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const sanitizedError = sanitizeErrorMessage(errorMessage);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error('[SendEmailTool] Failed', error as Error, { errorMessage, errorStack });
+    
+    const formatter = responseFormatters[channel] || responseFormatters.default;
+    return {
+      success: false,
+      error: sanitizedError,
+      response: formatter.error(sanitizedError)
+    };
+  }
+}
+
+/**
+ * Sanitize error messages for user-facing responses
+ * Removes internal details and stack traces
+ */
+function sanitizeErrorMessage(error: string): string {
+  // Remove stack traces
+  let sanitized = error.split('\n')[0];
+  
+  // Remove internal paths
+  sanitized = sanitized.replace(/\/[^\s]+/g, '[path]');
+  
+  // Remove sensitive patterns (API keys, tokens, etc.)
+  sanitized = sanitized.replace(/[A-Za-z0-9]{32,}/g, '[redacted]');
+  
+  // Limit length
+  if (sanitized.length > 200) {
+    sanitized = sanitized.substring(0, 197) + '...';
+  }
+  
+  return sanitized;
 }
 
 /**
@@ -86,277 +248,20 @@ export function buildSendEmailTool(config?: EmailToolsConfig): ITool {
       required: ['to', 'subject', 'body']
     })
     .onCall(async (params, ctx) => {
-      // Voice-optimized response
       logger.info('[SendEmailTool] Sending email via voice channel');
-
-      if (!config?.providerRegistry) {
-        return {
-          success: false,
-          error: 'Email provider not configured',
-          response: {
-            speak: 'I apologize, but email functionality is not configured.'
-          }
-        };
-      }
-
-      try {
-        // Get email provider (postmark only)
-        let emailProvider: IEmailProvider;
-        if (params.provider) {
-          emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
-        } else {
-          // Default to postmark
-          if (config.providerRegistry.has('postmark')) {
-            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
-          } else {
-            throw new Error('Postmark email provider not configured');
-          }
-        }
-
-        const result = await emailProvider.sendEmail({
-          to: params.to,
-          subject: params.subject,
-          text: params.body,
-          html: params.html,
-          cc: params.cc,
-          bcc: params.bcc,
-          attachments: params.attachments,
-          headers: params.inReplyTo ? {
-            'In-Reply-To': params.inReplyTo,
-            'References': params.references || params.inReplyTo
-          } : undefined
-        });
-
-        if (!result.success) {
-          return {
-            success: false,
-            error: result.error?.toString(),
-            response: {
-              speak:
-                'I apologize, but I was unable to send the email. Please try again or contact support.'
-            }
-          };
-        }
-
-        return {
-          success: true,
-          data: { messageId: result.messageId },
-          response: {
-            speak: `I've sent your email to ${params.to}. You should receive a confirmation shortly.`
-          }
-        };
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : undefined;
-        logger.error('[SendEmailTool] Failed', error as Error, { errorMessage, errorStack });
-        return {
-          success: false,
-          error: errorMessage,
-          response: {
-            speak: `I apologize, but I was unable to send the email: ${errorMessage}`
-          }
-        };
-      }
+      return sendEmailCore(params, config, 'call');
     })
     .onSMS(async (params, ctx) => {
-      // SMS-optimized response
       logger.info('[SendEmailTool] Sending email via SMS channel');
-
-      if (!config?.providerRegistry) {
-        return {
-          success: false,
-          error: 'Email provider not configured',
-          response: {
-            message: 'Email not configured'
-          }
-        };
-      }
-
-      try {
-        // Get email provider (postmark only)
-        let emailProvider: IEmailProvider;
-        if (params.provider) {
-          emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
-        } else {
-          // Default to postmark
-          if (config.providerRegistry.has('postmark')) {
-            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
-          } else {
-            throw new Error('Postmark email provider not configured');
-          }
-        }
-
-        const result = await emailProvider.sendEmail({
-          to: params.to,
-          subject: params.subject,
-          text: params.body,
-          html: params.html,
-          headers: params.inReplyTo ? {
-            'In-Reply-To': params.inReplyTo,
-            'References': params.references || params.inReplyTo
-          } : undefined
-        });
-
-        if (!result.success) {
-          return {
-            success: false,
-            error: result.error?.toString(),
-            response: {
-              message: 'Failed to send email. Try again.'
-            }
-          };
-        }
-
-        return {
-          success: true,
-          data: { messageId: result.messageId },
-          response: {
-            message: `✓ Email sent to ${params.to}`
-          }
-        };
-      } catch (error) {
-        logger.error('[SendEmailTool] Failed', error as Error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          response: {
-            message: 'Failed to send email. Try again.'
-          }
-        };
-      }
+      return sendEmailCore(params, config, 'sms');
     })
     .onEmail(async (params, ctx) => {
-      // Email-optimized response (email to email)
       logger.info('[SendEmailTool] Sending email via email channel');
-
-      if (!config?.providerRegistry) {
-        return {
-          success: false,
-          error: 'Email provider not configured',
-          response: {
-            text: 'Email functionality is not configured.',
-            html: '<p>Email functionality is not configured.</p>'
-          }
-        };
-      }
-
-      try {
-        // Get email provider (postmark only)
-        let emailProvider: IEmailProvider;
-        if (params.provider) {
-          emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
-        } else {
-          // Default to postmark
-          if (config.providerRegistry.has('postmark')) {
-            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
-          } else {
-            throw new Error('Postmark email provider not configured');
-          }
-        }
-
-        const result = await emailProvider.sendEmail({
-          to: params.to,
-          subject: params.subject,
-          text: params.body,
-          html: params.html,
-          cc: params.cc,
-          bcc: params.bcc,
-          attachments: params.attachments,
-          headers: params.inReplyTo ? {
-            'In-Reply-To': params.inReplyTo,
-            'References': params.references || params.inReplyTo
-          } : undefined
-        });
-
-        if (!result.success) {
-          return {
-            success: false,
-            error: result.error?.toString(),
-            response: {
-              text: 'Failed to send email. Please try again.',
-              html: '<p>Failed to send email. Please try again.</p>'
-            }
-          };
-        }
-
-        return {
-          success: true,
-          data: { messageId: result.messageId },
-          response: {
-            text: `Email sent successfully to ${params.to}`,
-            html: `
-              <h3>Email Sent Successfully</h3>
-              <p><strong>To:</strong> ${params.to}</p>
-              <p><strong>Subject:</strong> ${params.subject}</p>
-              <p><strong>Message ID:</strong> ${result.messageId}</p>
-            `
-          }
-        };
-      } catch (error) {
-        logger.error('[SendEmailTool] Failed', error as Error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          response: {
-            text: 'Failed to send email. Please try again.',
-            html: '<p>Failed to send email. Please try again.</p>'
-          }
-        };
-      }
+      return sendEmailCore(params, config, 'email');
     })
     .default(async (params, ctx) => {
-      // Fallback handler
       logger.info('[SendEmailTool] Sending email via default channel');
-
-      if (!config?.providerRegistry) {
-        return {
-          success: false,
-          error: 'Email provider not configured',
-          response: { text: 'Email functionality is not configured.' }
-        };
-      }
-
-      try {
-        // Get email provider (postmark only)
-        let emailProvider: IEmailProvider;
-        if (params.provider) {
-          emailProvider = await config.providerRegistry.get<IEmailProvider>(params.provider);
-        } else {
-          // Default to postmark
-          if (config.providerRegistry.has('postmark')) {
-            emailProvider = await config.providerRegistry.get<IEmailProvider>('postmark');
-          } else {
-            throw new Error('Postmark email provider not configured');
-          }
-        }
-
-        const result = await emailProvider.sendEmail({
-          to: params.to,
-          subject: params.subject,
-          text: params.body,
-          html: params.html,
-          headers: params.inReplyTo ? {
-            'In-Reply-To': params.inReplyTo,
-            'References': params.references || params.inReplyTo
-          } : undefined
-        });
-
-        return {
-          success: result.success,
-          data: result.messageId ? { messageId: result.messageId } : undefined,
-          error: result.error?.toString(),
-          response: {
-            text: result.success ? `Email sent to ${params.to}` : 'Failed to send email'
-          }
-        };
-      } catch (error) {
-        logger.error('[SendEmailTool] Failed', error as Error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          response: { text: 'Failed to send email' }
-        };
-      }
+      return sendEmailCore(params, config, 'default');
     })
     .build();
 }

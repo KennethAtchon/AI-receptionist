@@ -33,11 +33,11 @@ export function buildInitiateCallTool(config?: CallToolsConfig): ITool {
       logger.info('[InitiateCallTool] Starting call', { to: params.to });
 
       if (!config?.providerRegistry) {
-        logger.warn('[InitiateCallTool] No provider registry configured, returning mock data');
+        logger.error('[InitiateCallTool] No provider registry configured');
         return {
-          success: true,
-          data: { callSid: 'MOCK_CALL_123', status: 'initiated' },
-          response: { text: `Call initiated to ${params.to} (mock).` }
+          success: false,
+          error: 'Call provider not configured',
+          response: { text: 'Call functionality is not configured. Please configure a communication provider.' }
         };
       }
 
@@ -93,11 +93,11 @@ export function buildEndCallTool(config?: CallToolsConfig): ITool {
       logger.info('[EndCallTool] Ending call', { callSid: params.callSid });
 
       if (!config?.providerRegistry) {
-        logger.warn('[EndCallTool] No provider registry configured, returning mock data');
+        logger.error('[EndCallTool] No provider registry configured');
         return {
-          success: true,
-          data: { callSid: params.callSid },
-          response: { text: `Call ${params.callSid} ended (mock).` }
+          success: false,
+          error: 'Call provider not configured',
+          response: { text: 'Call functionality is not configured. Please configure a communication provider.' }
         };
       }
 

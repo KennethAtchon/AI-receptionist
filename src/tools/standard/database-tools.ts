@@ -27,11 +27,23 @@ export interface DatabaseToolsConfig {
 
 /**
  * Setup all database tools
+ * 
+ * Registers database management tools for customer information, call logging, and preferences.
+ * All tools use the agent's memory system for persistence.
+ * 
+ * @param registry - Tool registry to register tools with
+ * @param config - Configuration with agent and optional storage
+ * @returns Promise that resolves when all tools are registered
+ * 
+ * @example
+ * ```typescript
+ * await setupDatabaseTools(registry, { agent, storage });
+ * ```
  */
-export function setupDatabaseTools(
+export async function setupDatabaseTools(
   registry: ToolRegistry,
   config: DatabaseToolsConfig
-): void {
+): Promise<void> {
   logger.info('[DatabaseTools] Registering database management tools');
 
   // Customer management tools

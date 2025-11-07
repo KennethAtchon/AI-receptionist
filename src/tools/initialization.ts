@@ -117,7 +117,7 @@ async function registerDatabaseTools(
   logger.info('[ToolInit] Auto-registering database tools (memory storage enabled)');
 
   const { setupDatabaseTools } = await import('./standard/database-tools');
-  setupDatabaseTools(toolRegistry, {
+  await setupDatabaseTools(toolRegistry, {
     agent: context.agent,
     storage: memoryConfig.longTermStorage
   });

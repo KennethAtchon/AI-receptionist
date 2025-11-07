@@ -33,11 +33,11 @@ export function buildSendSMSTool(config?: MessagingToolsConfig): ITool {
       logger.info('[SendSMSTool] Sending SMS', { to: params.to, length: params.message.length });
 
       if (!config?.providerRegistry) {
-        logger.warn('[SendSMSTool] No provider registry configured, returning mock data');
+        logger.error('[SendSMSTool] No provider registry configured');
         return {
-          success: true,
-          data: { messageSid: 'MOCK_SMS_123', status: 'sent' },
-          response: { text: `SMS sent to ${params.to} (mock).` }
+          success: false,
+          error: 'SMS provider not configured',
+          response: { text: 'SMS functionality is not configured. Please configure a communication provider.' }
         };
       }
 

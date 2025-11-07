@@ -99,6 +99,12 @@ export interface ITool {
   description: string;
   parameters: JSONSchema;
   handlers: ToolHandlers;
+  /**
+   * Optional version string for tool versioning
+   * Format: "major.minor.patch" (e.g., "1.0.0")
+   * @default "1.0.0"
+   */
+  version?: string;
 }
 
 export interface ToolHandlers {
@@ -111,9 +117,9 @@ export interface ToolHandlers {
 
 export type ToolHandler = (params: any, context: ExecutionContext) => Promise<ToolResult>;
 
-export interface ToolResult {
+export interface ToolResult<T = any> {
   success: boolean;
-  data?: any;
+  data?: T;
   error?: string;
   response: ChannelResponse;
 }

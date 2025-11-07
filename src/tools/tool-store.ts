@@ -1,15 +1,36 @@
 /**
  * ToolStore
  * Centralized persistence and querying for tool executions backed by Agent memory
+ * 
+ * The ToolStore provides a lightweight facade for logging tool executions and errors
+ * into the Agent's memory system. All tool executions are automatically logged when
+ * a ToolStore is attached to a ToolRegistry.
+ * 
+ * @example
+ * ```typescript
+ * const toolStore = new ToolStore(agent);
+ * registry.setToolStore(toolStore);
+ * 
+ * // Tool executions are now automatically logged
+ * await registry.execute('my_tool', params, context);
+ * 
+ * // Query execution history
+ * const executions = await toolStore.findExecutions({
+ *   toolName: 'my_tool',
+ *   limit: 10
+ * });
+ * ```
  */
 
 import type { ExecutionContext, ToolResult } from '../types';
 import type { Agent } from '../agent/core/Agent';
-function generateId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 import { logger } from '../utils/logger';
+import { generateId } from '../utils/id-generator';
 
+/**
+ * Tool execution record interface
+ * Represents a logged tool execution in memory
+ */
 export interface ToolExecutionRecord {
   id: string;
   toolName: string;
@@ -23,21 +44,52 @@ export interface ToolExecutionRecord {
 }
 
 /**
+ * ToolStore
  * A lightweight facade that writes tool execution events into the Agent's memory
  * and provides simple query helpers.
  */
 export class ToolStore {
   private agent?: Agent;
 
+  /**
+   * Create a new ToolStore instance
+   * 
+   * @param agent - Optional agent instance. Can be set later with setAgent()
+   * 
+   * @example
+   * ```typescript
+   * const toolStore = new ToolStore(agent);
+   * // or
+   * const toolStore = new ToolStore();
+   * toolStore.setAgent(agent);
+   * ```
+   */
   constructor(agent?: Agent) {
     this.agent = agent;
   }
 
+  /**
+   * Set the agent instance for logging
+   * 
+   * @param agent - The agent instance to use for memory storage
+   * 
+   * @example
+   * ```typescript
+   * toolStore.setAgent(agent);
+   * ```
+   */
   setAgent(agent: Agent): void {
     this.agent = agent;
   }
 
   // ================= Registry/System Logs =================
+  
+  /**
+   * Log when a tool is registered
+   * 
+   * @param toolName - Name of the registered tool
+   * @internal This is called automatically by ToolRegistry
+   */
   async logToolRegistered(toolName: string): Promise<void> {
     if (!this.agent) return;
     try {
@@ -57,6 +109,12 @@ export class ToolStore {
     }
   }
 
+  /**
+   * Log when a tool is unregistered
+   * 
+   * @param toolName - Name of the unregistered tool
+   * @internal This is called automatically by ToolRegistry
+   */
   async logToolUnregistered(toolName: string): Promise<void> {
     if (!this.agent) return;
     try {
@@ -78,6 +136,13 @@ export class ToolStore {
 
   /**
    * Persist a successful tool execution into memory
+   * 
+   * @param toolName - Name of the executed tool
+   * @param parameters - Parameters passed to the tool
+   * @param result - Tool execution result
+   * @param context - Execution context
+   * @param durationMs - Execution duration in milliseconds
+   * @internal This is called automatically by ToolRegistry
    */
   async logExecution(
     toolName: string,
@@ -126,6 +191,13 @@ export class ToolStore {
 
   /**
    * Persist a failed tool execution into memory
+   * 
+   * @param toolName - Name of the tool that failed
+   * @param parameters - Parameters passed to the tool
+   * @param error - Error that occurred
+   * @param context - Execution context
+   * @param durationMs - Execution duration in milliseconds
+   * @internal This is called automatically by ToolRegistry
    */
   async logError(
     toolName: string,
@@ -171,6 +243,29 @@ export class ToolStore {
 
   /**
    * Query recent tool executions from memory
+   * 
+   * @param params - Query parameters
+   * @param params.conversationId - Optional conversation ID to filter by
+   * @param params.toolName - Optional tool name to filter by
+   * @param params.success - Optional success filter (true for successes, false for errors)
+   * @param params.limit - Maximum number of results (default: 20)
+   * @returns Array of memory entries matching the query
+   * 
+   * @example
+   * ```typescript
+   * // Get all executions for a conversation
+   * const executions = await toolStore.findExecutions({
+   *   conversationId: 'conv-123',
+   *   limit: 50
+   * });
+   * 
+   * // Get failed executions for a specific tool
+   * const errors = await toolStore.findExecutions({
+   *   toolName: 'send_email',
+   *   success: false,
+   *   limit: 10
+   * });
+   * ```
    */
   async findExecutions(params: {
     conversationId?: string;
@@ -193,7 +288,21 @@ export class ToolStore {
   }
 
   /**
-   * Convenience: get last successful execution of a tool in a conversation
+   * Get the last successful execution of a tool in a conversation
+   * 
+   * Convenience method to retrieve the most recent successful execution.
+   * 
+   * @param toolName - Name of the tool
+   * @param conversationId - Optional conversation ID to filter by
+   * @returns The most recent successful execution, or null if none found
+   * 
+   * @example
+   * ```typescript
+   * const lastExecution = await toolStore.getLastExecution('send_email', 'conv-123');
+   * if (lastExecution) {
+   *   console.log('Last email sent:', lastExecution.toolResult?.data);
+   * }
+   * ```
    */
   async getLastExecution(toolName: string, conversationId?: string) {
     const list = await this.findExecutions({

@@ -18,9 +18,6 @@ export type { CallToolsConfig } from './call-tools';
 export { setupMessagingTools } from './messaging-tools';
 export type { MessagingToolsConfig } from './messaging-tools';
 
-export { setupCalendarTools } from './calendar-tools';
-export type { CalendarToolsConfig } from './calendar-tools';
-
 export { setupGoogleTools } from './google-tools';
 export type { GoogleServicesToolsConfig } from './google-tools';
 
