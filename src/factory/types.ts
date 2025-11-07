@@ -40,8 +40,12 @@ export interface FactoryConfig {
     type: 'database' | 'memory';
     database?: {
       db: any; // Drizzle/Prisma instance
-      // Note: Migrations should be handled via Drizzle Kit (drizzle-kit)
-      // Run: npx drizzle-kit generate and npx drizzle-kit migrate
+      /**
+       * Automatically create tables if they don't exist.
+       * Default: false (requires manual migrations via drizzle-kit)
+       * Set to true to enable automatic table creation on initialization.
+       */
+      autoMigrate?: boolean;
     };
   };
 

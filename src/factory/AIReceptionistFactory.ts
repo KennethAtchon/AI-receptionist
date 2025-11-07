@@ -99,9 +99,13 @@ export class AIReceptionistFactory {
       logger.info('[Factory] Initializing shared storage...');
 
       if (this.config.storage.type === 'database' && this.config.storage.database) {
+        const dbConfig = this.config.storage.database;
         this.sharedStorage = new DatabaseStorage({
-          db: this.config.storage.database.db
+          db: dbConfig.db,
+          autoMigrate: dbConfig.autoMigrate
         });
+        // Initialize storage (creates tables if autoMigrate is enabled)
+        await this.sharedStorage.initialize();
       } else {
         this.sharedStorage = new InMemoryStorage();
       }

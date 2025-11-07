@@ -5,12 +5,13 @@
  * Supports PostgreSQL through Drizzle's API.
  *
  * MIGRATIONS:
- * Database migrations should be handled via Drizzle Kit, not this class.
- * The schema is defined in ./schema.ts. To run migrations:
+ * By default, database migrations should be handled via Drizzle Kit:
  * 1. Generate migration: npx drizzle-kit generate
  * 2. Apply migration: npx drizzle-kit migrate
  *
- * This ensures the database schema stays in sync with schema.ts definitions.
+ * However, you can enable automatic table creation by setting autoMigrate: true.
+ * This will automatically create required tables if they don't exist.
+ * The schema is defined in ./schema.ts.
  */
 
 import type { Memory, IStorage, MemorySearchQuery } from '../types';
@@ -18,6 +19,7 @@ import { eq, and, gte, lte, inArray, desc, asc, sql, or } from 'drizzle-orm';
 // Removed strict PgDatabase import to avoid cross-package type coupling
 // import type { PgDatabase } from 'drizzle-orm/pg-core';
 import { memory, allowlist } from './schema';
+import { ensureTablesExist } from './migrations';
 
 // Relaxed DB typing to avoid version/copy mismatches of drizzle types across packages
 // and to support different drizzle drivers (node-postgres, http, etc.)
@@ -28,19 +30,38 @@ import { memory, allowlist } from './schema';
 export interface DatabaseStorageConfig {
   db: SupportedDatabase;
   tableName?: string; // Optional custom table name
-  // Note: Migrations should be handled via Drizzle Kit (drizzle-kit)
-  // Run: npx drizzle-kit generate and npx drizzle-kit migrate
+  /**
+   * Automatically create tables if they don't exist.
+   * Default: false (requires manual migrations via drizzle-kit)
+   * Set to true to enable automatic table creation on initialization.
+   */
+  autoMigrate?: boolean;
 }
 
 export class DatabaseStorage implements IStorage {
   private db: SupportedDatabase;
   private table: typeof memory;
   private config: DatabaseStorageConfig;
+  private initialized = false;
 
   constructor(config: DatabaseStorageConfig) {
     this.db = config.db;
     this.table = memory;
     this.config = config;
+  }
+
+  /**
+   * Initialize storage - creates tables if autoMigrate is enabled
+   * Should be called after construction if autoMigrate is true
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    if (this.config.autoMigrate) {
+      await ensureTablesExist(this.db);
+    }
+
+    this.initialized = true;
   }
 
   /**
