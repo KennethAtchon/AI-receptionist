@@ -47,6 +47,8 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
       'I will say "I don\'t know" when I\'m not confident in my answer or when the question is outside my expertise.';
   }
 
+  // ==================== PRIVATE METHODS ====================
+
   /**
    * Process language configuration
    */
@@ -69,13 +71,6 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
       fluent: languages.fluent || ['English'],
       conversational: languages.conversational || []
     };
-  }
-
-  /**
-   * Dispose of knowledge base resources
-   */
-  public async dispose(): Promise<void> {
-    // Cleanup resources when implemented
   }
 
   // ==================== UPDATE METHODS ====================
@@ -197,6 +192,30 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
    */
   public updateUncertaintyThreshold(threshold: string): void {
     this._uncertaintyThreshold = threshold;
+  }
+
+  // ==================== UTILITY METHODS ====================
+
+  /**
+   * Dispose of knowledge base resources
+   */
+  public async dispose(): Promise<void> {
+    // Cleanup resources when implemented
+  }
+
+  /**
+   * Convert knowledge base to JSON for serialization
+   */
+  public toJSON(): Record<string, unknown> {
+    return {
+      domain: this.domain,
+      expertise: this.expertise,
+      languages: this.languages,
+      industries: this.industries,
+      knownDomains: this.knownDomains,
+      limitations: this.limitations,
+      uncertaintyThreshold: this.uncertaintyThreshold
+    };
   }
 
   /**

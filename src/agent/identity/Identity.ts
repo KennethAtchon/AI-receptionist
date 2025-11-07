@@ -63,74 +63,13 @@ export class IdentityImpl implements Identity {
     this._certifications = config.certifications || [];
   }
 
+  // ==================== PUBLIC GETTER METHODS ====================
+
   /**
    * Get a summary of the agent's identity
    */
   public summary(): string {
     return `${this.name} (${this.title})`;
-  }
-
-  /**
-   * Convert identity to JSON for serialization
-   */
-  public toJSON(): Record<string, unknown> {
-    return {
-      name: this.name,
-      role: this.role,
-      title: this.title,
-      backstory: this.backstory,
-      department: this.department,
-      reportsTo: this.reportsTo,
-      authorityLevel: this.authorityLevel,
-      escalationRules: this.escalationRules,
-      yearsOfExperience: this.yearsOfExperience,
-      specializations: this.specializations,
-      certifications: this.certifications
-    };
-  }
-
-  /**
-   * Get full identity description for system prompts
-   */
-  public getDescription(): string {
-    let description = '# IDENTITY & ROLE\n\n';
-    description += `You are ${this.name}, ${this.title}.\n\n`;
-
-    if (this.backstory) {
-      description += `## Background\n${this.backstory}\n\n`;
-    }
-
-    description += `## Role & Responsibilities\n`;
-    description += `- Primary Role: ${this.role}\n`;
-    if (this.department) {
-      description += `- Department: ${this.department}\n`;
-    }
-    if (this.reportsTo) {
-      description += `- Reporting Structure: ${this.reportsTo}\n`;
-    }
-    description += '\n';
-
-    description += `## Authority Level\n`;
-    description += `- Decision-making authority: ${this.authorityLevel}\n`;
-    if (this.escalationRules.length > 0) {
-      description += `- Escalation triggers: ${this.escalationRules.join(', ')}\n`;
-    }
-    description += '\n';
-
-    if (this.yearsOfExperience > 0 || this.specializations.length > 0 || this.certifications.length > 0) {
-      description += `## Professional Context\n`;
-      if (this.yearsOfExperience > 0) {
-        description += `- Experience: ${this.yearsOfExperience} years\n`;
-      }
-      if (this.specializations.length > 0) {
-        description += `- Specializations: ${this.specializations.join(', ')}\n`;
-      }
-      if (this.certifications.length > 0) {
-        description += `- Certifications: ${this.certifications.join(', ')}\n`;
-      }
-    }
-
-    return description.trim();
   }
 
   // ==================== UPDATE METHODS ====================
@@ -252,5 +191,70 @@ export class IdentityImpl implements Identity {
    */
   public removeCertification(certification: string): void {
     this._certifications = this._certifications.filter(c => c !== certification);
+  }
+
+  // ==================== UTILITY METHODS ====================
+
+  /**
+   * Convert identity to JSON for serialization
+   */
+  public toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      role: this.role,
+      title: this.title,
+      backstory: this.backstory,
+      department: this.department,
+      reportsTo: this.reportsTo,
+      authorityLevel: this.authorityLevel,
+      escalationRules: this.escalationRules,
+      yearsOfExperience: this.yearsOfExperience,
+      specializations: this.specializations,
+      certifications: this.certifications
+    };
+  }
+
+  /**
+   * Get full identity description for system prompts
+   */
+  public getDescription(): string {
+    let description = '# IDENTITY & ROLE\n\n';
+    description += `You are ${this.name}, ${this.title}.\n\n`;
+
+    if (this.backstory) {
+      description += `## Background\n${this.backstory}\n\n`;
+    }
+
+    description += `## Role & Responsibilities\n`;
+    description += `- Primary Role: ${this.role}\n`;
+    if (this.department) {
+      description += `- Department: ${this.department}\n`;
+    }
+    if (this.reportsTo) {
+      description += `- Reporting Structure: ${this.reportsTo}\n`;
+    }
+    description += '\n';
+
+    description += `## Authority Level\n`;
+    description += `- Decision-making authority: ${this.authorityLevel}\n`;
+    if (this.escalationRules.length > 0) {
+      description += `- Escalation triggers: ${this.escalationRules.join(', ')}\n`;
+    }
+    description += '\n';
+
+    if (this.yearsOfExperience > 0 || this.specializations.length > 0 || this.certifications.length > 0) {
+      description += `## Professional Context\n`;
+      if (this.yearsOfExperience > 0) {
+        description += `- Experience: ${this.yearsOfExperience} years\n`;
+      }
+      if (this.specializations.length > 0) {
+        description += `- Specializations: ${this.specializations.join(', ')}\n`;
+      }
+      if (this.certifications.length > 0) {
+        description += `- Certifications: ${this.certifications.join(', ')}\n`;
+      }
+    }
+
+    return description.trim();
   }
 }

@@ -28,9 +28,9 @@ export class PersonalityEngineImpl implements PersonalityEngine {
   private _stressResponse: string;
   private _adaptabilityRules: string[];
 
-  // Getters for readonly access
-  public get traits(): PersonalityTrait[] { return this._traits; }
-  public get communicationStyle(): CommunicationStyleConfig { return this._communicationStyle; }
+  // Readonly getters
+  public get traits(): PersonalityTrait[] { return [...this._traits]; }
+  public get communicationStyle(): CommunicationStyleConfig { return { ...this._communicationStyle }; }
   public get tone(): string { return this._tone; }
   public get formalityLevel(): number { return this._formalityLevel; }
   public get emotionalIntelligence(): 'low' | 'medium' | 'high' { return this._emotionalIntelligence; }
@@ -38,7 +38,7 @@ export class PersonalityEngineImpl implements PersonalityEngine {
   public get conflictStyle(): string { return this._conflictStyle; }
   public get decisionStyle(): string { return this._decisionStyle; }
   public get stressResponse(): string { return this._stressResponse; }
-  public get adaptabilityRules(): string[] { return this._adaptabilityRules; }
+  public get adaptabilityRules(): string[] { return [...this._adaptabilityRules]; }
 
   constructor(config: PersonalityConfig) {
     // Process traits
@@ -64,6 +64,8 @@ export class PersonalityEngineImpl implements PersonalityEngine {
       'Be more direct when detecting urgency'
     ];
   }
+
+  // ==================== PRIVATE METHODS ====================
 
   /**
    * Process traits from config
@@ -133,7 +135,7 @@ export class PersonalityEngineImpl implements PersonalityEngine {
       };
 
       return {
-        primary: style as any,
+        primary: style as 'consultative' | 'assertive' | 'empathetic' | 'analytical' | 'casual',
         tone: toneMap[style.toLowerCase()] || 'professional',
         formalityLevel: this.getDefaultFormalityLevel(style)
       };
@@ -163,6 +165,8 @@ export class PersonalityEngineImpl implements PersonalityEngine {
 
     return levels[style.toLowerCase()] || 7;
   }
+
+  // ==================== PUBLIC GETTER METHODS ====================
 
   /**
    * Get error message based on channel and personality
@@ -204,58 +208,7 @@ export class PersonalityEngineImpl implements PersonalityEngine {
     return "I apologize, but I'm experiencing technical difficulties. Please try again in a moment, or contact support if the issue persists.";
   }
 
-  /**
-   * Convert personality to JSON for serialization
-   */
-  public toJSON(): Record<string, unknown> {
-    return {
-      traits: this.traits,
-      communicationStyle: this.communicationStyle,
-      tone: this.tone,
-      formalityLevel: this.formalityLevel,
-      emotionalIntelligence: this.emotionalIntelligence,
-      adaptability: this.adaptability,
-      conflictStyle: this.conflictStyle,
-      decisionStyle: this.decisionStyle,
-      stressResponse: this.stressResponse,
-      adaptabilityRules: this.adaptabilityRules
-    };
-  }
-
-  /**
-   * Get personality description for system prompts
-   */
-  public getDescription(): string {
-    let description = '# PERSONALITY & COMMUNICATION STYLE\n\n';
-
-    description += '## Core Traits\n';
-    for (const trait of this.traits) {
-      description += `- ${trait.name}: ${trait.description}\n`;
-    }
-    description += '\n';
-
-    description += `## Communication Style\n`;
-    description += `- Primary Style: ${this.communicationStyle.primary}\n`;
-    description += `- Tone: ${this.tone}\n`;
-    description += `- Formality Level: ${this.formalityLevel}/10\n`;
-    description += `- Emotional Intelligence: ${this.emotionalIntelligence}\n`;
-    description += '\n';
-
-    description += `## Behavioral Patterns\n`;
-    description += `- Response to conflict: ${this.conflictStyle}\n`;
-    description += `- Decision-making approach: ${this.decisionStyle}\n`;
-    description += `- Stress response: ${this.stressResponse}\n`;
-    description += '\n';
-
-    if (this.adaptabilityRules.length > 0) {
-      description += `## Adaptability\n`;
-      for (const rule of this.adaptabilityRules) {
-        description += `- ${rule}\n`;
-      }
-    }
-
-    return description.trim();
-  }
+  // ==================== UPDATE METHODS ====================
 
   /**
    * Add a new personality trait
@@ -310,5 +263,60 @@ export class PersonalityEngineImpl implements PersonalityEngine {
       throw new Error('Formality level must be a number');
     }
     this._formalityLevel = Math.max(1, Math.min(10, level)); // Clamp between 1-10
+  }
+
+  // ==================== UTILITY METHODS ====================
+
+  /**
+   * Convert personality to JSON for serialization
+   */
+  public toJSON(): Record<string, unknown> {
+    return {
+      traits: this.traits,
+      communicationStyle: this.communicationStyle,
+      tone: this.tone,
+      formalityLevel: this.formalityLevel,
+      emotionalIntelligence: this.emotionalIntelligence,
+      adaptability: this.adaptability,
+      conflictStyle: this.conflictStyle,
+      decisionStyle: this.decisionStyle,
+      stressResponse: this.stressResponse,
+      adaptabilityRules: this.adaptabilityRules
+    };
+  }
+
+  /**
+   * Get personality description for system prompts
+   */
+  public getDescription(): string {
+    let description = '# PERSONALITY & COMMUNICATION STYLE\n\n';
+
+    description += '## Core Traits\n';
+    for (const trait of this.traits) {
+      description += `- ${trait.name}: ${trait.description}\n`;
+    }
+    description += '\n';
+
+    description += `## Communication Style\n`;
+    description += `- Primary Style: ${this.communicationStyle.primary}\n`;
+    description += `- Tone: ${this.tone}\n`;
+    description += `- Formality Level: ${this.formalityLevel}/10\n`;
+    description += `- Emotional Intelligence: ${this.emotionalIntelligence}\n`;
+    description += '\n';
+
+    description += `## Behavioral Patterns\n`;
+    description += `- Response to conflict: ${this.conflictStyle}\n`;
+    description += `- Decision-making approach: ${this.decisionStyle}\n`;
+    description += `- Stress response: ${this.stressResponse}\n`;
+    description += '\n';
+
+    if (this.adaptabilityRules.length > 0) {
+      description += `## Adaptability\n`;
+      for (const rule of this.adaptabilityRules) {
+        description += `- ${rule}\n`;
+      }
+    }
+
+    return description.trim();
   }
 }

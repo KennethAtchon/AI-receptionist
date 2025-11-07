@@ -14,15 +14,20 @@ import type {
 } from '../types';
 
 export class GoalSystemImpl implements IGoalSystem {
-  private goals: Goal[];
+  private _goals: Goal[];
+
+  // Readonly getters
+  public get goals(): Goal[] { return [...this._goals]; }
 
   constructor(config: GoalConfig) {
     // Validate that primary goal exists
     if (!config.primary || config.primary.trim().length === 0) {
       throw new Error('GoalConfig must have a non-empty primary goal');
     }
-    this.goals = this.parseGoals(config);
+    this._goals = this.parseGoals(config);
   }
+
+  // ==================== PRIVATE METHODS ====================
 
   /**
    * Parse goal configuration into Goal objects
@@ -84,26 +89,30 @@ export class GoalSystemImpl implements IGoalSystem {
     return goals;
   }
 
+  // ==================== PUBLIC GETTER METHODS ====================
+
   /**
    * Get current goals
    */
   public getCurrent(): Goal[] {
-    return [...this.goals];
+    return [...this._goals];
   }
 
   /**
    * Get primary goal
    */
   public getPrimary(): Goal | undefined {
-    return this.goals.find(g => g.type === 'primary');
+    return this._goals.find(g => g.type === 'primary');
   }
 
   /**
    * Get secondary goals
    */
   public getSecondary(): Goal[] {
-    return this.goals.filter(g => g.type === 'secondary');
+    return this._goals.filter(g => g.type === 'secondary');
   }
+
+  // ==================== UPDATE METHODS ====================
 
   /**
    * Add a new goal
@@ -113,19 +122,19 @@ export class GoalSystemImpl implements IGoalSystem {
       throw new Error('Goal must have name and description');
     }
     // Check for duplicate names
-    if (this.goals.some(g => g.name === goal.name)) {
+    if (this._goals.some(g => g.name === goal.name)) {
       throw new Error(`Goal with name "${goal.name}" already exists`);
     }
-    this.goals.push(goal);
+    this._goals.push(goal);
   }
 
   /**
    * Remove a goal by name
    */
   public removeGoal(name: string): boolean {
-    const initialLength = this.goals.length;
-    this.goals = this.goals.filter(g => g.name !== name);
-    return this.goals.length < initialLength;
+    const initialLength = this._goals.length;
+    this._goals = this._goals.filter(g => g.name !== name);
+    return this._goals.length < initialLength;
   }
 
   /**
@@ -135,7 +144,7 @@ export class GoalSystemImpl implements IGoalSystem {
     if (!name || name.trim().length === 0) {
       throw new Error('Goal name cannot be empty');
     }
-    const goal = this.goals.find(g => g.name === name);
+    const goal = this._goals.find(g => g.name === name);
     if (!goal) return false;
 
     // Validate updates
@@ -153,12 +162,14 @@ export class GoalSystemImpl implements IGoalSystem {
     return true;
   }
 
+  // ==================== UTILITY METHODS ====================
+
   /**
    * Convert goals to JSON for serialization
    */
   public toJSON(): Record<string, unknown> {
     return {
-      goals: this.goals
+      goals: this._goals
     };
   }
 
@@ -192,7 +203,7 @@ export class GoalSystemImpl implements IGoalSystem {
     }
 
     // Add constraints from all goals
-    const allConstraints = this.goals.flatMap(g => g.constraints);
+    const allConstraints = this._goals.flatMap(g => g.constraints);
     if (allConstraints.length > 0) {
       description += `## Constraints\n`;
       description += 'You must adhere to these constraints:\n';
@@ -201,10 +212,10 @@ export class GoalSystemImpl implements IGoalSystem {
     }
 
     // Add prioritization guidance if multiple goals
-    if (this.goals.length > 1) {
+    if (this._goals.length > 1) {
       description += `## Priority Order\n`;
       description += 'When conflicts arise, prioritize goals in this order:\n';
-      const sorted = [...this.goals].sort((a, b) => a.priority - b.priority);
+      const sorted = [...this._goals].sort((a, b) => a.priority - b.priority);
       description += sorted.map((g, i) => `${i + 1}. ${g.description}`).join('\n');
     }
 

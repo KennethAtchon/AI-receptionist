@@ -21,7 +21,8 @@ import type {
   KnowledgeBase,
   MemoryManager,
   GoalSystem,
-  ConversationHistory
+  ConversationHistory,
+  Channel
 } from '../types';
 
 import { AgentStatus } from '../types';
@@ -50,6 +51,7 @@ export class Agent {
   private readonly promptOptimizer: PromptOptimizer;
   private cachedSystemPrompt: string | null = null;
   private readonly customSystemPrompt?: string; // User-provided raw system prompt
+  private promptNeedsRebuild: boolean = false; // Flag to track if prompt needs rebuilding
 
   // ==================== STATE ====================
   private state: AgentStatus;
@@ -82,7 +84,6 @@ export class Agent {
     // Initialize knowledge base
     this.knowledge = new KnowledgeBaseImpl(config.knowledge || { domain: 'general' });
 
-
     // Initialize memory
     this.memory = new MemoryManagerImpl(config.memory || {});
 
@@ -102,10 +103,12 @@ export class Agent {
 
     // Initialize security
     this.inputValidator = new InputValidator();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.securityEnabled = (config as any).security?.inputValidation !== false; // Enabled by default
 
     // Set external dependencies
     this.aiProvider = config.aiProvider;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.toolRegistry = (config as any).toolRegistry;
 
     // Set custom system prompt if provided
@@ -151,8 +154,6 @@ export class Agent {
     const interactionId = request.id;
     this.state = AgentStatus.PROCESSING;
 
-    const startTime = Date.now();
-
     try {
       // 1. Security validation
       if (this.securityEnabled) {
@@ -196,17 +197,22 @@ export class Agent {
         channel: request.channel
       });
 
-      // 3. Build system prompt (static, no memory)
-      let systemPrompt = request.channel
-        ? await this.promptBuilder.build({
-            identity: this.identity,
-            personality: this.personality,
-            knowledge: this.knowledge,
-            goalSystem: this.goals,
-            channel: request.channel,
-            businessContext: request.context.businessContext
-          })
-        : this.cachedSystemPrompt!;
+      // 3. Build system prompt (rebuild if needed or if channel-specific)
+      let systemPrompt: string;
+      if (request.channel || this.promptNeedsRebuild) {
+        systemPrompt = await this.promptBuilder.build({
+          identity: this.identity,
+          personality: this.personality,
+          knowledge: this.knowledge,
+          goalSystem: this.goals,
+          channel: request.channel,
+          businessContext: request.context.businessContext
+        });
+        this.cachedSystemPrompt = systemPrompt;
+        this.promptNeedsRebuild = false;
+      } else {
+        systemPrompt = this.cachedSystemPrompt!;
+      }
 
       // Append system prompt enhancement if provided
       if (request.context.systemPromptEnhancement) {
@@ -373,7 +379,7 @@ export class Agent {
   private async synthesizeResponse(
     aiResponse: any,
     toolResults: any[],
-    channel: string
+    channel: Channel
   ): Promise<AgentResponse> {
     // Ask AI again with tool results to generate final user-facing response
     const toolSummary = toolResults.map(tr => 
@@ -388,7 +394,7 @@ export class Agent {
 
     return {
       content: finalAIResponse.content || aiResponse.content || 'Task completed.',
-      channel: channel as any,
+      channel: channel,
       metadata: {
         toolsUsed: toolResults.map(t => t.toolName),
         toolResults: toolResults.map(t => t.result)
@@ -427,6 +433,7 @@ export class Agent {
       knowledge: this.knowledge,
       goalSystem: this.goals
     });
+    this.promptNeedsRebuild = false;
 
     logger.info('[Agent] System prompt built', {
       agentId: this.id,
@@ -499,14 +506,30 @@ export class Agent {
     this.toolRegistry = registry;
   }
 
-  // ==================== PILLAR UPDATE METHODS ====================
-  // Direct access to pillar components for PillarManager
+  // ==================== PILLAR ACCESS METHODS ====================
+  // Direct access to pillar components
+  // NOTE: After updating pillars directly, call markPromptForRebuild() to ensure
+  // the system prompt is refreshed on the next request.
 
   public getIdentity() { return this.identity; }
   public getPersonality() { return this.personality; }
   public getKnowledge() { return this.knowledge; }
   public getGoals() { return this.goals; }
   public getMemory() { return this.memory; }
+
+  /**
+   * Mark system prompt for rebuild on next request
+   * Call this after updating any pillar (identity, personality, knowledge, goals)
+   * 
+   * Example:
+   * ```typescript
+   * agent.getIdentity().updateName("New Name");
+   * agent.markPromptForRebuild();
+   * ```
+   */
+  public markPromptForRebuild(): void {
+    this.promptNeedsRebuild = true;
+  }
 
   /**
    * Dispose of agent resources
@@ -527,6 +550,7 @@ export class Agent {
 
     // Clear references to shared resources
     // This helps garbage collection even though these are shared objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.aiProvider = null as any;
     this.toolRegistry = null;
 
