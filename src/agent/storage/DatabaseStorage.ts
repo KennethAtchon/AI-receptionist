@@ -107,7 +107,6 @@ export class DatabaseStorage implements IStorage {
       const { drizzle } = await import('drizzle-orm/node-postgres');
       let Pool: any;
       try {
-        // @ts-expect-error - pg is an optional peer dependency, handled at runtime
         const pgModule = await import('pg');
         Pool = pgModule.Pool;
       } catch (error) {
