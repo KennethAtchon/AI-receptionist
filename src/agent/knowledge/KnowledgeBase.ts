@@ -72,94 +72,10 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
   }
 
   /**
-   * Load knowledge base (placeholder for future RAG integration)
-   */
-  public async load(): Promise<void> {
-    // In the future, this would:
-    // - Initialize RAG systems
-    // - Cache frequently accessed knowledge
-    // For now, it's a no-op
-  }
-
-  /**
    * Dispose of knowledge base resources
    */
   public async dispose(): Promise<void> {
     // Cleanup resources when implemented
-  }
-
-  /**
-   * Convert knowledge to JSON for serialization
-   */
-  public toJSON(): Record<string, unknown> {
-    return {
-      domain: this.domain,
-      expertise: this.expertise,
-      languages: this.languages,
-      industries: this.industries,
-      knownDomains: this.knownDomains,
-      limitations: this.limitations,
-      uncertaintyThreshold: this.uncertaintyThreshold
-    };
-  }
-
-  /**
-   * Get knowledge description for system prompts
-   */
-  public getDescription(): string {
-    let description = '## Knowledge & Expertise\n\n';
-
-    description += `### Primary Domain\n`;
-    description += `You are an expert in: **${this.domain}**\n\n`;
-
-    if (this.expertise.length > 0) {
-      description += `### Areas of Expertise\n`;
-      description += this.expertise.map(e => `- ${e}`).join('\n');
-      description += '\n\n';
-    }
-
-    if (this.industries.length > 0) {
-      description += `### Industry Knowledge\n`;
-      description += `You have knowledge of: ${this.industries.join(', ')}\n\n`;
-    }
-
-    description += `### Languages\n`;
-    description += `- Fluent in: ${this.languages.fluent?.join(', ') || 'English'}\n`;
-    if (this.languages.conversational && this.languages.conversational.length > 0) {
-      description += `- Conversational in: ${this.languages.conversational.join(', ')}\n`;
-    }
-    description += '\n';
-
-    description += `### Knowledge Boundaries\n\n`;
-    description += `**What you know:**\n`;
-    description += this.knownDomains.map(d => `- ${d}`).join('\n');
-    description += '\n\n';
-
-    description += `**What you DON'T know (be honest about):**\n`;
-    description += this.limitations.map(l => `- ${l}`).join('\n');
-    description += '\n\n';
-
-    description += `**When to say "I don't know":**\n`;
-    description += this.uncertaintyThreshold;
-
-    return description;
-  }
-
-  /**
-   * Check if the agent has knowledge in a specific domain
-   */
-  public hasKnowledge(domain: string): boolean {
-    const domainLower = domain.toLowerCase();
-    return this.knownDomains.some(d => d.toLowerCase().includes(domainLower)) ||
-           this.expertise.some(e => e.toLowerCase().includes(domainLower));
-  }
-
-  /**
-   * Check if a topic is within limitations
-   */
-  public isLimitedKnowledge(topic: string): boolean {
-    const topicLower = topic.toLowerCase();
-    return this.limitations.some(l => l.toLowerCase().includes(topicLower));
   }
 
   // ==================== UPDATE METHODS ====================
@@ -281,5 +197,54 @@ export class KnowledgeBaseImpl implements KnowledgeBase {
    */
   public updateUncertaintyThreshold(threshold: string): void {
     this._uncertaintyThreshold = threshold;
+  }
+
+  /**
+   * Get knowledge description for system prompts
+   */
+  public getDescription(): string {
+    let description = '# KNOWLEDGE & EXPERTISE\n\n';
+
+    description += `## Domain Expertise\n`;
+    description += `- Primary Domain: ${this._domain}\n`;
+    if (this._industries.length > 0) {
+      description += `- Industry Knowledge: ${this._industries.join(', ')}\n`;
+    }
+    if (this._expertise.length > 0) {
+      description += `- Subject Matter Expertise: ${this._expertise.join(', ')}\n`;
+    }
+    description += '\n';
+
+    description += `## Languages\n`;
+    if (this._languages.fluent && this._languages.fluent.length > 0) {
+      description += `- Fluent in: ${this._languages.fluent.join(', ')}\n`;
+    }
+    if (this._languages.conversational && this._languages.conversational.length > 0) {
+      description += `- Conversational in: ${this._languages.conversational.join(', ')}\n`;
+    }
+    description += '\n';
+
+    description += `## Knowledge Boundaries\n`;
+    if (this._knownDomains.length > 0) {
+      description += `What you know:\n`;
+      for (const domain of this._knownDomains) {
+        description += `- ${domain}\n`;
+      }
+      description += '\n';
+    }
+
+    if (this._limitations.length > 0) {
+      description += `What you DON'T know (be honest about):\n`;
+      for (const limitation of this._limitations) {
+        description += `- ${limitation}\n`;
+      }
+      description += '\n';
+    }
+
+    if (this._uncertaintyThreshold) {
+      description += `When to say "I don't know":\n${this._uncertaintyThreshold}\n`;
+    }
+
+    return description.trim();
   }
 }

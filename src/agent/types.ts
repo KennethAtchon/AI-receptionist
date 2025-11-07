@@ -140,12 +140,8 @@ export interface KnowledgeBase {
   knownDomains: string[];
   limitations: string[];
   uncertaintyThreshold: string;
-  load(): Promise<void>;
   dispose(): Promise<void>;
-  toJSON(): Record<string, unknown>;
   getDescription(): string;
-  hasKnowledge(domain: string): boolean;
-  isLimitedKnowledge(topic: string): boolean;
   updateDomain(domain: string): void;
   addExpertise(area: string): void;
   removeExpertise(area: string): void;
@@ -387,28 +383,13 @@ export interface Goal {
   priority: number;
   metric?: string;
   constraints: string[];
-  completed?: boolean;
-  completedAt?: Date;
-  completionCriteria?: string;
 }
 
 export interface GoalSystem {
   getCurrent(): Goal[];
   getPrimary(): Goal | undefined;
   getSecondary(): Goal[];
-  getCompleted(): Goal[];
-  getIncomplete(): Goal[];
   getDescription(): string;
-  getProgressStats(): {
-    totalInteractions: number;
-    goalContributions: Record<string, number>;
-    completedGoals: number;
-    totalGoals: number;
-  };
-  trackProgress(request: AgentRequest, response: AgentResponse): Promise<void>;
-  markGoalCompleted(name: string, completionCriteria?: string): boolean;
-  markGoalIncomplete(name: string): boolean;
-  isGoalCompleted(name: string): boolean;
   toJSON(): Record<string, unknown>;
   addGoal(goal: Goal): void;
   removeGoal(name: string): boolean;
@@ -472,7 +453,7 @@ export interface PromptContext {
   identity?: Identity;
   personality?: PersonalityEngine;
   knowledge?: KnowledgeBase;
-  goals?: Goal[];
+  goalSystem?: GoalSystem;  // Changed from goals?: Goal[] to use GoalSystem.getDescription()
   channel?: Channel;
   maxTokens?: number;
   policies?: PolicyRule[];

@@ -73,8 +73,8 @@ export class Agent {
     this.identity = new IdentityImpl(config.identity || {
       name: 'Custom Agent',
       role: 'AI Assistant',
-      authorityLevel: 'standard'
-    } as any);
+      authorityLevel: 'medium'
+    });
 
     // Initialize personality
     this.personality = new PersonalityEngineImpl(config.personality || {});
@@ -131,10 +131,6 @@ export class Agent {
     try {
       // Initialize memory systems
       await this.memory.initialize();
-
-      // Load knowledge base
-      await this.knowledge.load();
-
 
       // Build initial system prompt
       await this.rebuildSystemPrompt();
@@ -206,7 +202,7 @@ export class Agent {
             identity: this.identity,
             personality: this.personality,
             knowledge: this.knowledge,
-            goals: this.goals.getCurrent(),
+            goalSystem: this.goals,
             channel: request.channel,
             businessContext: request.context.businessContext
           })
@@ -251,8 +247,6 @@ export class Agent {
         importance: 5
       });
 
-      // 6. Track goal progress
-      await this.goals.trackProgress(request, response);
 
       this.state = AgentStatus.READY;
       return response;
@@ -431,7 +425,7 @@ export class Agent {
       identity: this.identity,
       personality: this.personality,
       knowledge: this.knowledge,
-      goals: this.goals.getCurrent()
+      goalSystem: this.goals
     });
 
     logger.info('[Agent] System prompt built', {

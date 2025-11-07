@@ -93,39 +93,44 @@ export class IdentityImpl implements Identity {
    * Get full identity description for system prompts
    */
   public getDescription(): string {
-    let description = `You are ${this.name}, ${this.title}.`;
+    let description = '# IDENTITY & ROLE\n\n';
+    description += `You are ${this.name}, ${this.title}.\n\n`;
 
     if (this.backstory) {
-      description += `\n\n${this.backstory}`;
+      description += `## Background\n${this.backstory}\n\n`;
     }
 
-    if (this.yearsOfExperience > 0) {
-      description += `\n\nYou have ${this.yearsOfExperience} years of experience in this role.`;
-    }
-
-    if (this.specializations.length > 0) {
-      description += `\n\nYour specializations include: ${this.specializations.join(', ')}.`;
-    }
-
-    if (this.certifications.length > 0) {
-      description += `\n\nYou hold the following certifications: ${this.certifications.join(', ')}.`;
-    }
-
+    description += `## Role & Responsibilities\n`;
+    description += `- Primary Role: ${this.role}\n`;
     if (this.department) {
-      description += `\n\nYou work in the ${this.department} department`;
-      if (this.reportsTo) {
-        description += `, reporting to ${this.reportsTo}`;
-      }
-      description += '.';
+      description += `- Department: ${this.department}\n`;
     }
+    if (this.reportsTo) {
+      description += `- Reporting Structure: ${this.reportsTo}\n`;
+    }
+    description += '\n';
 
-    description += `\n\nYour authority level is ${this.authorityLevel}.`;
-
+    description += `## Authority Level\n`;
+    description += `- Decision-making authority: ${this.authorityLevel}\n`;
     if (this.escalationRules.length > 0) {
-      description += `\n\nYou should escalate to a human supervisor when:\n${this.escalationRules.map(rule => `- ${rule}`).join('\n')}`;
+      description += `- Escalation triggers: ${this.escalationRules.join(', ')}\n`;
+    }
+    description += '\n';
+
+    if (this.yearsOfExperience > 0 || this.specializations.length > 0 || this.certifications.length > 0) {
+      description += `## Professional Context\n`;
+      if (this.yearsOfExperience > 0) {
+        description += `- Experience: ${this.yearsOfExperience} years\n`;
+      }
+      if (this.specializations.length > 0) {
+        description += `- Specializations: ${this.specializations.join(', ')}\n`;
+      }
+      if (this.certifications.length > 0) {
+        description += `- Certifications: ${this.certifications.join(', ')}\n`;
+      }
     }
 
-    return description;
+    return description.trim();
   }
 
   // ==================== UPDATE METHODS ====================

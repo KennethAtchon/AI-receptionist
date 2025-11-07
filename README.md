@@ -231,7 +231,7 @@ The AI has access to these tools and uses them **automatically** when needed:
 
 **You never call these tools manually.** The AI decides when and how to use them.
 
-## Agent Configuration (Six Pillars)
+## Agent Configuration (Five Pillars)
 
 Configure your AI agent's behavior through six core pillars:
 
@@ -316,17 +316,6 @@ memory: {
     minImportance: 7,          // Auto-save memories with importance >= 7
     types: ['decision', 'tool_execution', 'customer_info']
   }
-}
-```
-
-### 6. Voice - How the agent sounds (for voice calls)
-
-```typescript
-voice: {
-  provider: 'elevenlabs',      // elevenlabs | google | amazon
-  voiceId: 'sarah-voice-id',
-  stability: 0.5,              // 0-1 (higher = more consistent)
-  similarityBoost: 0.75        // 0-1 (higher = more similar to training)
 }
 ```
 

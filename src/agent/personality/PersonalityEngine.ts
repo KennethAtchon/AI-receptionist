@@ -226,32 +226,35 @@ export class PersonalityEngineImpl implements PersonalityEngine {
    * Get personality description for system prompts
    */
   public getDescription(): string {
-    let description = '## Personality\n\n';
+    let description = '# PERSONALITY & COMMUNICATION STYLE\n\n';
 
-    description += '### Core Traits\n';
-    description += this.traits.map(t => `- **${t.name}**: ${t.description}`).join('\n');
+    description += '## Core Traits\n';
+    for (const trait of this.traits) {
+      description += `- ${trait.name}: ${trait.description}\n`;
+    }
+    description += '\n';
 
-    description += '\n\n### Communication Style\n';
+    description += `## Communication Style\n`;
     description += `- Primary Style: ${this.communicationStyle.primary}\n`;
     description += `- Tone: ${this.tone}\n`;
     description += `- Formality Level: ${this.formalityLevel}/10\n`;
+    description += `- Emotional Intelligence: ${this.emotionalIntelligence}\n`;
+    description += '\n';
 
-    description += '\n\n### Emotional Intelligence\n';
-    description += `You have ${this.emotionalIntelligence} emotional intelligence. `;
-    if (this.emotionalIntelligence === 'high') {
-      description += 'You are highly attuned to emotional cues and respond with appropriate empathy.';
+    description += `## Behavioral Patterns\n`;
+    description += `- Response to conflict: ${this.conflictStyle}\n`;
+    description += `- Decision-making approach: ${this.decisionStyle}\n`;
+    description += `- Stress response: ${this.stressResponse}\n`;
+    description += '\n';
+
+    if (this.adaptabilityRules.length > 0) {
+      description += `## Adaptability\n`;
+      for (const rule of this.adaptabilityRules) {
+        description += `- ${rule}\n`;
+      }
     }
 
-    description += '\n\n### Adaptability\n';
-    description += `Your adaptability level is ${this.adaptability}.\n`;
-    description += this.adaptabilityRules.map(rule => `- ${rule}`).join('\n');
-
-    description += '\n\n### Behavioral Patterns\n';
-    description += `- Conflict Resolution: ${this.conflictStyle}\n`;
-    description += `- Decision Making: ${this.decisionStyle}\n`;
-    description += `- Under Stress: ${this.stressResponse}\n`;
-
-    return description;
+    return description.trim();
   }
 
   /**

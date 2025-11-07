@@ -15,7 +15,7 @@ import type {
   Identity,
   PersonalityEngine,
   KnowledgeBase,
-  Goal,
+  GoalSystem,
   Channel,
   PromptExample
 } from '../types';
@@ -29,22 +29,38 @@ export class SystemPromptBuilder {
 
     // 1. IDENTITY & ROLE (highest priority)
     if (context.identity) {
-      sections.push(this.buildIdentitySection(context.identity));
+      sections.push({
+        name: 'IDENTITY',
+        priority: 10,
+        content: context.identity.getDescription()
+      });
     }
 
     // 2. PERSONALITY & COMMUNICATION
     if (context.personality) {
-      sections.push(this.buildPersonalitySection(context.personality));
+      sections.push({
+        name: 'PERSONALITY',
+        priority: 9,
+        content: context.personality.getDescription()
+      });
     }
 
     // 3. KNOWLEDGE & EXPERTISE
     if (context.knowledge) {
-      sections.push(this.buildKnowledgeSection(context.knowledge));
+      sections.push({
+        name: 'KNOWLEDGE',
+        priority: 8,
+        content: context.knowledge.getDescription()
+      });
     }
 
     // 4. GOALS & OBJECTIVES
-    if (context.goals && context.goals.length > 0) {
-      sections.push(this.buildGoalsSection(context.goals));
+    if (context.goalSystem) {
+      sections.push({
+        name: 'GOALS',
+        priority: 9,
+        content: context.goalSystem.getDescription()
+      });
     }
 
     // 5. DECISION-MAKING PRINCIPLES
@@ -75,207 +91,6 @@ export class SystemPromptBuilder {
     return this.assemble(sections);
   }
 
-  /**
-   * Build IDENTITY section
-   */
-  private buildIdentitySection(identity: Identity): PromptSection {
-    let content = '# IDENTITY & ROLE\n\n';
-    content += `You are ${identity.name}, ${identity.title}.\n\n`;
-
-    if (identity.backstory) {
-      content += `## Background\n${identity.backstory}\n\n`;
-    }
-
-    content += `## Role & Responsibilities\n`;
-    content += `- Primary Role: ${identity.role}\n`;
-    if (identity.department) {
-      content += `- Department: ${identity.department}\n`;
-    }
-    if (identity.reportsTo) {
-      content += `- Reporting Structure: ${identity.reportsTo}\n`;
-    }
-    content += '\n';
-
-    content += `## Authority Level\n`;
-    content += `- Decision-making authority: ${identity.authorityLevel}\n`;
-    if (identity.escalationRules.length > 0) {
-      content += `- Escalation triggers: ${identity.escalationRules.join(', ')}\n`;
-    }
-    content += '\n';
-
-    if (identity.yearsOfExperience || identity.specializations.length > 0 || identity.certifications.length > 0) {
-      content += `## Professional Context\n`;
-      if (identity.yearsOfExperience) {
-        content += `- Experience: ${identity.yearsOfExperience} years\n`;
-      }
-      if (identity.specializations.length > 0) {
-        content += `- Specializations: ${identity.specializations.join(', ')}\n`;
-      }
-      if (identity.certifications.length > 0) {
-        content += `- Certifications: ${identity.certifications.join(', ')}\n`;
-      }
-    }
-
-    return {
-      name: 'IDENTITY',
-      priority: 10,
-      content: content.trim()
-    };
-  }
-
-  /**
-   * Build PERSONALITY section
-   */
-  private buildPersonalitySection(personality: PersonalityEngine): PromptSection {
-    let content = '# PERSONALITY & COMMUNICATION STYLE\n\n';
-
-    content += `## Core Traits\n`;
-    for (const trait of personality.traits) {
-      content += `- ${trait.name}: ${trait.description}\n`;
-    }
-    content += '\n';
-
-    content += `## Communication Style\n`;
-    content += `- Primary Style: ${personality.communicationStyle.primary}\n`;
-    content += `- Tone: ${personality.tone}\n`;
-    content += `- Formality Level: ${personality.formalityLevel}/10\n`;
-    content += `- Emotional Intelligence: ${personality.emotionalIntelligence}\n`;
-    content += '\n';
-
-    content += `## Behavioral Patterns\n`;
-    content += `- Response to conflict: ${personality.conflictStyle}\n`;
-    content += `- Decision-making approach: ${personality.decisionStyle}\n`;
-    content += `- Stress response: ${personality.stressResponse}\n`;
-    content += '\n';
-
-    if (personality.adaptabilityRules.length > 0) {
-      content += `## Adaptability\n`;
-      for (const rule of personality.adaptabilityRules) {
-        content += `- ${rule}\n`;
-      }
-    }
-
-    return {
-      name: 'PERSONALITY',
-      priority: 9,
-      content: content.trim()
-    };
-  }
-
-  /**
-   * Build KNOWLEDGE section
-   */
-  private buildKnowledgeSection(knowledge: KnowledgeBase): PromptSection {
-    let content = '# KNOWLEDGE & EXPERTISE\n\n';
-
-    content += `## Domain Expertise\n`;
-    content += `- Primary Domain: ${knowledge.domain}\n`;
-    if (knowledge.industries.length > 0) {
-      content += `- Industry Knowledge: ${knowledge.industries.join(', ')}\n`;
-    }
-    if (knowledge.expertise.length > 0) {
-      content += `- Subject Matter Expertise: ${knowledge.expertise.join(', ')}\n`;
-    }
-    content += '\n';
-
-    content += `## Languages\n`;
-    if (knowledge.languages.fluent && knowledge.languages.fluent.length > 0) {
-      content += `- Fluent in: ${knowledge.languages.fluent.join(', ')}\n`;
-    }
-    if (knowledge.languages.conversational && knowledge.languages.conversational.length > 0) {
-      content += `- Conversational in: ${knowledge.languages.conversational.join(', ')}\n`;
-    }
-    content += '\n';
-
-    content += `## Knowledge Boundaries\n`;
-    if (knowledge.knownDomains.length > 0) {
-      content += `What you know:\n`;
-      for (const domain of knowledge.knownDomains) {
-        content += `- ${domain}\n`;
-      }
-      content += '\n';
-    }
-
-    if (knowledge.limitations.length > 0) {
-      content += `What you DON'T know (be honest about):\n`;
-      for (const limitation of knowledge.limitations) {
-        content += `- ${limitation}\n`;
-      }
-      content += '\n';
-    }
-
-    if (knowledge.uncertaintyThreshold) {
-      content += `When to say "I don't know":\n${knowledge.uncertaintyThreshold}\n`;
-    }
-
-    return {
-      name: 'KNOWLEDGE',
-      priority: 8,
-      content: content.trim()
-    };
-  }
-
-  /**
-   * Build GOALS section
-   */
-  private buildGoalsSection(goals: Goal[]): PromptSection {
-    let content = '# GOALS & OBJECTIVES\n\n';
-
-    const primaryGoal = goals.find(g => g.type === 'primary');
-    if (primaryGoal) {
-      content += `## Primary Goal\n`;
-      content += `${primaryGoal.description}\n\n`;
-    }
-
-    const secondaryGoals = goals.filter(g => g.type === 'secondary');
-    if (secondaryGoals.length > 0) {
-      content += `## Secondary Goals\n`;
-      for (const goal of secondaryGoals) {
-        content += `- ${goal.description}`;
-        if (goal.metric) {
-          content += ` (Metric: ${goal.metric})`;
-        }
-        content += '\n';
-      }
-      content += '\n';
-    }
-
-    // Success metrics
-    const goalsWithMetrics = goals.filter(g => g.metric);
-    if (goalsWithMetrics.length > 0) {
-      content += `## Success Metrics\n`;
-      for (const goal of goalsWithMetrics) {
-        content += `- ${goal.name}: ${goal.metric}\n`;
-      }
-      content += '\n';
-    }
-
-    // Constraints
-    const allConstraints = goals.flatMap(g => g.constraints).filter(c => c);
-    if (allConstraints.length > 0) {
-      content += `## Constraints\n`;
-      for (const constraint of allConstraints) {
-        content += `- ${constraint}\n`;
-      }
-      content += '\n';
-    }
-
-    // Priority order
-    if (goals.length > 1) {
-      content += `## Trade-offs\n`;
-      content += `When conflicts arise, prioritize:\n`;
-      const sorted = [...goals].sort((a, b) => a.priority - b.priority);
-      for (let i = 0; i < Math.min(3, sorted.length); i++) {
-        content += `${i + 1}. ${sorted[i].description}\n`;
-      }
-    }
-
-    return {
-      name: 'GOALS',
-      priority: 9,
-      content: content.trim()
-    };
-  }
 
 
   /**
