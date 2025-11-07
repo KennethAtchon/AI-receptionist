@@ -3,6 +3,14 @@
  * Uses Drizzle ORM for database persistence
  *
  * Supports PostgreSQL through Drizzle's API.
+ *
+ * MIGRATIONS:
+ * Database migrations should be handled via Drizzle Kit, not this class.
+ * The schema is defined in ./schema.ts. To run migrations:
+ * 1. Generate migration: npx drizzle-kit generate
+ * 2. Apply migration: npx drizzle-kit migrate
+ *
+ * This ensures the database schema stays in sync with schema.ts definitions.
  */
 
 import type { Memory, IStorage, MemorySearchQuery } from '../types';
@@ -20,7 +28,8 @@ import { memory, allowlist } from './schema';
 export interface DatabaseStorageConfig {
   db: SupportedDatabase;
   tableName?: string; // Optional custom table name
-  autoMigrate?: boolean; // Auto-create tables if they don't exist
+  // Note: Migrations should be handled via Drizzle Kit (drizzle-kit)
+  // Run: npx drizzle-kit generate and npx drizzle-kit migrate
 }
 
 export class DatabaseStorage implements IStorage {
@@ -32,99 +41,6 @@ export class DatabaseStorage implements IStorage {
     this.db = config.db;
     this.table = memory;
     this.config = config;
-
-    if (config.autoMigrate) {
-      this.migrate().catch(err => {
-        console.error('Failed to auto-migrate database:', err);
-      });
-    }
-  }
-
-  /**
-   * Run database migrations
-   */
-  async migrate(): Promise<void> {
-    // Create required tables and indexes if they don't exist
-    // Use raw SQL to avoid requiring drizzle-kit at runtime
-    try {
-      // ai_receptionist_memory
-      await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS ai_receptionist_memory (
-          id UUID PRIMARY KEY,
-          content TEXT NOT NULL,
-          timestamp TIMESTAMP NOT NULL,
-          type TEXT NOT NULL,
-          importance INTEGER,
-          channel TEXT,
-          session_metadata JSONB,
-          role TEXT,
-          tool_call JSONB,
-          tool_result JSONB,
-          metadata JSONB,
-          goal_achieved BOOLEAN,
-          created_at TIMESTAMP DEFAULT NOW() NOT NULL
-        )
-      `);
-
-      // Indexes for memory
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_conversation_id_idx ON ai_receptionist_memory USING GIN (session_metadata)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_channel_idx ON ai_receptionist_memory (channel)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_type_idx ON ai_receptionist_memory (type)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_timestamp_idx ON ai_receptionist_memory (timestamp)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS memory_importance_idx ON ai_receptionist_memory (importance)`);
-
-      // ai_receptionist_leads
-      await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS ai_receptionist_leads (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          name TEXT,
-          email TEXT,
-          phone TEXT,
-          source TEXT,
-          metadata JSONB,
-          created_at TIMESTAMP DEFAULT NOW() NOT NULL
-        )
-      `);
-
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS leads_source_idx ON ai_receptionist_leads (source)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS leads_created_at_idx ON ai_receptionist_leads (created_at)`);
-
-      // ai_receptionist_call_logs
-      await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS ai_receptionist_call_logs (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          conversation_id UUID,
-          phone_number TEXT,
-          duration INTEGER,
-          outcome TEXT,
-          summary TEXT,
-          metadata JSONB,
-          created_at TIMESTAMP DEFAULT NOW() NOT NULL
-        )
-      `);
-
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_conversation_id_idx ON ai_receptionist_call_logs (conversation_id)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_outcome_idx ON ai_receptionist_call_logs (outcome)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS call_logs_created_at_idx ON ai_receptionist_call_logs (created_at)`);
-
-      // ai_receptionist_allowlist (unified email and SMS allowlist)
-      await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS ai_receptionist_allowlist (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          identifier TEXT NOT NULL,
-          type TEXT NOT NULL,
-          added_at TIMESTAMP DEFAULT NOW() NOT NULL,
-          added_by TEXT,
-          UNIQUE(identifier, type)
-        )
-      `);
-
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS allowlist_identifier_type_idx ON ai_receptionist_allowlist (identifier, type)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS allowlist_type_idx ON ai_receptionist_allowlist (type)`);
-      await this.db.execute(sql`CREATE INDEX IF NOT EXISTS allowlist_added_at_idx ON ai_receptionist_allowlist (added_at)`);
-    } catch (error) {
-      console.warn('Auto-migration failed; ensure database role has CREATE privileges. Error:', error);
-    }
   }
 
   /**

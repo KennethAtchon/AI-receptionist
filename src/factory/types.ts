@@ -40,7 +40,8 @@ export interface FactoryConfig {
     type: 'database' | 'memory';
     database?: {
       db: any; // Drizzle/Prisma instance
-      autoMigrate?: boolean;
+      // Note: Migrations should be handled via Drizzle Kit (drizzle-kit)
+      // Run: npx drizzle-kit generate and npx drizzle-kit migrate
     };
   };
 

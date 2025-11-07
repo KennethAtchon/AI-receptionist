@@ -100,8 +100,7 @@ export class AIReceptionistFactory {
 
       if (this.config.storage.type === 'database' && this.config.storage.database) {
         this.sharedStorage = new DatabaseStorage({
-          db: this.config.storage.database.db,
-          autoMigrate: this.config.storage.database.autoMigrate ?? true
+          db: this.config.storage.database.db
         });
       } else {
         this.sharedStorage = new InMemoryStorage();
