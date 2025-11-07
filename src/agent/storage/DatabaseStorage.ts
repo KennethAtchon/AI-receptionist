@@ -27,41 +27,134 @@ import { ensureTablesExist } from './migrations';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
  type SupportedDatabase = any;
 
-export interface DatabaseStorageConfig {
-  db: SupportedDatabase;
-  tableName?: string; // Optional custom table name
-  /**
-   * Automatically create tables if they don't exist.
-   * Default: false (requires manual migrations via drizzle-kit)
-   * Set to true to enable automatic table creation on initialization.
-   */
-  autoMigrate?: boolean;
-}
+/**
+ * Database connection configuration
+ * Either provide a connection string, individual connection details, or an existing Drizzle instance
+ */
+export type DatabaseStorageConfig =
+  | {
+      /** PostgreSQL connection string (e.g., postgresql://user:password@host:port/database) */
+      connectionString: string;
+      tableName?: string;
+      autoMigrate?: boolean;
+    }
+  | {
+      /** Individual connection parameters */
+      host: string;
+      port?: number;
+      database: string;
+      user: string;
+      password: string;
+      ssl?: boolean | { rejectUnauthorized?: boolean };
+      tableName?: string;
+      autoMigrate?: boolean;
+    }
+  | {
+      /** Existing Drizzle ORM instance (for advanced users) */
+      db: SupportedDatabase;
+      tableName?: string;
+      autoMigrate?: boolean;
+    };
 
 export class DatabaseStorage implements IStorage {
   private db: SupportedDatabase;
   private table: typeof memory;
   private config: DatabaseStorageConfig;
   private initialized = false;
+  private ownsConnection = false; // Track if we created the connection
+  private pool?: any; // Store pool for cleanup if we created it
 
   constructor(config: DatabaseStorageConfig) {
-    this.db = config.db;
-    this.table = memory;
     this.config = config;
+    this.table = memory;
+
+    // If db is provided directly, use it
+    if ('db' in config && config.db) {
+      this.db = config.db;
+      this.ownsConnection = false;
+    } else {
+      // We'll create the connection in initialize()
+      this.db = null as any;
+      this.ownsConnection = true;
+    }
   }
 
   /**
-   * Initialize storage - creates tables if autoMigrate is enabled
-   * Should be called after construction if autoMigrate is true
+   * Initialize storage - creates connection if needed and tables if autoMigrate is enabled
+   * Should be called after construction
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
+
+    // Create connection if we own it
+    if (this.ownsConnection) {
+      await this.createConnection();
+    }
 
     if (this.config.autoMigrate) {
       await ensureTablesExist(this.db);
     }
 
     this.initialized = true;
+  }
+
+  /**
+   * Create Drizzle connection from config
+   */
+  private async createConnection(): Promise<void> {
+    try {
+      // Dynamic import to avoid requiring these packages if user provides their own db
+      const { drizzle } = await import('drizzle-orm/node-postgres');
+      let Pool: any;
+      try {
+        // @ts-expect-error - pg is an optional peer dependency, handled at runtime
+        const pgModule = await import('pg');
+        Pool = pgModule.Pool;
+      } catch (error) {
+        throw new Error(
+          'Database packages not found. Please install: npm install drizzle-orm pg @types/pg\n' +
+          'Or provide your own Drizzle instance via the "db" option.'
+        );
+      }
+
+      let pool: any;
+
+      if ('connectionString' in this.config && this.config.connectionString) {
+        pool = new Pool({
+          connectionString: this.config.connectionString,
+        });
+      } else if ('host' in this.config && this.config.host) {
+        pool = new Pool({
+          host: this.config.host,
+          port: this.config.port || 5432,
+          database: this.config.database,
+          user: this.config.user,
+          password: this.config.password,
+          ssl: this.config.ssl,
+        });
+      } else {
+        throw new Error('Invalid database configuration: must provide connectionString, connection details, or db instance');
+      }
+
+      this.pool = pool;
+      this.db = drizzle(pool);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Database packages not found')) {
+        throw error;
+      }
+      throw new Error(`Failed to create database connection: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Dispose of the connection if we own it
+   */
+  async dispose(): Promise<void> {
+    if (this.ownsConnection && this.pool) {
+      await this.pool.end();
+      this.pool = undefined;
+    }
+    this.initialized = false;
   }
 
   /**

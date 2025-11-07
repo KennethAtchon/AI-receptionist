@@ -100,11 +100,28 @@ export class AIReceptionistFactory {
 
       if (this.config.storage.type === 'database' && this.config.storage.database) {
         const dbConfig = this.config.storage.database;
-        this.sharedStorage = new DatabaseStorage({
-          db: dbConfig.db,
+        // Build config object - must have connectionString, connection details, or db
+        const storageConfig: any = {
           autoMigrate: dbConfig.autoMigrate
-        });
-        // Initialize storage (creates tables if autoMigrate is enabled)
+        };
+        
+        if (dbConfig.connectionString) {
+          storageConfig.connectionString = dbConfig.connectionString;
+        } else if (dbConfig.host && dbConfig.database && dbConfig.user && dbConfig.password) {
+          storageConfig.host = dbConfig.host;
+          storageConfig.port = dbConfig.port;
+          storageConfig.database = dbConfig.database;
+          storageConfig.user = dbConfig.user;
+          storageConfig.password = dbConfig.password;
+          storageConfig.ssl = dbConfig.ssl;
+        } else if (dbConfig.db) {
+          storageConfig.db = dbConfig.db;
+        } else {
+          throw new Error('Database configuration must include connectionString, connection details (host/database/user/password), or db instance');
+        }
+        
+        this.sharedStorage = new DatabaseStorage(storageConfig);
+        // Initialize storage (creates connection if needed and tables if autoMigrate is enabled)
         await this.sharedStorage.initialize();
       } else {
         this.sharedStorage = new InMemoryStorage();
@@ -261,7 +278,10 @@ export class AIReceptionistFactory {
       await this.providerRegistry.disposeAll();
     }
 
-    // Storage doesn't need disposal (connection managed externally)
+    // Dispose storage if it owns the connection
+    if (this.sharedStorage && 'dispose' in this.sharedStorage) {
+      await (this.sharedStorage as any).dispose();
+    }
 
     this.initialized = false;
     logger.info('[Factory] ✅ Factory disposed');

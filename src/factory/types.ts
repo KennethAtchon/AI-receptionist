@@ -39,7 +39,70 @@ export interface FactoryConfig {
   storage?: {
     type: 'database' | 'memory';
     database?: {
-      db: any; // Drizzle/Prisma instance
+      /**
+       * Database connection configuration.
+       * You can provide a connection string, connection details, or an existing Drizzle instance.
+       * 
+       * @example Using connection string (simplest)
+       * ```typescript
+       * const factory = await AIReceptionistFactory.create({
+       *   // ...
+       *   storage: {
+       *     type: 'database',
+       *     database: {
+       *       connectionString: process.env.DATABASE_URL,
+       *       autoMigrate: true
+       *     }
+       *   }
+       * });
+       * ```
+       * 
+       * @example Using connection details
+       * ```typescript
+       * const factory = await AIReceptionistFactory.create({
+       *   // ...
+       *   storage: {
+       *     type: 'database',
+       *     database: {
+       *       host: 'localhost',
+       *       port: 5432,
+       *       database: 'myapp',
+       *       user: 'postgres',
+       *       password: 'password',
+       *       autoMigrate: true
+       *     }
+       *   }
+       * });
+       * ```
+       * 
+       * @example Using existing Drizzle instance (advanced)
+       * ```typescript
+       * import { drizzle } from 'drizzle-orm/node-postgres';
+       * import { Pool } from 'pg';
+       * 
+       * const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+       * const db = drizzle(pool);
+       * 
+       * const factory = await AIReceptionistFactory.create({
+       *   // ...
+       *   storage: {
+       *     type: 'database',
+       *     database: {
+       *       db: db,
+       *       autoMigrate: true
+       *     }
+       *   }
+       * });
+       * ```
+       */
+      connectionString?: string;
+      host?: string;
+      port?: number;
+      database?: string;
+      user?: string;
+      password?: string;
+      ssl?: boolean | { rejectUnauthorized?: boolean };
+      db?: any; // Existing Drizzle ORM instance (alternative to connectionString/details)
       /**
        * Automatically create tables if they don't exist.
        * Default: false (requires manual migrations via drizzle-kit)

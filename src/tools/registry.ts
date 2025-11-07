@@ -230,9 +230,9 @@ export class ToolRegistry {
     if (this.config.validateParameters && tool.parameters) {
       const validation = validateParameters(tool.parameters, parameters);
       if (!validation.valid) {
-        const error = `Invalid parameters for tool '${toolName}': ${validation.errors.join(', ')}`;
-        logger.error(`[ToolRegistry] ${error}`, { parameters, errors: validation.errors });
-        throw new Error(error);
+        const errorMessage = `Invalid parameters for tool '${toolName}': ${validation.errors.join(', ')}`;
+        logger.error(`[ToolRegistry] ${errorMessage}`, undefined, { parameters, errors: validation.errors });
+        throw new Error(errorMessage);
       }
     }
 
