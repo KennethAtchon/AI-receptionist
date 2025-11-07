@@ -45,14 +45,17 @@ export class EmailStorage {
       role: 'user', // Incoming emails are from the user
       sessionMetadata: {
         conversationId,
-        emailId: email.id, // Store email ID for thread detection
-        threadRoot, // First message in the thread
+        emailId: email.id,
         inReplyTo: email.headers?.['in-reply-to'],
-        references: email.headers?.references,
-        direction: 'inbound',
         from: email.from,
         to: Array.isArray(email.to) ? email.to.join(', ') : email.to,
         subject: email.subject,
+      },
+      metadata: {
+        // Moved to metadata - can rebuild from conversation history
+        threadRoot,
+        references: email.headers?.references,
+        direction: 'inbound',
         attachments: email.attachments?.map(att => ({
           name: att.name,
           contentType: att.contentType,
@@ -97,13 +100,16 @@ export class EmailStorage {
       role: 'assistant', // Outgoing emails are from the assistant
       sessionMetadata: {
         conversationId: options.conversationId,
-        emailId: options.messageId, // Store email ID for thread detection
-        threadRoot, // First message in the thread
+        emailId: options.messageId,
         inReplyTo: options.inReplyTo,
-        references: options.references,
-        direction: 'outbound',
         to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
         subject: options.subject
+      },
+      metadata: {
+        // Moved to metadata - can rebuild from conversation history
+        threadRoot,
+        references: options.references,
+        direction: 'outbound'
       }
     });
 

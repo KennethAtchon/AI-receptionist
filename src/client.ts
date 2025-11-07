@@ -18,7 +18,6 @@ import { initializeProviders, getAIProvider } from './providers/initialization';
 import { createToolInfrastructure, registerAllTools } from './tools/initialization';
 import { initializeResources } from './resources/initialization';
 import { WebhookRouter } from './webhooks/webhook-router';
-import { SessionManager } from './sessions';
 import { SDK_VERSION } from './version';
 
 // Type-only imports for tree-shaking
@@ -96,7 +95,6 @@ export class AIReceptionist {
   private providerRegistry!: ProviderRegistry; // Centralized provider management
   private toolRegistry!: ToolRegistry;
   private toolStore!: ToolStore;
-  private sessionManager!: SessionManager; // Session management for webhook-driven mode
   private webhookRouter!: WebhookRouter; // Webhook routing
 
   private initialized = false;
@@ -221,8 +219,7 @@ export class AIReceptionist {
         throw new Error(`Failed to register tools: ${(error as Error).message}`);
       }
 
-      // 5. Initialize session management
-      this.sessionManager = new SessionManager();
+      // 5. Initialize webhook router
       this.webhookRouter = new WebhookRouter(this);
 
       // 6. Initialize resources (session managers)
@@ -545,14 +542,6 @@ export class AIReceptionist {
   getToolStore(): ToolStore {
     this.ensureInitialized();
     return this.toolStore;
-  }
-
-  /**
-   * Get session manager for session lifecycle management
-   */
-  public getSessionManager(): SessionManager {
-    this.ensureInitialized();
-    return this.sessionManager;
   }
 
   /**

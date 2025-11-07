@@ -52,80 +52,55 @@ export class MemoryManagerImpl implements IMemoryManager {
     // Future: Load initial context from storage
   }
 
-  /**
-   * TODO: Refractor this, remove the input (user message) because it is utterly meaningless to retrieve a CONVERSATION HISTORY, make sure there is NO limit. Just retrieve the conversation using the ID, this function should be as simple as that. Just query the long term storage, completely remove short term from here
-   * @param input - The user's message
-   * @param context - convo Id, channel
-   * @returns 
-   */
-  public async retrieve(input: string, context?: {
-    conversationId?: string;
-    channel?: Channel;
-  }): Promise<ConversationHistory> {
-    const messages: Message[] = [];
-    const contextMessages: Message[] = [];
-
-    if (context?.conversationId) {
-      const conversationMemories = this.shortTerm.getAll().filter(
-        m => m.sessionMetadata?.conversationId === context.conversationId
-      );
-      messages.push(...this.convertMemoriesToMessages(conversationMemories));
-    }
-
-    if (this.longTerm && context?.conversationId) {
-      try {
-        const keywords = this.extractKeywords(input);
-        const searchQuery: MemorySearchQuery = {
-          keywords,
-          limit: 5,
-          minImportance: 5,
-          conversationId: context.conversationId
-        };
-
-        if (context?.channel) {
-          searchQuery.channel = context.channel;
-        }
-
-        const longTermMemories = await this.longTerm.search(searchQuery);
-
-        if (longTermMemories.length > 0) {
-          contextMessages.push({
-            role: 'system',
-            content: this.formatLongTermContext(longTermMemories),
-            timestamp: new Date()
-          });
-        }
-      } catch (error) {
-        logger.warn('[MemoryManager] Long-term memory search failed:', { error: error instanceof Error ? error.message : String(error) });
-      }
-    }
-
-    const metadata: ConversationHistoryMetadata = {
-      conversationId: context?.conversationId,
-      messageCount: messages.length,
-      oldestMessageTimestamp: messages[0]?.timestamp,
-      newestMessageTimestamp: messages[messages.length - 1]?.timestamp,
-      hasLongTermContext: !!contextMessages.length
-    };
-
-    return {
-      messages,
-      contextMessages,
-      metadata
-    };
-  }
 
   /**
    * Store new memory
+   * 
+   * IMPORTANT: Short-term memory is ONLY used if the information will 100% 
+   * still be there in the 20 message window. For all persistent data, use 
+   * long-term storage exclusively.
    */
   public async store(memory: Memory): Promise<void> {
-    // Always store in short-term memory
-    await this.shortTerm.add(memory);
+    // Store in short-term memory ONLY if it's guaranteed to be in the 20 message window
+    // This means: current conversation messages that haven't exceeded the context window
+    // For all other data, skip short-term and go directly to long-term
+    const shouldUseShortTerm = this.shouldUseShortTerm(memory);
+    
+    if (shouldUseShortTerm) {
+      await this.shortTerm.add(memory);
+    }
 
     // Decide if important enough for long-term storage
     if (this.shouldPersist(memory) && this.longTerm) {
       await this.longTerm.add(memory);
     }
+  }
+
+  /**
+   * Determine if memory should be stored in short-term memory
+   * 
+   * Short-term memory should ONLY be used if:
+   * - It's a conversation message (type: 'conversation')
+   * - It's part of the current active conversation
+   * - The short-term buffer has space (will definitely be in 20 message window)
+   * 
+   * All other memories (decisions, errors, tool executions, system events) 
+   * should go directly to long-term storage.
+   */
+  private shouldUseShortTerm(memory: Memory): boolean {
+    // Only conversation messages can use short-term memory
+    if (memory.type !== 'conversation') {
+      return false;
+    }
+
+    // Only if short-term memory has space (guaranteed to be in window)
+    if (this.shortTerm.isFull()) {
+      return false;
+    }
+
+    // Only for current conversation context
+    // Short-term is for immediate context window, not historical data
+    return true;
   }
 
   /**
@@ -162,16 +137,6 @@ export class MemoryManagerImpl implements IMemoryManager {
     );
   }
 
-  /**
-   * Delete this, what the fuck is this?
-   * Extract keywords from input (simple implementation)
-   */
-  private extractKeywords(input: string): string[] {
-    // Simple keyword extraction - remove common words
-    const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for']);
-    const words = input.toLowerCase().split(/\s+/);
-    return words.filter(word => !commonWords.has(word) && word.length > 3);
-  }
 
   /**
    * Get memory statistics
@@ -223,33 +188,48 @@ export class MemoryManagerImpl implements IMemoryManager {
 
   /**
    * Get all memories for a specific conversation
+   * 
+   * IMPORTANT: Short-term memory is ONLY used if:
+   * 1. Long-term storage is not available (fallback only)
+   * 2. The information will 100% still be there in the 20 message window
+   * 
+   * For all conversation history retrieval, use long-term storage exclusively.
    */
   public async getConversationHistory(conversationId: string): Promise<Memory[]> {
     if (!this.longTerm) {
-      // Fallback to short-term if no long-term storage
+      // Fallback to short-term ONLY if no long-term storage available
+      // This is a development/testing scenario only
       return this.shortTerm.getAll().filter(
         m => m.sessionMetadata?.conversationId === conversationId
       );
     }
 
+    // Always use long-term storage for conversation history
+    // No limit - retrieve entire conversation
     return this.longTerm.search({
       conversationId,
       orderBy: 'timestamp',
       orderDirection: 'asc'
+      // No limit - get full conversation history
     });
   }
 
   /**
    * Get all memories for a specific channel
+   * 
+   * IMPORTANT: Short-term memory is ONLY used if long-term storage is unavailable.
+   * All channel history should use long-term storage exclusively.
    */
   public async getChannelHistory(
     channel: Channel,
     options?: { limit?: number; conversationId?: string }
   ): Promise<Memory[]> {
     if (!this.longTerm) {
+      // Fallback to short-term ONLY if no long-term storage available
       return this.shortTerm.getAll().filter(m => m.channel === channel);
     }
 
+    // Always use long-term storage for channel history
     return this.longTerm.search({
       channel,
       conversationId: options?.conversationId,
@@ -261,10 +241,14 @@ export class MemoryManagerImpl implements IMemoryManager {
 
   /**
    * Search memories with advanced filtering
+   * 
+   * IMPORTANT: Short-term memory is ONLY used if long-term storage is unavailable.
+   * All searches should use long-term storage exclusively.
    */
   public async search(query: MemorySearchQuery): Promise<Memory[]> {
     if (!this.longTerm) {
-      // Basic filtering on short-term memory
+      // Fallback to short-term ONLY if no long-term storage available
+      // This is a development/testing scenario only
       let results = this.shortTerm.getAll();
 
       if (query.channel) {
@@ -285,6 +269,7 @@ export class MemoryManagerImpl implements IMemoryManager {
       return results.slice(0, query.limit || 10);
     }
 
+    // Always use long-term storage for searches
     return this.longTerm.search(query);
   }
 
@@ -303,8 +288,7 @@ export class MemoryManagerImpl implements IMemoryManager {
       type: 'system',
       channel: session.channel,
       sessionMetadata: {
-        conversationId: session.conversationId,
-        status: 'active'
+        conversationId: session.conversationId
       },
       metadata: session.metadata,
       importance: 5
@@ -323,13 +307,65 @@ export class MemoryManagerImpl implements IMemoryManager {
       timestamp: new Date(),
       type: 'system',
       sessionMetadata: {
-        conversationId,
-        status: 'completed'
+        conversationId
       },
       importance: 7 // Higher importance for session summaries
     };
 
     await this.store(memory);
+  }
+
+  /**
+   * Get conversation by identifier (phone number, email, etc.)
+   * Useful for webhook routing to find existing conversations
+   */
+  public async getConversationByIdentifier(
+    channel: Channel,
+    identifier: string
+  ): Promise<Memory | null> {
+    if (!this.longTerm) {
+      // Fallback to short-term if no long-term storage
+      const memories = this.shortTerm.getAll();
+      return memories.find(m => {
+        if (m.channel !== channel) return false;
+        const metadata = m.sessionMetadata;
+        if (channel === 'email' && metadata?.from === identifier) return true;
+        if (channel === 'email' && metadata?.to === identifier) return true;
+        if ((channel === 'call' || channel === 'sms') && metadata?.from === identifier) return true;
+        if ((channel === 'call' || channel === 'sms') && metadata?.to === identifier) return true;
+        return false;
+      }) || null;
+    }
+
+    // Search for most recent conversation with this identifier
+    const results = await this.longTerm.search({
+      channel,
+      orderBy: 'timestamp',
+      orderDirection: 'desc',
+      limit: 10
+    });
+
+    // Find match by identifier in sessionMetadata
+    return results.find(m => {
+      const metadata = m.sessionMetadata;
+      if (channel === 'email' && (metadata?.from === identifier || metadata?.to === identifier)) {
+        return true;
+      }
+      if ((channel === 'call' || channel === 'sms') && 
+          (metadata?.from === identifier || metadata?.to === identifier)) {
+        return true;
+      }
+      return false;
+    }) || null;
+  }
+
+  /**
+   * Generate a new conversation ID
+   */
+  public generateConversationId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 9);
+    return `conv_${timestamp}_${random}`;
   }
 
   /**
@@ -394,32 +430,5 @@ export class MemoryManagerImpl implements IMemoryManager {
     };
     
     await this.store(memory);
-  }
-
-  // ==================== HELPER METHODS ====================
-
-  /**
-   * Convert Memory objects to Message format
-   */
-  private convertMemoriesToMessages(memories: Memory[]): Message[] {
-    return memories.map(memory => ({
-      role: memory.role || 'assistant',
-      content: memory.content,
-      timestamp: memory.timestamp,
-      toolCall: memory.toolCall,
-      toolResult: memory.toolResult
-    }));
-  }
-
-  /**
-   * Format long-term memories as context message content
-   */
-  private formatLongTermContext(memories: Memory[]): string {
-    let context = 'Relevant context from past interactions:\n';
-    for (const memory of memories) {
-      const timestamp = memory.timestamp.toLocaleDateString();
-      context += `- [${timestamp}] ${memory.content}\n`;
-    }
-    return context.trim();
   }
 }

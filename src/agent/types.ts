@@ -205,23 +205,11 @@ export interface Memory {
     callSid?: string;
     messageSid?: string;
     emailId?: string;
-    threadId?: string; // Email thread tracking
-    threadRoot?: string; // First message ID in the email thread
-    inReplyTo?: string; // Parent email ID
-    references?: string; // Full email thread references chain
-    direction?: 'inbound' | 'outbound'; // Email/message direction
-    to?: string; // Recipient (for emails/SMS)
-    from?: string; // Sender (for emails/SMS)
-    subject?: string; // Email subject
-    status?: 'active' | 'completed' | 'failed';
-    duration?: number; // For calls
-    participants?: string[]; // Phone numbers, emails, etc.
-    attachments?: Array<{ // Email/MMS attachments
-      name: string;
-      contentType: string;
-      contentLength: number;
-      contentId?: string;
-    }>;
+    inReplyTo?: string; // REQUIRED for threading (this is enough!)
+    from?: string; // REQUIRED for participant matching
+    to?: string; // REQUIRED for participant matching
+    subject?: string; // REQUIRED for subject matching
+    // Remove references entirely - can rebuild from conversation history
   };
 
   // Role tracking (like messages)
@@ -339,10 +327,6 @@ export interface MemoryStats {
 }
 
 export interface MemoryManager {
-  retrieve(input: string, context?: {
-    conversationId?: string;
-    channel?: Channel;
-  }): Promise<ConversationHistory>;
   store(memory: Memory): Promise<void>;
   initialize(): Promise<void>;
   dispose(): Promise<void>;
@@ -359,6 +343,8 @@ export interface MemoryManager {
     metadata?: Record<string, any>;
   }): Promise<void>;
   endSession(conversationId: string, summary?: string): Promise<void>;
+  getConversationByIdentifier(channel: Channel, identifier: string): Promise<Memory | null>;
+  generateConversationId(): string;
   getConversationByCallId(callSid: string): Promise<Memory | null>;
   getConversationByMessageId(messageSid: string): Promise<Memory | null>;
   attachCallSid(conversationId: string, callSid: string): Promise<void>;

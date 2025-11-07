@@ -5,8 +5,8 @@
  * efficient concurrent request handling in server environments.
  */
 
-import { AIReceptionistFactory } from '../src/factory';
-import type { AgentInstance } from '../src/factory';
+import { AIReceptionistFactory } from '../../src/factory';
+import type { AgentInstance } from '../../src/factory';
 
 /**
  * Example 1: Basic Factory Setup

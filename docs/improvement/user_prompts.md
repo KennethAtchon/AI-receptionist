@@ -11,13 +11,10 @@ sessionMetadata: {
   // Remove references entirely - can rebuild from conversation history
 }
 
-And remove goalAchieved field
-
 Need a mandate that short term memory should only be used, if the information will 100% still be there in a 20 message window
 
 Fix the problem with retrieve() 
 
-The SDK doesn't need to have envs, just source everything from configs, and for logger, we should have basic configs for it, nothing too fancy
 
 
 

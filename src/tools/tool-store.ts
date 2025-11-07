@@ -151,7 +151,6 @@ export class ToolStore {
           conversationId: context.conversationId,
           callSid: context.callSid,
           messageSid: context.messageSid,
-          status: 'failed'
         },
         toolCall: {
           id: generateId('call'),
@@ -159,6 +158,7 @@ export class ToolStore {
           parameters
         },
         metadata: {
+          status: 'failed', // Moved to metadata
           durationMs
         }
       });

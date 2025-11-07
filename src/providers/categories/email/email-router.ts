@@ -238,8 +238,13 @@ export class EmailRouter {
     });
     
     const matchingConv = conversations.find(conv => {
-      const convParticipants = conv.sessionMetadata?.participants || [];
-      return participants.some(to => convParticipants.includes(to));
+      // Check participants from metadata (moved from sessionMetadata)
+      const convParticipants = (conv.metadata as any)?.participants || [];
+      // Also check from/to fields in sessionMetadata
+      const from = conv.sessionMetadata?.from;
+      const to = conv.sessionMetadata?.to;
+      const allParticipants = [...convParticipants, from, to].filter(Boolean);
+      return participants.some(p => allParticipants.includes(p));
     });
     
     if (matchingConv) {

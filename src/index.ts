@@ -76,13 +76,6 @@ export type { DatabaseStorageConfig } from './agent/storage';
 // Database Schema & Migrations
 export { memory, leads, callLogs } from './agent/storage';
 export type { Memory as DBMemory, NewMemory, Lead, NewLead, CallLog, NewCallLog } from './agent/storage';
-export {
-  migrateConversationsToMemory,
-  convertConversationToMemories,
-  verifyMigration,
-  rollbackMigration,
-} from './agent/storage';
-export type { MigrationOptions } from './agent/storage';
 
 // ============================================================================
 // Adapters (Protocol Adapters)
@@ -203,6 +196,7 @@ export type {
   EmailSession,
   GenerateTextOptions,
   TextResponse,
+
 
 
   // Other

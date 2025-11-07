@@ -5,12 +5,11 @@
  */
 
 import type { AIReceptionist } from '../client';
-import type { Session, SessionType } from '../sessions';
+import type { Channel } from '../agent/types';
 import { logger } from '../utils/logger';
 
 export interface WebhookResponse {
   success: boolean;
-  sessionId?: string;
   conversationId?: string;
   response?: any;
   error?: string;
@@ -20,23 +19,23 @@ export class WebhookRouter {
   constructor(private client: AIReceptionist) {}
 
   /**
-   * Route incoming webhook to appropriate session
+   * Route incoming webhook to appropriate conversation
    */
   async routeWebhook(
-    type: SessionType,
+    type: 'voice' | 'sms' | 'email',
     payload: any,
-    sessionId?: string
+    conversationId?: string
   ): Promise<WebhookResponse> {
     try {
-      logger.info(`[WebhookRouter] Routing ${type} webhook`, { sessionId });
+      logger.info(`[WebhookRouter] Routing ${type} webhook`, { conversationId });
 
-      // If sessionId provided, route to existing session
-      if (sessionId) {
-        return await this.routeToExistingSession(type, payload, sessionId);
+      // If conversationId provided, route to existing conversation
+      if (conversationId) {
+        return await this.routeToExistingConversation(type, payload, conversationId);
       }
 
-      // Otherwise, create new session or find by identifier
-      return await this.routeToNewOrExistingSession(type, payload);
+      // Otherwise, create new conversation or find by identifier
+      return await this.routeToNewOrExistingConversation(type, payload);
     } catch (error) {
       logger.error('[WebhookRouter] Routing error:', error as Error);
       return {
@@ -92,74 +91,76 @@ export class WebhookRouter {
   }
 
   /**
-   * Create new session from webhook data
+   * Create new conversation from webhook data
    */
-  async createSessionFromWebhook(
-    type: SessionType,
+  async createConversationFromWebhook(
+    type: 'voice' | 'sms' | 'email',
     payload: any
-  ): Promise<Session> {
-    logger.info(`[WebhookRouter] Creating session from webhook`, { type });
+  ): Promise<string> {
+    logger.info(`[WebhookRouter] Creating conversation from webhook`, { type });
 
+    const memory = this.client.getAgent().getMemory();
+    const conversationId = memory.generateConversationId();
     const identifier = this.extractIdentifier(type, payload);
-    const sessionManager = this.client.getSessionManager();
 
-    return await sessionManager.createSession(type, {
-      identifier,
+    await memory.startSession({
+      conversationId,
+      channel: type as Channel,
       metadata: {
         source: 'webhook',
+        identifier,
         payload: this.sanitizePayload(payload)
       }
     });
+
+    return conversationId;
   }
 
   /**
-   * Process webhook through existing session
+   * Process webhook through existing conversation
    */
-  private async routeToExistingSession(
-    type: SessionType,
+  private async routeToExistingConversation(
+    type: 'voice' | 'sms' | 'email',
     payload: any,
-    sessionId: string
+    conversationId: string
   ): Promise<WebhookResponse> {
-    const sessionManager = this.client.getSessionManager();
-    const session = await sessionManager.getSession(sessionId);
+    const memory = this.client.getAgent().getMemory();
+    const conversation = await memory.getConversationHistory(conversationId);
 
-    if (!session) {
-      throw new Error(`Session not found: ${sessionId}`);
+    if (conversation.length === 0) {
+      throw new Error(`Conversation not found: ${conversationId}`);
     }
-
-    // Update session activity
-    await sessionManager.updateActivity(sessionId);
 
     // Process through appropriate resource
     const response = await this.processWebhookWithResource(type, payload);
 
     return {
       success: true,
-      sessionId: session.id,
-      conversationId: session.conversationId,
+      conversationId,
       response
     };
   }
 
   /**
-   * Route to new or existing session based on identifier
+   * Route to new or existing conversation based on identifier
    */
-  private async routeToNewOrExistingSession(
-    type: SessionType,
+  private async routeToNewOrExistingConversation(
+    type: 'voice' | 'sms' | 'email',
     payload: any
   ): Promise<WebhookResponse> {
     const identifier = this.extractIdentifier(type, payload);
-    const sessionManager = this.client.getSessionManager();
+    const memory = this.client.getAgent().getMemory();
 
-    // Try to find existing session
-    let session = await sessionManager.getSessionByIdentifier(type, identifier);
+    // Try to find existing conversation
+    let existingConv = await memory.getConversationByIdentifier(type as Channel, identifier);
 
-    // Create new session if none exists
-    if (!session) {
-      session = await this.createSessionFromWebhook(type, payload);
+    let conversationId: string;
+    if (!existingConv) {
+      // Create new conversation
+      conversationId = await this.createConversationFromWebhook(type, payload);
     } else {
-      // Update existing session activity
-      await sessionManager.updateActivity(session.id);
+      conversationId = existingConv.sessionMetadata?.conversationId || 
+        await this.createConversationFromWebhook(type, payload);
     }
 
     // Process through appropriate resource
@@ -167,8 +168,7 @@ export class WebhookRouter {
 
     return {
       success: true,
-      sessionId: session.id,
-      conversationId: session.conversationId,
+      conversationId,
       response
     };
   }
@@ -177,7 +177,7 @@ export class WebhookRouter {
    * Process webhook with appropriate resource
    */
   private async processWebhookWithResource(
-    type: SessionType,
+    type: 'voice' | 'sms' | 'email',
     payload: any
   ): Promise<any> {
     switch (type) {
@@ -210,7 +210,7 @@ export class WebhookRouter {
   /**
    * Extract identifier from webhook payload
    */
-  private extractIdentifier(type: SessionType, payload: any): string {
+  private extractIdentifier(type: 'voice' | 'sms' | 'email', payload: any): string {
     switch (type) {
       case 'voice':
         return payload.From || payload.To || payload.phoneNumber;
@@ -244,7 +244,7 @@ export class WebhookRouter {
   /**
    * Generate error response for specific channel
    */
-  private generateErrorResponse(type: SessionType): any {
+  private generateErrorResponse(type: 'voice' | 'sms' | 'email'): any {
     switch (type) {
       case 'voice':
         return `<?xml version="1.0" encoding="UTF-8"?>

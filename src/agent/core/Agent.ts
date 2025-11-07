@@ -192,10 +192,33 @@ export class Agent {
       }
 
       // 2. Retrieve conversation history
-      const conversationHistory = await this.memory.retrieve(request.input, {
-        conversationId: request.context.conversationId,
-        channel: request.channel
-      });
+      // Get all memories for this conversation from long-term storage
+      const conversationMemories = request.context.conversationId
+        ? await this.memory.getConversationHistory(request.context.conversationId)
+        : [];
+
+      // Convert memories to messages format
+      const messages = conversationMemories
+        .filter(m => m.type === 'conversation' && m.role) // Only conversation messages with roles
+        .map(m => ({
+          role: m.role!,
+          content: m.content,
+          timestamp: m.timestamp,
+          toolCall: m.toolCall,
+          toolResult: m.toolResult
+        }));
+
+      const conversationHistory: ConversationHistory = {
+        messages,
+        contextMessages: [], // No separate context messages - everything is in the conversation
+        metadata: {
+          conversationId: request.context.conversationId,
+          messageCount: messages.length,
+          oldestMessageTimestamp: messages[0]?.timestamp,
+          newestMessageTimestamp: messages[messages.length - 1]?.timestamp,
+          hasLongTermContext: false
+        }
+      };
 
       // 3. Build system prompt (rebuild if needed or if channel-specific)
       let systemPrompt: string;

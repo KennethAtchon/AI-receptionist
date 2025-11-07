@@ -22,10 +22,3 @@ export type {
   NewAllowlist
 } from './schema';
 
-export {
-  migrateConversationsToMemory,
-  convertConversationToMemories,
-  verifyMigration,
-  rollbackMigration,
-} from './migrations';
-export type { MigrationOptions } from './migrations';
