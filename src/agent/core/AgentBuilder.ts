@@ -100,6 +100,14 @@ export class AgentBuilder {
   }
 
   /**
+   * Set the provider registry (OPTIONAL - for resources to access providers)
+   */
+  public withProviderRegistry(registry: any): this {
+    (this.config as any).providerRegistry = registry;
+    return this;
+  }
+
+  /**
    * Set the conversation service (OPTIONAL - for integration with existing SDK)
    */
   public withConversationService(service: any): this {

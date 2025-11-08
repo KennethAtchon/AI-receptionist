@@ -223,6 +223,7 @@ export class AIReceptionistFactory {
     // Build agent
     const agent = builder
       .withToolRegistry(this.baseToolRegistry) // Shared
+      .withProviderRegistry(this.providerRegistry) // Shared - needed for resources like VoiceResource
       .build();
 
     // Initialize agent

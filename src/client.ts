@@ -197,6 +197,7 @@ export class AIReceptionist {
           .withMemory(this.config.agent.memory || { contextWindow: 20 })
           .withAIProvider(aiProvider)
           .withToolRegistry(this.toolRegistry)
+          .withProviderRegistry(this.providerRegistry) // Needed for resources like VoiceResource
           .build();
 
         this.toolStore.setAgent(this.agent);

@@ -110,6 +110,8 @@ export class Agent {
     this.aiProvider = config.aiProvider;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.toolRegistry = (config as any).toolRegistry;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as any).providerRegistry = (config as any).providerRegistry;
 
     // Set custom system prompt if provided
     this.customSystemPrompt = config.customSystemPrompt;
