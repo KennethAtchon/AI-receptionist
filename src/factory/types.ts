@@ -22,105 +22,16 @@ import type { AIReceptionistConfig } from '../types';
 // Factory Configuration
 // ============================================================================
 
-export interface FactoryConfig {
-  // Model configuration (shared across all agents)
-  model: {
-    provider: 'openai' | 'openrouter';
-    apiKey: string;
-    model: string;
-    temperature?: number;
-    maxTokens?: number;
-  };
-
-  // Provider configuration (shared) - reuse existing config structure
-  providers?: AIReceptionistConfig['providers'];
-
-  // Storage configuration (shared)
-  storage?: {
-    type: 'database' | 'memory';
-    database?: {
-      /**
-       * Database connection configuration.
-       * You can provide a connection string, connection details, or an existing Drizzle instance.
-       * 
-       * @example Using connection string (simplest)
-       * ```typescript
-       * const factory = await AIReceptionistFactory.create({
-       *   // ...
-       *   storage: {
-       *     type: 'database',
-       *     database: {
-       *       connectionString: process.env.DATABASE_URL,
-       *       autoMigrate: true
-       *     }
-       *   }
-       * });
-       * ```
-       * 
-       * @example Using connection details
-       * ```typescript
-       * const factory = await AIReceptionistFactory.create({
-       *   // ...
-       *   storage: {
-       *     type: 'database',
-       *     database: {
-       *       host: 'localhost',
-       *       port: 5432,
-       *       database: 'myapp',
-       *       user: 'postgres',
-       *       password: 'password',
-       *       autoMigrate: true
-       *     }
-       *   }
-       * });
-       * ```
-       * 
-       * @example Using existing Drizzle instance (advanced)
-       * ```typescript
-       * import { drizzle } from 'drizzle-orm/node-postgres';
-       * import { Pool } from 'pg';
-       * 
-       * const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-       * const db = drizzle(pool);
-       * 
-       * const factory = await AIReceptionistFactory.create({
-       *   // ...
-       *   storage: {
-       *     type: 'database',
-       *     database: {
-       *       db: db,
-       *       autoMigrate: true
-       *     }
-       *   }
-       * });
-       * ```
-       */
-      connectionString?: string;
-      host?: string;
-      port?: number;
-      database?: string;
-      user?: string;
-      password?: string;
-      ssl?: boolean | { rejectUnauthorized?: boolean };
-      db?: any; // Existing Drizzle ORM instance (alternative to connectionString/details)
-      /**
-       * Automatically create tables if they don't exist.
-       * Default: false (requires manual migrations via drizzle-kit)
-       * Set to true to enable automatic table creation on initialization.
-       */
-      autoMigrate?: boolean;
-    };
-  };
-
-  // Tool configuration
-  tools?: {
-    defaults?: ('calendar' | 'booking' | 'crm')[];
-    custom?: any[]; // Custom tools array
-  };
-
-  // Debug mode
-  debug?: boolean;
-}
+/**
+ * Factory configuration uses AIReceptionistConfig but with agent config optional.
+ * Agent configuration is provided per-instance via AgentInstanceConfig.
+ * 
+ * @deprecated Use AIReceptionistConfig directly. FactoryConfig is kept for backward compatibility.
+ */
+export type FactoryConfig = Omit<AIReceptionistConfig, 'agent'> & {
+  // Agent config is optional for factory (provided per-instance)
+  agent?: never; // Explicitly disallow agent config at factory level
+};
 
 // ============================================================================
 // Agent Instance Configuration

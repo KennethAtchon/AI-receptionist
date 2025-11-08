@@ -110,6 +110,7 @@ export type { ILogger, LoggerConfig, LoggerContext } from './utils/logger';
 export type {
   // Main SDK config
   AIReceptionistConfig,
+  StorageConfig,
   VoiceConfig,
 
   // Agent types (Six-Pillar Architecture)

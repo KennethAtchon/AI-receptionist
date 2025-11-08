@@ -77,12 +77,15 @@ export class VoiceResource extends BaseResource<VoiceSession> {
     let twilioConfig: any;
     try {
       const providerRegistry = (agent as any).providerRegistry;
+      logger.info('[VoiceResource] Agent provider registry', providerRegistry);
       if (providerRegistry?.has('twilio')) {
-        twilioProvider = providerRegistry.getSync('twilio');
+        twilioProvider = (providerRegistry as any).get('twilio');
         twilioConfig = twilioProvider?.getConfig();
+      } else {
+        logger.error('[VoiceResource] Twilio provider not available');
       }
     } catch (error) {
-      // Provider not available, use defaults
+      logger.error('[VoiceResource] Error getting Twilio provider', error as Error);
     }
 
     // Use TwilioProvider methods if available, otherwise fall back to config/env

@@ -418,6 +418,8 @@ export interface AgentConfiguration {
   tools?: any[];
   aiProvider: any; // IAIProvider
   customSystemPrompt?: string; // Optional: Bypass SystemPromptBuilder and use raw custom prompt
+  toolRegistry?: any;
+  providerRegistry?: any;
 }
 
 export interface AgentState {

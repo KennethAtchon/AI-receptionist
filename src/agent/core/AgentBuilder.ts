@@ -95,7 +95,7 @@ export class AgentBuilder {
    * Set the tool registry (OPTIONAL - source of truth for available tools)
    */
   public withToolRegistry(registry: any): this {
-    (this.config as any).toolRegistry = registry;
+    this.config.toolRegistry = registry;
     return this;
   }
 
@@ -103,15 +103,7 @@ export class AgentBuilder {
    * Set the provider registry (OPTIONAL - for resources to access providers)
    */
   public withProviderRegistry(registry: any): this {
-    (this.config as any).providerRegistry = registry;
-    return this;
-  }
-
-  /**
-   * Set the conversation service (OPTIONAL - for integration with existing SDK)
-   */
-  public withConversationService(service: any): this {
-    (this.config as any).conversationService = service;
+    this.config.providerRegistry = registry;
     return this;
   }
 
@@ -168,12 +160,6 @@ export class AgentBuilder {
       if (!this.config.identity.role) {
         errors.push('Identity.role is required');
       }
-    }
-
-    // Validate personality if provided
-    if (this.config.personality) {
-      // Personality is optional, but if provided, validate structure
-      // All fields are optional, so no required validation needed
     }
 
     // Validate knowledge if provided

@@ -120,7 +120,10 @@ export class AIReceptionist {
     }
 
     // Validate required config
-    if (!config.agent?.identity && !config.agent?.customSystemPrompt) {
+    if (!config.agent) {
+      throw new Error('Agent configuration is required for AIReceptionist instances');
+    }
+    if (!config.agent.identity && !config.agent.customSystemPrompt) {
       throw new Error('Agent identity configuration is required unless using customSystemPrompt');
     }
     if (!config.model) {
@@ -153,7 +156,7 @@ export class AIReceptionist {
       return;
     }
 
-    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent.identity?.name || 'Custom Agent'}`);
+    logger.info(`[AIReceptionist] Initializing agent: ${this.config.agent!.identity?.name || 'Custom Agent'}`);
 
     try {
       // 1. Initialize provider registry and register all providers
@@ -179,22 +182,22 @@ export class AIReceptionist {
       const builder = AgentBuilder.create();
 
       // If custom system prompt is provided, use it
-      if (this.config.agent.customSystemPrompt) {
-        builder.withCustomSystemPrompt(this.config.agent.customSystemPrompt);
+      if (this.config.agent!.customSystemPrompt) {
+        builder.withCustomSystemPrompt(this.config.agent!.customSystemPrompt);
       }
 
       // Add identity if provided (required unless customSystemPrompt is set)
-      if (this.config.agent.identity) {
-        builder.withIdentity(this.config.agent.identity);
+      if (this.config.agent!.identity) {
+        builder.withIdentity(this.config.agent!.identity);
       }
 
       // Add optional configuration
       try {
         this.agent = builder
-          .withPersonality(this.config.agent.personality || {})
-          .withKnowledge(this.config.agent.knowledge || { domain: 'general' })
-          .withGoals(this.config.agent.goals || { primary: 'Assist users effectively' })
-          .withMemory(this.config.agent.memory || { contextWindow: 20 })
+          .withPersonality(this.config.agent!.personality || {})
+          .withKnowledge(this.config.agent!.knowledge || { domain: 'general' })
+          .withGoals(this.config.agent!.goals || { primary: 'Assist users effectively' })
+          .withMemory(this.config.agent!.memory || { contextWindow: 20 })
           .withAIProvider(aiProvider)
           .withToolRegistry(this.toolRegistry)
           .withProviderRegistry(this.providerRegistry) // Needed for resources like VoiceResource
@@ -418,33 +421,33 @@ export class AIReceptionist {
       // Merge agent config (deep merge for six pillars)
       agent: {
         identity: overrides.agent?.identity 
-          ? (this.config.agent.identity 
-              ? { ...this.config.agent.identity, ...overrides.agent.identity }
+          ? (this.config.agent!.identity 
+              ? { ...this.config.agent!.identity, ...overrides.agent.identity }
               : overrides.agent.identity)
-          : this.config.agent.identity,
+          : this.config.agent!.identity,
         personality: overrides.agent?.personality 
-          ? (this.config.agent.personality 
-              ? { ...this.config.agent.personality, ...overrides.agent.personality }
+          ? (this.config.agent!.personality 
+              ? { ...this.config.agent!.personality, ...overrides.agent.personality }
               : overrides.agent.personality)
-          : this.config.agent.personality,
+          : this.config.agent!.personality,
         knowledge: overrides.agent?.knowledge 
-          ? (this.config.agent.knowledge 
-              ? { ...this.config.agent.knowledge, ...overrides.agent.knowledge }
+          ? (this.config.agent!.knowledge 
+              ? { ...this.config.agent!.knowledge, ...overrides.agent.knowledge }
               : overrides.agent.knowledge)
-          : this.config.agent.knowledge,
+          : this.config.agent!.knowledge,
         goals: overrides.agent?.goals 
-          ? (this.config.agent.goals 
-              ? { ...this.config.agent.goals, ...overrides.agent.goals }
+          ? (this.config.agent!.goals 
+              ? { ...this.config.agent!.goals, ...overrides.agent.goals }
               : overrides.agent.goals)
-          : this.config.agent.goals,
+          : this.config.agent!.goals,
         memory: overrides.agent?.memory 
-          ? (this.config.agent.memory 
-              ? { ...this.config.agent.memory, ...overrides.agent.memory }
+          ? (this.config.agent!.memory 
+              ? { ...this.config.agent!.memory, ...overrides.agent.memory }
               : overrides.agent.memory)
-          : this.config.agent.memory,
+          : this.config.agent!.memory,
         customSystemPrompt: overrides.agent?.customSystemPrompt !== undefined
           ? overrides.agent.customSystemPrompt
-          : this.config.agent.customSystemPrompt
+          : this.config.agent!.customSystemPrompt
       },
 
       // Merge model config (not just replace)
@@ -694,7 +697,7 @@ export class AIReceptionist {
   } {
     return {
       version: SDK_VERSION,
-      agentName: this.config.agent.identity?.name || 'Custom Agent',
+      agentName: this.config.agent!.identity?.name || 'Custom Agent',
       initialized: this.initialized,
       channels: [
         this.voice ? 'voice' : null,

@@ -38,10 +38,10 @@ import { registerAllTools } from '../tools/initialization';
 import { initializeResources } from '../resources/initialization';
 import { logger } from '../utils/logger';
 import type {
-  FactoryConfig,
   AgentInstanceConfig,
   AgentInstance
 } from './types';
+import type { AIReceptionistConfig } from '../types';
 
 export class AIReceptionistFactory {
   // =============== SHARED RESOURCES ===============
@@ -51,18 +51,20 @@ export class AIReceptionistFactory {
   private baseToolRegistry!: ToolRegistry;
 
   // =============== CONFIG ===============
-  private config: FactoryConfig;
+  private config: AIReceptionistConfig;
   private initialized = false;
 
-  private constructor(config: FactoryConfig) {
+  private constructor(config: AIReceptionistConfig) {
     this.config = config;
   }
 
   /**
    * Create and initialize factory with shared resources
    * Call this ONCE at application startup
+   * 
+   * @param config - AIReceptionistConfig (agent config is optional for factory)
    */
-  static async create(config: FactoryConfig): Promise<AIReceptionistFactory> {
+  static async create(config: AIReceptionistConfig): Promise<AIReceptionistFactory> {
     logger.info('[Factory] Creating AI Receptionist Factory...');
     const factory = new AIReceptionistFactory(config);
     await factory.initialize();
@@ -80,7 +82,7 @@ export class AIReceptionistFactory {
     logger.info('[Factory] Initializing provider registry...');
 
     // Create a minimal config for provider initialization
-    const providerConfig: any = {
+    const providerConfig: AIReceptionistConfig = {
       model: this.config.model,
       providers: this.config.providers,
       debug: this.config.debug,
@@ -136,20 +138,8 @@ export class AIReceptionistFactory {
     logger.info('[Factory] Initializing base tool registry...');
     this.baseToolRegistry = new ToolRegistry();
 
-    // Register tools once (they're stateless)
-    // Create a minimal config for tool registration
-    const toolConfig: any = {
-      model: this.config.model,
-      providers: this.config.providers,
-      agent: {
-        // Tools don't need full agent config during registration
-        identity: { name: 'Factory', role: 'System' },
-        memory: { contextWindow: 20 }
-      }
-    };
-
     await registerAllTools({
-      config: toolConfig,
+      config: this.config,
       agent: null as any, // Tools are registered without agent in factory pattern
       providerRegistry: this.providerRegistry
     }, this.baseToolRegistry);

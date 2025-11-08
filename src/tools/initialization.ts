@@ -107,7 +107,7 @@ async function registerDatabaseTools(
   context: ToolInitializationContext,
   toolRegistry: ToolRegistry
 ): Promise<void> {
-  const memoryConfig = context.config.agent.memory;
+  const memoryConfig = context.config.agent?.memory;
 
   if (!memoryConfig?.longTermEnabled || !memoryConfig?.longTermStorage) {
     logger.info('[ToolInit] Long-term memory disabled, skipping database tools');
