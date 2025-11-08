@@ -68,6 +68,19 @@ export class ProviderProxy<T extends IProvider> {
   }
 
   /**
+   * Get provider instance sync
+   * @returns Provider instance
+   * @throws ProviderInitializationError if initialization fails
+   */
+  getInstanceSync(): T | undefined {
+    if (this.instance) {
+      return this.instance;
+    }
+
+    throw new ProviderInitializationError(this.name, 'Provider not initialized');
+  }
+
+  /**
    * Validate credentials without fully loading the provider
    * Performs both format and connection validation
    *

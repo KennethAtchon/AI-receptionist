@@ -105,6 +105,27 @@ export class ProviderRegistry {
   }
 
   /**
+   * Get provider instance sync
+   * 
+   * @param name - Provider identifier
+   * @returns Provider instance
+   * @throws ProviderNotConfiguredError if provider not registered
+   * 
+   * @example
+   * ```typescript
+   * const twilio = registry.getSync('twilio');
+   * twilio.sendSMS('+1234567890', 'Hello!');
+   * ```
+   */
+  getSync<T extends IProvider>(name: string): T {
+    const proxy = this.providers.get(name);
+    if (!proxy) {
+      throw new ProviderNotConfiguredError(name);
+    }
+    return proxy.getInstanceSync() as T;
+  }
+
+  /**
    * Validate all registered providers early
    * Call this during SDK initialization to fail fast
    *

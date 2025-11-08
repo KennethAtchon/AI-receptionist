@@ -16,7 +16,8 @@ import {
   CallRateLimiter,
   CallerMatcher
 } from './processors';
-import type { InboundCallPayload } from '../../types/voice.types';
+
+import { TwilioProvider } from '../../providers/categories/twilio/twilio.provider';
 
 // Helper function to generate UUID
 function generateUUID(): string {
@@ -73,19 +74,20 @@ export class VoiceResource extends BaseResource<VoiceSession> {
     this.transcribeCalls = config?.transcribeCalls || false;
 
     // Get webhook URL from TwilioProvider if available
-    let twilioProvider: any;
+    let twilioProvider: TwilioProvider | undefined;
     let twilioConfig: any;
     try {
       const providerRegistry = (agent as any).providerRegistry;
       logger.info('[VoiceResource] Agent provider registry', providerRegistry);
       if (providerRegistry?.has('twilio')) {
-        twilioProvider = (providerRegistry as any).get('twilio');
+        twilioProvider = providerRegistry.getSync('twilio');
         twilioConfig = twilioProvider?.getConfig();
       } else {
         logger.error('[VoiceResource] Twilio provider not available');
       }
     } catch (error) {
-      logger.error('[VoiceResource] Error getting Twilio provider', error as Error);
+      // Provider not available, use defaults
+      logger.error('[VoiceResource] Provider not available', error as Error);
     }
 
     // Use TwilioProvider methods if available, otherwise fall back to config/env
