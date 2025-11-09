@@ -44,14 +44,85 @@ export interface SpreadsheetResult {
 
 /**
  * Create a new Google Spreadsheet
+ * Uses Drive API to create the file, then Sheets API to configure it
+ * This approach works better with service accounts
  */
 export async function createSpreadsheet(
   sheetsClient: any,
-  params: CreateSpreadsheetParams
+  params: CreateSpreadsheetParams,
+  driveClient?: any
 ): Promise<SpreadsheetResult> {
   try {
     const { title, sheets = [] } = params;
 
+    // If driveClient is provided, use Drive API to create the spreadsheet
+    // This is more reliable with service accounts
+    if (driveClient) {
+      try {
+        // Create spreadsheet using Drive API
+        const driveResponse = await driveClient.files.create({
+          requestBody: {
+            name: title,
+            mimeType: 'application/vnd.google-apps.spreadsheet'
+          },
+          fields: 'id, name, webViewLink'
+        });
+
+        const spreadsheetId = driveResponse.data.id;
+        const spreadsheetUrl = driveResponse.data.webViewLink;
+
+        // If additional sheets are requested, add them using Sheets API
+        if (sheets.length > 0) {
+          try {
+            const batchUpdateRequest: any = {
+              requests: sheets.map(sheet => ({
+                addSheet: {
+                  properties: {
+                    title: sheet.title
+                  }
+                }
+              }))
+            };
+
+            await sheetsClient.spreadsheets.batchUpdate({
+              spreadsheetId,
+              requestBody: batchUpdateRequest
+            });
+          } catch (sheetError: any) {
+            // Log but don't fail - spreadsheet is already created
+            logger.warn('[GoogleSheet] Failed to add additional sheets, but spreadsheet was created', {
+              spreadsheetId,
+              error: sheetError?.message
+            });
+          }
+        }
+
+        logger.info('[GoogleSheet] Spreadsheet created successfully via Drive API', {
+          spreadsheetId,
+          title
+        });
+
+        return {
+          success: true,
+          data: {
+            spreadsheetId,
+            spreadsheetUrl: spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
+            title
+          },
+          response: {
+            text: `Spreadsheet created successfully. Spreadsheet ID: ${spreadsheetId}`,
+            url: spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
+          }
+        };
+      } catch (driveError: any) {
+        logger.warn('[GoogleSheet] Drive API creation failed, falling back to Sheets API', {
+          error: driveError?.message
+        });
+        // Fall through to Sheets API method
+      }
+    }
+
+    // Fallback: Use Sheets API directly (may not work with service accounts)
     const requestBody: any = {
       properties: {
         title: title
@@ -71,7 +142,7 @@ export async function createSpreadsheet(
       requestBody
     });
 
-    logger.info('[GoogleSheet] Spreadsheet created successfully', {
+    logger.info('[GoogleSheet] Spreadsheet created successfully via Sheets API', {
       spreadsheetId: response.data.spreadsheetId,
       title: response.data.properties?.title
     });

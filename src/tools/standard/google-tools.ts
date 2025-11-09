@@ -30,7 +30,7 @@ export function buildCreateCalendarMeetingTool(config?: GoogleServicesToolsConfi
         type: 'object',
         properties: {
             operation: {
-                type: 'integer',
+                type: 'number',
                 description: 'the operation ( CREATE - 1, DELETE - 2, UPDATE - 3)'
             },
             host: {
@@ -87,8 +87,11 @@ export function buildCreateCalendarMeetingTool(config?: GoogleServicesToolsConfi
         
         const { operation, host, mainGuest, thirdPartyGuests, startTime, endTime, meetingId, summary, description } = params;
 
+        // Convert operation to integer if it's a number
+        const operationInt = typeof operation === 'number' ? Math.floor(operation) : parseInt(String(operation), 10);
+
         try {
-            switch(operation){
+            switch(operationInt){
                 case 1: {
                     // CREATE
                     logger.info('[ManageGoogleCalendarTool] Creating calendar meeting', { host, mainGuest });
@@ -358,7 +361,8 @@ export function buildGoogleSheetsTool(config?: GoogleServicesToolsConfig): ITool
                         };
                     }
 
-                    const result = await GoogleSheet.createSpreadsheet(sheetsClient, { title });
+                    // Pass driveClient to use Drive API for creation (more reliable with service accounts)
+                    const result = await GoogleSheet.createSpreadsheet(sheetsClient, { title }, driveClient);
                     return result;
                 }
 

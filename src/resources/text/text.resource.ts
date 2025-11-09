@@ -57,6 +57,12 @@ export class TextResource {
         logger.info(`[TextResource] Created new conversation: ${conversationId}`);
       } else {
         // Add user message to existing conversation
+        logger.info('[TextResource] Storing user message to memory', {
+          conversationId,
+          contentPreview: options.prompt.substring(0, 100) + (options.prompt.length > 100 ? '...' : ''),
+          contentLength: options.prompt.length
+        });
+
         await this.agent.getMemory().store({
           id: `msg-${conversationId}-${Date.now()}`,
           content: options.prompt,
@@ -66,7 +72,10 @@ export class TextResource {
           role: 'user',
           sessionMetadata: { conversationId }
         });
-        logger.info(`[TextResource] Added user message to conversation: ${conversationId}`);
+
+        logger.info('[TextResource] User message stored to memory', {
+          conversationId
+        });
       }
 
       // Create agent request with enhanced context
@@ -86,6 +95,13 @@ export class TextResource {
       });
 
       // Add assistant response to conversation using Agent memory
+      logger.info('[TextResource] Storing assistant response to memory', {
+        conversationId,
+        contentPreview: agentResponse.content.substring(0, 100) + (agentResponse.content.length > 100 ? '...' : ''),
+        contentLength: agentResponse.content.length,
+        hasToolCalls: !!(agentResponse.metadata?.toolsUsed && agentResponse.metadata.toolsUsed.length > 0)
+      });
+
       await this.agent.getMemory().store({
         id: `msg-${conversationId}-${Date.now()}`,
         content: agentResponse.content,
@@ -95,7 +111,10 @@ export class TextResource {
         role: 'assistant',
         sessionMetadata: { conversationId }
       });
-      logger.info(`[TextResource] Added assistant response to conversation: ${conversationId}`);
+
+      logger.info('[TextResource] Assistant response stored to memory', {
+        conversationId
+      });
 
       const response: TextResponse = {
         text: agentResponse.content,

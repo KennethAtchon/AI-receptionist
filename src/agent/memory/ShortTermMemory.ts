@@ -6,6 +6,7 @@
  */
 
 import type { Memory, Message } from '../types';
+import { logger } from '../../utils/logger';
 
 export class ShortTermMemory {
   private buffer: Memory[] = [];
@@ -19,12 +20,39 @@ export class ShortTermMemory {
    * Add a memory to short-term storage
    */
   public async add(memory: Memory): Promise<void> {
+    const countBefore = this.buffer.length;
+    const evictedCount = countBefore >= this.maxSize ? 1 : 0;
+    const evictedMemory = countBefore >= this.maxSize ? this.buffer[0] : undefined;
+
+    logger.info('[ShortTermMemory] Adding memory', {
+      memoryId: memory.id,
+      type: memory.type,
+      role: memory.role,
+      conversationId: memory.sessionMetadata?.conversationId,
+      contentPreview: memory.content.substring(0, 100) + (memory.content.length > 100 ? '...' : ''),
+      bufferCountBefore: countBefore,
+      maxSize: this.maxSize,
+      willEvict: countBefore >= this.maxSize,
+      evictedMemoryId: evictedMemory?.id
+    });
+
     this.buffer.push(memory);
 
     // Evict oldest if over capacity
     while (this.buffer.length > this.maxSize) {
-      this.buffer.shift();
+      const evicted = this.buffer.shift();
+      logger.info('[ShortTermMemory] Evicted memory from buffer', {
+        evictedMemoryId: evicted?.id,
+        evictedType: evicted?.type,
+        bufferCountAfter: this.buffer.length
+      });
     }
+
+    logger.info('[ShortTermMemory] Memory added', {
+      memoryId: memory.id,
+      bufferCountAfter: this.buffer.length,
+      evictedCount
+    });
   }
 
   /**
@@ -38,7 +66,17 @@ export class ShortTermMemory {
    * Get all memories in short-term storage
    */
   public getAll(): Memory[] {
-    return [...this.buffer];
+    const memories = [...this.buffer];
+    logger.info('[ShortTermMemory] Retrieved all memories', {
+      count: memories.length,
+      memories: memories.map(m => ({
+        id: m.id,
+        type: m.type,
+        role: m.role,
+        contentPreview: m.content.substring(0, 50) + (m.content.length > 50 ? '...' : '')
+      }))
+    });
+    return memories;
   }
 
   /**

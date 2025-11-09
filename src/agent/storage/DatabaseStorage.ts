@@ -20,6 +20,7 @@ import { eq, and, gte, lte, inArray, desc, asc, sql, or } from 'drizzle-orm';
 // import type { PgDatabase } from 'drizzle-orm/pg-core';
 import { memory, allowlist } from './schema';
 import { ensureTablesExist } from './migrations';
+import { logger } from '../../utils/logger';
 
 // Relaxed DB typing to avoid version/copy mismatches of drizzle types across packages
 // and to support different drizzle drivers (node-postgres, http, etc.)
@@ -84,32 +85,85 @@ export class DatabaseStorage implements IStorage {
    * Should be called after construction
    */
   async initialize(): Promise<void> {
-    if (this.initialized) return;
+    logger.info('[DatabaseStorage] Initializing database storage', {
+      initialized: this.initialized,
+      ownsConnection: this.ownsConnection,
+      hasDb: !!this.db,
+      autoMigrate: this.config.autoMigrate,
+      configType: 'db' in this.config ? 'db-instance' : 'connectionString' in this.config ? 'connection-string' : 'connection-details'
+    });
+
+    if (this.initialized) {
+      logger.info('[DatabaseStorage] Already initialized, skipping');
+      return;
+    }
 
     // Create connection if we own it
     if (this.ownsConnection) {
+      logger.info('[DatabaseStorage] Creating database connection...');
       await this.createConnection();
+      logger.info('[DatabaseStorage] Database connection created successfully');
+    } else {
+      logger.info('[DatabaseStorage] Using provided database instance (no connection creation needed)');
+      if (!this.db) {
+        logger.error('[DatabaseStorage] No database instance provided and not owning connection!');
+        throw new Error('DatabaseStorage: No database connection available');
+      }
     }
 
     if (this.config.autoMigrate) {
-      await ensureTablesExist(this.db);
+      logger.info('[DatabaseStorage] Auto-migrate enabled, ensuring tables exist...');
+      try {
+        await ensureTablesExist(this.db);
+        logger.info('[DatabaseStorage] Tables verified/created successfully');
+      } catch (error) {
+        logger.error('[DatabaseStorage] Failed to ensure tables exist', error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      }
+    } else {
+      logger.info('[DatabaseStorage] Auto-migrate disabled, skipping table creation');
+    }
+
+    // Test connection with a simple query
+    try {
+      logger.info('[DatabaseStorage] Testing database connection...');
+      await this.db.select().from(this.table).limit(1);
+      logger.info('[DatabaseStorage] Database connection test successful');
+    } catch (error) {
+      logger.error('[DatabaseStorage] Database connection test failed', error instanceof Error ? error : new Error(String(error)), {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      // Don't throw - might be okay if table doesn't exist yet
     }
 
     this.initialized = true;
+    logger.info('[DatabaseStorage] ✅ Database storage initialized successfully', {
+      initialized: this.initialized,
+      hasDb: !!this.db
+    });
   }
 
   /**
    * Create Drizzle connection from config
    */
   private async createConnection(): Promise<void> {
+    logger.info('[DatabaseStorage] Creating database connection from config', {
+      hasConnectionString: 'connectionString' in this.config && !!this.config.connectionString,
+      hasHost: 'host' in this.config && !!this.config.host,
+      hasDb: 'db' in this.config && !!this.config.db
+    });
+
     try {
       // Dynamic import to avoid requiring these packages if user provides their own db
+      logger.info('[DatabaseStorage] Importing drizzle-orm and pg packages...');
       const { drizzle } = await import('drizzle-orm/node-postgres');
       let Pool: any;
       try {
         const pgModule = await import('pg');
         Pool = pgModule.Pool;
+        logger.info('[DatabaseStorage] Successfully imported pg and drizzle-orm packages');
       } catch (error) {
+        logger.error('[DatabaseStorage] Failed to import database packages', error instanceof Error ? error : new Error(String(error)));
         throw new Error(
           'Database packages not found. Please install: npm install drizzle-orm pg @types/pg\n' +
           'Or provide your own Drizzle instance via the "db" option.'
@@ -119,25 +173,37 @@ export class DatabaseStorage implements IStorage {
       let pool: any;
 
       if ('connectionString' in this.config && this.config.connectionString) {
+        logger.info('[DatabaseStorage] Creating pool from connection string');
         pool = new Pool({
           connectionString: this.config.connectionString,
         });
       } else if ('host' in this.config && this.config.host) {
+        logger.info('[DatabaseStorage] Creating pool from connection details', {
+          host: this.config.host,
+          port: this.config.port || 5432,
+          database: this.config.database
+        });
         pool = new Pool({
           host: this.config.host,
           port: this.config.port || 5432,
           database: this.config.database,
           user: this.config.user,
-          password: this.config.password,
+          password: this.config.password ? '***' : undefined, // Don't log password
           ssl: this.config.ssl,
         });
       } else {
+        logger.error('[DatabaseStorage] Invalid database configuration');
         throw new Error('Invalid database configuration: must provide connectionString, connection details, or db instance');
       }
 
       this.pool = pool;
       this.db = drizzle(pool);
+      logger.info('[DatabaseStorage] Database connection pool created and Drizzle instance initialized');
     } catch (error) {
+      logger.error('[DatabaseStorage] Failed to create database connection', error instanceof Error ? error : new Error(String(error)), {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       if (error instanceof Error && error.message.includes('Database packages not found')) {
         throw error;
       }
@@ -160,20 +226,46 @@ export class DatabaseStorage implements IStorage {
    * Save a memory to the database
    */
   async save(memory: Memory): Promise<void> {
-    await this.db.insert(this.table).values({
-      id: memory.id,
-      content: memory.content,
-      timestamp: memory.timestamp,
+    logger.info('[DatabaseStorage] Saving memory to database', {
+      memoryId: memory.id,
       type: memory.type,
-      importance: memory.importance,
-      channel: memory.channel,
-      sessionMetadata: memory.sessionMetadata as any,
       role: memory.role,
-      toolCall: memory.toolCall as any,
-      toolResult: memory.toolResult as any,
-      metadata: memory.metadata as any,
-      goalAchieved: memory.goalAchieved,
+      channel: memory.channel,
+      conversationId: memory.sessionMetadata?.conversationId,
+      contentPreview: memory.content.substring(0, 100) + (memory.content.length > 100 ? '...' : ''),
+      contentLength: memory.content.length,
+      sessionMetadata: JSON.stringify(memory.sessionMetadata)
     });
+
+    try {
+      await this.db.insert(this.table).values({
+        id: memory.id,
+        content: memory.content,
+        timestamp: memory.timestamp,
+        type: memory.type,
+        importance: memory.importance,
+        channel: memory.channel,
+        sessionMetadata: memory.sessionMetadata as any,
+        role: memory.role,
+        toolCall: memory.toolCall as any,
+        toolResult: memory.toolResult as any,
+        metadata: memory.metadata as any,
+        goalAchieved: memory.goalAchieved,
+      });
+
+      logger.info('[DatabaseStorage] Memory saved successfully', {
+        memoryId: memory.id,
+        conversationId: memory.sessionMetadata?.conversationId
+      });
+    } catch (error) {
+      logger.error('[DatabaseStorage] Failed to save memory', error instanceof Error ? error : new Error(String(error)), {
+        memoryId: memory.id,
+        conversationId: memory.sessionMetadata?.conversationId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error;
+    }
   }
 
   /**
@@ -217,6 +309,18 @@ export class DatabaseStorage implements IStorage {
    * Search memories with flexible query
    */
   async search(query: MemorySearchQuery): Promise<Memory[]> {
+    logger.info('[DatabaseStorage] Searching memories', {
+      query: {
+        conversationId: query.conversationId,
+        channel: query.channel,
+        type: query.type,
+        role: query.role,
+        limit: query.limit,
+        orderBy: query.orderBy,
+        orderDirection: query.orderDirection
+      }
+    });
+
     let dbQuery = this.db.select().from(this.table);
 
     // Build WHERE clauses
@@ -224,6 +328,10 @@ export class DatabaseStorage implements IStorage {
 
     // Filter by conversationId (using JSONB query)
     if (query.conversationId) {
+      logger.info('[DatabaseStorage] Adding conversationId filter', {
+        conversationId: query.conversationId,
+        sqlQuery: `sessionMetadata->>'conversationId' = '${query.conversationId}'`
+      });
       conditions.push(
         sql`${this.table.sessionMetadata}->>'conversationId' = ${query.conversationId}`
       );
@@ -301,8 +409,46 @@ export class DatabaseStorage implements IStorage {
     const offset = query.offset || 0;
     dbQuery = dbQuery.limit(limit).offset(offset) as any;
 
+    logger.info('[DatabaseStorage] Executing database query', {
+      conversationId: query.conversationId,
+      conditionCount: conditions.length,
+      limit,
+      offset,
+      orderBy: query.orderBy || 'timestamp',
+      orderDirection: query.orderDirection || 'desc'
+    });
+
     const results = await dbQuery;
-    return results.map((r: any) => this.mapToMemory(r));
+
+    logger.info('[DatabaseStorage] Search completed', {
+      conversationId: query.conversationId,
+      resultCount: results.length,
+      results: results.map((r: any) => ({
+        id: r.id,
+        type: r.type,
+        role: r.role,
+        conversationId: r.sessionMetadata?.conversationId,
+        contentPreview: r.content?.substring(0, 100) + (r.content?.length > 100 ? '...' : ''),
+        timestamp: r.timestamp,
+        sessionMetadata: r.sessionMetadata
+      }))
+    });
+
+    const memories = results.map((r: any) => this.mapToMemory(r));
+
+    logger.info('[DatabaseStorage] Mapped results to Memory objects', {
+      conversationId: query.conversationId,
+      memoryCount: memories.length,
+      memories: memories.map((m: Memory) => ({
+        id: m.id,
+        type: m.type,
+        role: m.role,
+        conversationId: m.sessionMetadata?.conversationId,
+        contentPreview: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : '')
+      }))
+    });
+
+    return memories;
   }
 
   /**

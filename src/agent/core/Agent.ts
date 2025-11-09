@@ -195,9 +195,34 @@ export class Agent {
 
       // 2. Retrieve conversation history
       // Get all memories for this conversation from long-term storage
+      logger.info('[Agent] Retrieving conversation history from memory', {
+        agentId: this.id,
+        conversationId: request.context.conversationId
+      });
+
       const conversationMemories = request.context.conversationId
         ? await this.memory.getConversationHistory(request.context.conversationId)
         : [];
+
+      logger.info('[Agent] Raw memories retrieved from storage', {
+        agentId: this.id,
+        conversationId: request.context.conversationId,
+        totalMemoryCount: conversationMemories.length,
+        memoryBreakdown: {
+          conversation: conversationMemories.filter(m => m.type === 'conversation').length,
+          system: conversationMemories.filter(m => m.type === 'system').length,
+          decision: conversationMemories.filter(m => m.type === 'decision').length,
+          other: conversationMemories.filter(m => !['conversation', 'system', 'decision'].includes(m.type)).length
+        },
+        memories: conversationMemories.map(m => ({
+          id: m.id,
+          type: m.type,
+          role: m.role,
+          hasRole: !!m.role,
+          contentLength: m.content.length,
+          timestamp: m.timestamp
+        }))
+      });
 
       // Convert memories to messages format
       const messages = conversationMemories
@@ -210,6 +235,22 @@ export class Agent {
           toolResult: m.toolResult
         }));
 
+      logger.info('[Agent] Converted memories to messages format', {
+        agentId: this.id,
+        conversationId: request.context.conversationId,
+        rawMemoryCount: conversationMemories.length,
+        filteredMessageCount: messages.length,
+        filteredOut: conversationMemories.length - messages.length,
+        messages: messages.map(m => ({
+          role: m.role,
+          contentPreview: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : ''),
+          contentLength: m.content.length,
+          timestamp: m.timestamp,
+          hasToolCall: !!m.toolCall,
+          hasToolResult: !!m.toolResult
+        }))
+      });
+
       const conversationHistory: ConversationHistory = {
         messages,
         contextMessages: [], // No separate context messages - everything is in the conversation
@@ -221,6 +262,14 @@ export class Agent {
           hasLongTermContext: false
         }
       };
+
+      logger.info('[Agent] Conversation history object created', {
+        agentId: this.id,
+        conversationId: request.context.conversationId,
+        messageCount: conversationHistory.messages.length,
+        contextMessageCount: conversationHistory.contextMessages?.length || 0,
+        metadata: conversationHistory.metadata
+      });
 
       // 3. Build system prompt (rebuild if needed or if channel-specific)
       let systemPrompt: string;
@@ -250,6 +299,14 @@ export class Agent {
       // 5. Update memory - Store user and assistant messages separately
       // Store user message (skip if input is empty - indicates content already in history)
       if (request.input && request.input.trim().length > 0) {
+        logger.info('[Agent] Storing user message to memory', {
+          agentId: this.id,
+          conversationId: request.context.conversationId,
+          messageId: `${interactionId}-user`,
+          contentPreview: request.input.substring(0, 100) + (request.input.length > 100 ? '...' : ''),
+          contentLength: request.input.length
+        });
+
         await this.memory.store({
           id: `${interactionId}-user`,
           content: request.input,
@@ -262,9 +319,29 @@ export class Agent {
           },
           importance: 5
         });
+
+        logger.info('[Agent] User message stored to memory', {
+          agentId: this.id,
+          conversationId: request.context.conversationId,
+          messageId: `${interactionId}-user`
+        });
+      } else {
+        logger.info('[Agent] Skipping user message storage (empty input)', {
+          agentId: this.id,
+          conversationId: request.context.conversationId
+        });
       }
 
       // Store assistant response
+      logger.info('[Agent] Storing assistant response to memory', {
+        agentId: this.id,
+        conversationId: request.context.conversationId,
+        messageId: `${interactionId}-assistant`,
+        contentPreview: response.content.substring(0, 100) + (response.content.length > 100 ? '...' : ''),
+        contentLength: response.content.length,
+        hasToolCalls: !!(response.metadata?.toolsUsed && response.metadata.toolsUsed.length > 0)
+      });
+
       await this.memory.store({
         id: `${interactionId}-assistant`,
         content: response.content,
@@ -275,7 +352,15 @@ export class Agent {
         sessionMetadata: {
           conversationId: request.context.conversationId
         },
-        importance: 5
+        importance: 5,
+        toolCall: response.metadata?.toolCalls?.[0],
+        toolResult: response.metadata?.toolResults?.[0]
+      });
+
+      logger.info('[Agent] Assistant response stored to memory', {
+        agentId: this.id,
+        conversationId: request.context.conversationId,
+        messageId: `${interactionId}-assistant`
       });
 
 
@@ -324,15 +409,27 @@ export class Agent {
     ];
 
     // Log conversation history being passed to AI
-    logger.info('[Agent] Conversation history passed to AI', {
+    logger.info('[Agent] Final conversation history being passed to AI provider', {
       agentId: this.id,
       conversationId: request.context.conversationId,
-      messageCount: fullHistory.length,
+      originalMessageCount: conversationHistory.messages.length,
+      compressedMessageCount: messages.length,
+      finalMessageCount: fullHistory.length,
       contextMessageCount: conversationHistory.contextMessages?.length || 0,
-      messages: fullHistory.map(m => ({
+      wasCompressed: messages.length < conversationHistory.messages.length,
+      compressionRatio: conversationHistory.messages.length > 0 
+        ? (messages.length / conversationHistory.messages.length).toFixed(2)
+        : 'N/A',
+      fullHistory: fullHistory.map((m, index) => ({
+        index,
         role: m.role,
-        contentPreview: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : ''),
-        contentLength: m.content.length
+        content: m.content, // Full content for debugging
+        contentLength: m.content.length,
+        timestamp: m.timestamp,
+        hasToolCall: !!m.toolCall,
+        hasToolResult: !!m.toolResult,
+        toolCall: m.toolCall ? JSON.stringify(m.toolCall) : undefined,
+        toolResult: m.toolResult ? JSON.stringify(m.toolResult) : undefined
       }))
     });
 

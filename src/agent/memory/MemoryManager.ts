@@ -30,19 +30,40 @@ export class MemoryManagerImpl implements IMemoryManager {
   constructor(config: MemoryConfig) {
     this.config = config;
 
+    logger.info('[MemoryManager] Initializing MemoryManager', {
+      longTermEnabled: config.longTermEnabled,
+      hasSharedLongTermMemory: !!config.sharedLongTermMemory,
+      hasLongTermStorage: !!config.longTermStorage,
+      contextWindow: config.contextWindow || 20
+    });
+
     // Initialize short-term memory (always present)
     this.shortTerm = new ShortTermMemory(config.contextWindow || 20);
+    logger.info('[MemoryManager] Short-term memory initialized', {
+      contextWindow: config.contextWindow || 20
+    });
 
     // Initialize long-term memory if enabled
     if (config.longTermEnabled) {
       if (config.sharedLongTermMemory) {
         // Use shared LongTermMemory instance (factory pattern)
+        logger.info('[MemoryManager] Using shared LongTermMemory instance (factory pattern)');
         this.longTerm = config.sharedLongTermMemory;
       } else if (config.longTermStorage) {
         // Create per-agent LongTermMemory (legacy pattern)
+        logger.info('[MemoryManager] Creating per-agent LongTermMemory (legacy pattern)');
         this.longTerm = new LongTermMemory(config.longTermStorage);
+      } else {
+        logger.warn('[MemoryManager] longTermEnabled is true but no storage provided - long-term memory will not be available');
       }
+    } else {
+      logger.info('[MemoryManager] Long-term memory disabled');
     }
+
+    logger.info('[MemoryManager] MemoryManager initialized', {
+      hasShortTerm: !!this.shortTerm,
+      hasLongTerm: !!this.longTerm
+    });
   }
 
   // ==================== CORE MEMORY OPERATIONS ====================
@@ -55,18 +76,59 @@ export class MemoryManagerImpl implements IMemoryManager {
    * long-term storage exclusively.
    */
   public async store(memory: Memory): Promise<void> {
+    logger.info('[MemoryManager] Storing memory', {
+      memoryId: memory.id,
+      type: memory.type,
+      role: memory.role,
+      channel: memory.channel,
+      conversationId: memory.sessionMetadata?.conversationId,
+      contentPreview: memory.content.substring(0, 100) + (memory.content.length > 100 ? '...' : ''),
+      contentLength: memory.content.length,
+      importance: memory.importance,
+      timestamp: memory.timestamp
+    });
+
     // Store in short-term memory ONLY if it's guaranteed to be in the 20 message window
     // This means: current conversation messages that haven't exceeded the context window
     // For all other data, skip short-term and go directly to long-term
     const shouldUseShortTerm = this.shouldUseShortTerm(memory);
     
+    logger.info('[MemoryManager] Memory storage decision', {
+      memoryId: memory.id,
+      shouldUseShortTerm,
+      shouldPersist: this.shouldPersist(memory),
+      hasLongTermStorage: !!this.longTerm,
+      shortTermFull: this.shortTerm.isFull(),
+      shortTermCount: this.shortTerm.count()
+    });
+
     if (shouldUseShortTerm) {
+      logger.info('[MemoryManager] Storing in short-term memory', {
+        memoryId: memory.id,
+        shortTermCountBefore: this.shortTerm.count()
+      });
       await this.shortTerm.add(memory);
+      logger.info('[MemoryManager] Stored in short-term memory', {
+        memoryId: memory.id,
+        shortTermCountAfter: this.shortTerm.count()
+      });
     }
 
     // Decide if important enough for long-term storage
     if (this.shouldPersist(memory) && this.longTerm) {
+      logger.info('[MemoryManager] Storing in long-term memory', {
+        memoryId: memory.id
+      });
       await this.longTerm.add(memory);
+      logger.info('[MemoryManager] Stored in long-term memory', {
+        memoryId: memory.id
+      });
+    } else if (this.shouldPersist(memory) && !this.longTerm) {
+      logger.warn('[MemoryManager] Memory should be persisted but no long-term storage available', {
+        memoryId: memory.id,
+        type: memory.type,
+        importance: memory.importance
+      });
     }
   }
 
@@ -77,9 +139,23 @@ export class MemoryManagerImpl implements IMemoryManager {
    * All searches should use long-term storage exclusively.
    */
   public async search(query: MemorySearchQuery): Promise<Memory[]> {
+    logger.info('[MemoryManager] Searching memories', {
+      query: {
+        conversationId: query.conversationId,
+        channel: query.channel,
+        type: query.type,
+        keywords: query.keywords,
+        limit: query.limit,
+        orderBy: query.orderBy,
+        orderDirection: query.orderDirection
+      },
+      hasLongTermStorage: !!this.longTerm
+    });
+
     if (!this.longTerm) {
       // Fallback to short-term ONLY if no long-term storage available
       // This is a development/testing scenario only
+      logger.warn('[MemoryManager] No long-term storage available, using short-term fallback for search');
       let results = this.shortTerm.getAll();
 
       if (query.channel) {
@@ -97,7 +173,17 @@ export class MemoryManagerImpl implements IMemoryManager {
         results = results.filter(m => types.includes(m.type));
       }
 
-      return results.slice(0, query.limit || 10);
+      const finalResults = results.slice(0, query.limit || 10);
+      logger.info('[MemoryManager] Search completed (short-term fallback)', {
+        resultCount: finalResults.length,
+        results: finalResults.map(m => ({
+          id: m.id,
+          type: m.type,
+          role: m.role,
+          contentPreview: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : '')
+        }))
+      });
+      return finalResults;
     }
 
     // Always use long-term storage for searches
@@ -116,22 +202,54 @@ export class MemoryManagerImpl implements IMemoryManager {
    * For all conversation history retrieval, use long-term storage exclusively.
    */
   public async getConversationHistory(conversationId: string): Promise<Memory[]> {
+    logger.info('[MemoryManager] Retrieving conversation history', {
+      conversationId,
+      hasLongTermStorage: !!this.longTerm,
+      hasShortTermStorage: true
+    });
+
+    let memories: Memory[];
+
     if (!this.longTerm) {
       // Fallback to short-term ONLY if no long-term storage available
       // This is a development/testing scenario only
-      return this.shortTerm.getAll().filter(
+      logger.warn('[MemoryManager] No long-term storage available, using short-term fallback', { conversationId });
+      memories = this.shortTerm.getAll().filter(
         m => m.sessionMetadata?.conversationId === conversationId
       );
+    } else {
+      // Always use long-term storage for conversation history
+      // No limit - retrieve entire conversation
+      logger.info('[MemoryManager] Querying long-term storage for conversation history', {
+        conversationId,
+        orderBy: 'timestamp',
+        orderDirection: 'asc'
+      });
+      
+      memories = await this.longTerm.search({
+        conversationId,
+        orderBy: 'timestamp',
+        orderDirection: 'asc'
+        // No limit - get full conversation history
+      });
     }
 
-    // Always use long-term storage for conversation history
-    // No limit - retrieve entire conversation
-    return this.longTerm.search({
+    logger.info('[MemoryManager] Conversation history retrieved', {
       conversationId,
-      orderBy: 'timestamp',
-      orderDirection: 'asc'
-      // No limit - get full conversation history
+      memoryCount: memories.length,
+      memories: memories.map(m => ({
+        id: m.id,
+        type: m.type,
+        role: m.role,
+        contentPreview: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : ''),
+        contentLength: m.content.length,
+        timestamp: m.timestamp,
+        hasToolCall: !!m.toolCall,
+        hasToolResult: !!m.toolResult
+      }))
     });
+
+    return memories;
   }
 
   /**
@@ -144,9 +262,21 @@ export class MemoryManagerImpl implements IMemoryManager {
     channel: Channel,
     options?: { limit?: number; conversationId?: string }
   ): Promise<Memory[]> {
+    logger.info('[MemoryManager] Getting channel history', {
+      channel,
+      options,
+      hasLongTermStorage: !!this.longTerm
+    });
+
     if (!this.longTerm) {
       // Fallback to short-term ONLY if no long-term storage available
-      return this.shortTerm.getAll().filter(m => m.channel === channel);
+      logger.warn('[MemoryManager] No long-term storage available, using short-term fallback for channel history', { channel });
+      const results = this.shortTerm.getAll().filter(m => m.channel === channel);
+      logger.info('[MemoryManager] Channel history retrieved (short-term fallback)', {
+        channel,
+        resultCount: results.length
+      });
+      return results;
     }
 
     // Always use long-term storage for channel history
@@ -178,6 +308,12 @@ export class MemoryManagerImpl implements IMemoryManager {
     channel: Channel;
     metadata?: Record<string, any>;
   }): Promise<void> {
+    logger.info('[MemoryManager] Starting new session', {
+      conversationId: session.conversationId,
+      channel: session.channel,
+      metadata: session.metadata
+    });
+
     const memory: Memory = {
       id: `session-start-${session.conversationId}`,
       content: `Started ${session.channel} conversation`,
@@ -192,12 +328,21 @@ export class MemoryManagerImpl implements IMemoryManager {
     };
 
     await this.store(memory);
+    logger.info('[MemoryManager] Session started', {
+      conversationId: session.conversationId,
+      channel: session.channel
+    });
   }
 
   /**
    * End a conversation session
    */
   public async endSession(conversationId: string, summary?: string): Promise<void> {
+    logger.info('[MemoryManager] Ending session', {
+      conversationId,
+      summary: summary?.substring(0, 100)
+    });
+
     const memory: Memory = {
       id: `session-end-${conversationId}`,
       content: summary || 'Conversation ended',
@@ -210,6 +355,9 @@ export class MemoryManagerImpl implements IMemoryManager {
     };
 
     await this.store(memory);
+    logger.info('[MemoryManager] Session ended', {
+      conversationId
+    });
   }
 
   // ==================== CONVERSATION LOOKUP ====================

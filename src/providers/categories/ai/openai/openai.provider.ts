@@ -90,6 +90,14 @@ export class OpenAIProvider extends BaseAIProvider {
    * We merge context messages into the main system prompt.
    */
   private buildMessages(options: ChatOptions): ChatCompletionMessageParam[] {
+    logger.info('[OpenAIProvider] Building messages array for OpenAI API', {
+      conversationId: options.conversationId,
+      conversationHistoryLength: options.conversationHistory?.length || 0,
+      hasSystemPrompt: !!options.systemPrompt,
+      systemPromptLength: options.systemPrompt?.length || 0,
+      userMessageLength: options.userMessage?.length || 0
+    });
+
     const messages: ChatCompletionMessageParam[] = [];
 
     // Build comprehensive system message
@@ -100,6 +108,17 @@ export class OpenAIProvider extends BaseAIProvider {
     const conversationMessages: ChatCompletionMessageParam[] = [];
 
     if (options.conversationHistory) {
+      logger.info('[OpenAIProvider] Processing conversation history', {
+        conversationId: options.conversationId,
+        totalHistoryItems: options.conversationHistory.length,
+        historyBreakdown: {
+          system: options.conversationHistory.filter(m => m.role === 'system').length,
+          user: options.conversationHistory.filter(m => m.role === 'user').length,
+          assistant: options.conversationHistory.filter(m => m.role === 'assistant').length,
+          other: options.conversationHistory.filter(m => !['system', 'user', 'assistant'].includes(m.role)).length
+        }
+      });
+
       for (const msg of options.conversationHistory) {
         if (msg.role === 'system') {
           // Collect system/context messages
@@ -112,11 +131,28 @@ export class OpenAIProvider extends BaseAIProvider {
           });
         }
       }
+
+      logger.info('[OpenAIProvider] Processed conversation history', {
+        conversationId: options.conversationId,
+        contextMessageCount: contextMessages.length,
+        conversationMessageCount: conversationMessages.length,
+        conversationMessages: conversationMessages.map((m, index) => ({
+          index,
+          role: m.role,
+          content: m.content, // Full content for debugging
+          contentLength: typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length
+        }))
+      });
     }
 
     // Merge context into system prompt
     if (contextMessages.length > 0) {
       systemContent += '\n\n# RELEVANT CONTEXT\n' + contextMessages.join('\n\n');
+      logger.info('[OpenAIProvider] Merged context messages into system prompt', {
+        conversationId: options.conversationId,
+        contextMessageCount: contextMessages.length,
+        finalSystemPromptLength: systemContent.length
+      });
     }
 
     // Add single comprehensive system message
@@ -134,6 +170,24 @@ export class OpenAIProvider extends BaseAIProvider {
     messages.push({
       role: 'user',
       content: options.userMessage
+    });
+
+    logger.info('[OpenAIProvider] Final messages array built for OpenAI API', {
+      conversationId: options.conversationId,
+      totalMessageCount: messages.length,
+      systemMessageCount: messages.filter(m => m.role === 'system').length,
+      userMessageCount: messages.filter(m => m.role === 'user').length,
+      assistantMessageCount: messages.filter(m => m.role === 'assistant').length,
+      messages: messages.map((m, index) => ({
+        index,
+        role: m.role,
+        contentPreview: (typeof m.content === 'string' 
+          ? m.content.substring(0, 200) 
+          : JSON.stringify(m.content).substring(0, 200)) + '...',
+        contentLength: typeof m.content === 'string' 
+          ? m.content.length 
+          : JSON.stringify(m.content).length
+      }))
     });
 
     return messages;
