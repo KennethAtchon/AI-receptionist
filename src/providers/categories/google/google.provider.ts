@@ -84,7 +84,7 @@
  *    c. Add scopes:
  *       - https://www.googleapis.com/auth/calendar
  *       - https://www.googleapis.com/auth/spreadsheets
- *       - https://www.googleapis.com/auth/drive.file
+ *       - https://www.googleapis.com/auth/drive
  *    d. Add test users (if in testing mode)
  *    e. Save and continue through all steps
  * 4. Back in Credentials, click "Create Credentials" → "OAuth client ID"
@@ -105,7 +105,7 @@
  *     d. In left panel, find and select:
  *        - Google Calendar API v3 → https://www.googleapis.com/auth/calendar
  *        - Google Sheets API v4 → https://www.googleapis.com/auth/spreadsheets
- *        - Google Drive API v3 → https://www.googleapis.com/auth/drive.file
+ *        - Google Drive API v3 → https://www.googleapis.com/auth/drive
  *     e. Click "Authorize APIs"
  *     f. Sign in with the Google account you want to use
  *     g. Grant permissions
@@ -170,8 +170,8 @@
  *   (Google Calendar: create, read, update, delete events)
  * - https://www.googleapis.com/auth/spreadsheets
  *   (Google Sheets: full access to spreadsheets)
- * - https://www.googleapis.com/auth/drive.file
- *   (Google Drive: create files and folders)
+ * - https://www.googleapis.com/auth/drive
+ *   (Google Drive: full access to create, read, update, and delete files)
  * 
  * These are automatically included when using Service Account or OAuth2.
  * 
@@ -181,6 +181,11 @@
  * 
  * Error: "Request had insufficient authentication scopes"
  * → Solution: Ensure all required APIs are enabled and scopes are correct
+ * 
+ * Error: "The caller does not have permission" (when creating spreadsheets)
+ * → Solution: Ensure you're using the 'drive' scope (not 'drive.file') to create new files
+ * → Solution (OAuth2): Regenerate your refresh token with the 'drive' scope included
+ * → Solution (Service Account): Ensure the service account has proper IAM permissions in Google Cloud Console
  * 
  * Error: "Calendar not found" or "Access denied"
  * → Solution (Service Account): Share the calendar with service account email
@@ -326,7 +331,7 @@ export class GoogleProvider extends BaseProvider {
           scopes: [
             'https://www.googleapis.com/auth/calendar',
             'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive.file'
+            'https://www.googleapis.com/auth/drive'
           ]
         });
       } else if (this.isOAuth2Credentials(this.config.credentials)) {
@@ -359,7 +364,7 @@ export class GoogleProvider extends BaseProvider {
         scopes: [
           'https://www.googleapis.com/auth/calendar',
           'https://www.googleapis.com/auth/spreadsheets',
-          'https://www.googleapis.com/auth/drive.file'
+          'https://www.googleapis.com/auth/drive'
         ]
       });
     } else {
