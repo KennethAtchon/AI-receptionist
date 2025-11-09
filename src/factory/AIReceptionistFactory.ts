@@ -37,6 +37,7 @@ import { initializeProviders, getAIProvider } from '../providers/initialization'
 import { registerAllTools } from '../tools/initialization';
 import { initializeResources } from '../resources/initialization';
 import { logger } from '../utils/logger';
+import { setupDatabaseTools } from '../tools/standard/database-tools';
 import type {
   AgentInstanceConfig,
   AgentInstance
@@ -49,6 +50,7 @@ export class AIReceptionistFactory {
   private sharedStorage?: DatabaseStorage | InMemoryStorage;
   private sharedLongTermMemory?: LongTermMemory;
   private baseToolRegistry!: ToolRegistry;
+  private databaseToolsRegistered = false; // Track if database tools have been registered
 
   // =============== CONFIG ===============
   private config: AIReceptionistConfig;
@@ -224,7 +226,10 @@ export class AIReceptionistFactory {
       builder.withMemory({
         contextWindow: config.memory.contextWindow || 20,
         longTermEnabled: true,
-        longTermStorage: config.memory.longTermStorage
+        longTermStorage: config.memory.longTermStorage,
+        autoPersist: config.memory.autoPersist || {
+          persistAll: true // Default: persist all memories
+        }
       });
     } else if (this.sharedLongTermMemory) {
       // Use factory's shared memory (default for factory pattern)
@@ -234,7 +239,10 @@ export class AIReceptionistFactory {
       builder.withMemory({
         contextWindow: config.memory?.contextWindow || 20,
         longTermEnabled: true,
-        sharedLongTermMemory: this.sharedLongTermMemory // Shared
+        sharedLongTermMemory: this.sharedLongTermMemory, // Shared
+        autoPersist: config.memory?.autoPersist || {
+          persistAll: true // Default: persist all memories
+        }
       });
     } else {
       // No storage configured
@@ -258,6 +266,21 @@ export class AIReceptionistFactory {
 
     // Initialize agent
     await agent.initialize();
+
+    // Register database tools if long-term memory is enabled
+    // Check if agent has long-term memory by inspecting memory manager
+    const memoryManager = agent.getMemory() as any;
+    const hasLongTermMemory = memoryManager?.longTerm !== undefined;
+    
+    if (hasLongTermMemory && !this.databaseToolsRegistered) {
+      logger.info('[Factory] Registering database tools for agent with long-term memory');
+      // Storage is optional - database tools use agent.getMemory() directly
+      await setupDatabaseTools(this.baseToolRegistry, {
+        agent: agent
+      });
+      this.databaseToolsRegistered = true;
+      logger.info('[Factory] Database tools registered');
+    }
 
     // Create per-agent tool store (binds to agent's memory)
     const toolStore = new ToolStore();

@@ -193,10 +193,13 @@ export async function createCalendarEvent(
   eventObject: EventObject
 ): Promise<CalendarResult> {
   try {
+    // Use 'none' instead of 'all' to avoid Domain-Wide Delegation requirement
+    // Service accounts cannot send invitations without Domain-Wide Delegation
+    // The event will still be created with attendees, but invitations won't be sent automatically
     const response = await calendarClient.events.insert({
       calendarId: calendarId,
       requestBody: eventObject,
-      sendUpdates: 'all' // Send invitations to all attendees
+      sendUpdates: 'none' // Don't send invitations (avoids Domain-Wide Delegation requirement)
     });
 
     logger.info('[GoogleCalendar] Calendar event created successfully', {
@@ -240,11 +243,13 @@ export async function updateCalendarEvent(
   eventObject: EventObject
 ): Promise<CalendarResult> {
   try {
+    // Use 'none' instead of 'all' to avoid Domain-Wide Delegation requirement
+    // Service accounts cannot send invitations without Domain-Wide Delegation
     const response = await calendarClient.events.update({
       calendarId: calendarId,
       eventId: eventId,
       requestBody: eventObject,
-      sendUpdates: 'all' // Notify all attendees of changes
+      sendUpdates: 'none' // Don't send notifications (avoids Domain-Wide Delegation requirement)
     });
 
     logger.info('[GoogleCalendar] Calendar event updated successfully', {
@@ -285,10 +290,12 @@ export async function deleteCalendarEvent(
   eventId: string
 ): Promise<CalendarResult> {
   try {
+    // Use 'none' instead of 'all' to avoid Domain-Wide Delegation requirement
+    // Service accounts cannot send invitations without Domain-Wide Delegation
     await calendarClient.events.delete({
       calendarId: calendarId,
       eventId: eventId,
-      sendUpdates: 'all' // Notify all attendees of cancellation
+      sendUpdates: 'none' // Don't send cancellation notifications (avoids Domain-Wide Delegation requirement)
     });
 
     logger.info('[GoogleCalendar] Calendar event deleted successfully', { eventId });

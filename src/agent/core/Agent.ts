@@ -40,11 +40,11 @@ import { logger } from '../../utils/logger';
 
 export class Agent {
   // ==================== CORE COMPONENTS (The 5 Pillars) ====================
-  private readonly identity: Identity;
-  private readonly personality: PersonalityEngine;
-  private readonly knowledge: KnowledgeBase;
-  private readonly memory: MemoryManager;
-  private readonly goals: GoalSystem;
+  private identity: Identity;
+  private personality: PersonalityEngine;
+  private knowledge: KnowledgeBase;
+  private memory: MemoryManager;
+  private goals: GoalSystem;
 
   // ==================== SUPPORTING SYSTEMS ====================
   private readonly promptBuilder: SystemPromptBuilder;
@@ -651,6 +651,131 @@ export class Agent {
    */
   public markPromptForRebuild(): void {
     this.promptNeedsRebuild = true;
+  }
+
+  /**
+   * Update agent configuration dynamically
+   * Allows runtime updates to agent configuration
+   * Recreates components cleanly following the same pattern as the constructor
+   * 
+   * @param config - Partial agent configuration to update
+   * @returns Agent instance for method chaining
+   * 
+   * @example
+   * ```typescript
+   * agent.withAgentConfig({
+   *   identity: { name: 'New Name', role: 'New Role' },
+   *   memory: { contextWindow: 30 }
+   * });
+   * ```
+   */
+  public withAgentConfig(config: Partial<AgentConfiguration>): this {
+    // Build merged configuration by combining existing config with new config
+    // This follows the same pattern as the constructor
+    const currentConfig = this.getCurrentConfig();
+    const mergedConfig: AgentConfiguration = {
+      ...currentConfig,
+      ...config,
+      // Merge nested objects properly
+      identity: config.identity ? { ...currentConfig.identity, ...config.identity } : currentConfig.identity,
+      personality: config.personality ? { ...currentConfig.personality, ...config.personality } : currentConfig.personality,
+      knowledge: config.knowledge ? { ...currentConfig.knowledge, ...config.knowledge } : currentConfig.knowledge,
+      memory: config.memory ? { ...currentConfig.memory, ...config.memory } : currentConfig.memory,
+      goals: config.goals ? { ...currentConfig.goals, ...config.goals } : currentConfig.goals,
+    };
+
+    // Track what needs to be rebuilt
+    const needsIdentityRebuild = !!config.identity;
+    const needsPersonalityRebuild = !!config.personality;
+    const needsKnowledgeRebuild = !!config.knowledge;
+    const needsMemoryRebuild = !!config.memory;
+    const needsGoalsRebuild = !!config.goals;
+    let needsPromptRebuild = needsIdentityRebuild || needsPersonalityRebuild || needsKnowledgeRebuild || needsGoalsRebuild;
+
+    // Rebuild components that changed, following constructor pattern
+    if (needsIdentityRebuild) {
+      this.identity = new IdentityImpl(mergedConfig.identity || {
+        name: 'Custom Agent',
+        role: 'AI Assistant',
+        authorityLevel: 'medium'
+      });
+    }
+
+    if (needsPersonalityRebuild) {
+      this.personality = new PersonalityEngineImpl(mergedConfig.personality || {});
+    }
+
+    if (needsKnowledgeRebuild) {
+      this.knowledge = new KnowledgeBaseImpl(mergedConfig.knowledge || { domain: 'general' });
+    }
+
+    if (needsMemoryRebuild) {
+      // Dispose old memory manager
+      this.memory.dispose().catch(err => {
+        logger.warn('[Agent] Error disposing old memory manager', { agentId: this.id, error: err });
+      });
+
+      // Create new memory manager following constructor pattern
+      this.memory = new MemoryManagerImpl(mergedConfig.memory || {});
+      // Initialize asynchronously (memory initialization is async)
+      this.memory.initialize().catch(err => {
+        logger.error('[Agent] Failed to initialize new memory manager', err as Error, { agentId: this.id });
+      });
+    }
+
+    if (needsGoalsRebuild) {
+      const goalConfig = mergedConfig.goals || { primary: 'Assist users effectively' };
+      if (!goalConfig.primary || goalConfig.primary.trim().length === 0) {
+        goalConfig.primary = 'Assist users effectively';
+      }
+      this.goals = new GoalSystemImpl(goalConfig);
+    }
+
+    // Update custom system prompt if provided
+    if (config.customSystemPrompt !== undefined) {
+      (this as any).customSystemPrompt = config.customSystemPrompt;
+      needsPromptRebuild = true;
+    }
+
+    // Mark prompt for rebuild if any pillar changed
+    if (needsPromptRebuild) {
+      this.markPromptForRebuild();
+    }
+
+    logger.info('[Agent] Agent configuration updated', {
+      agentId: this.id,
+      updatedComponents: {
+        identity: needsIdentityRebuild,
+        personality: needsPersonalityRebuild,
+        knowledge: needsKnowledgeRebuild,
+        memory: needsMemoryRebuild,
+        goals: needsGoalsRebuild
+      }
+    });
+
+    return this;
+  }
+
+  /**
+   * Get current agent configuration
+   * Used internally by withAgentConfig to merge with new config
+   */
+  private getCurrentConfig(): AgentConfiguration {
+    return {
+      identity: (this.identity as any).toJSON ? (this.identity as any).toJSON() : {
+        name: this.identity.name,
+        role: this.identity.role,
+        authorityLevel: this.identity.authorityLevel
+      },
+      personality: {}, // Personality doesn't expose config getter
+      knowledge: { domain: 'general' }, // Knowledge doesn't expose config getter
+      memory: (this.memory as any).config || {},
+      goals: { primary: 'Assist users effectively' }, // Goals doesn't expose config getter
+      aiProvider: this.aiProvider,
+      toolRegistry: this.toolRegistry,
+      providerRegistry: (this as any).providerRegistry,
+      customSystemPrompt: this.customSystemPrompt
+    };
   }
 
   /**

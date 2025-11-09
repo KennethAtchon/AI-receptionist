@@ -562,13 +562,17 @@ export class MemoryManagerImpl implements IMemoryManager {
   private shouldPersist(memory: Memory): boolean {
     // Use auto-persist rules if configured
     if (this.config.autoPersist) {
-      const { minImportance, types } = this.config.autoPersist;
+      const { minImportance, types, persistAll } = this.config.autoPersist;
 
       if (minImportance && memory.importance && memory.importance >= minImportance) {
         return true;
       }
 
       if (types && types.includes(memory.type)) {
+        return true;
+      }
+
+      if (persistAll) {
         return true;
       }
     }

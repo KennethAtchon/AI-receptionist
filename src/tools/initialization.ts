@@ -102,15 +102,31 @@ async function registerCustomTools(
 
 /**
  * Register database tools for long-term memory
+ * 
+ * Note: Database tools require an agent instance, so they can only be registered
+ * when creating individual agents, not at factory initialization.
+ * At factory initialization, we skip them since no agent exists yet.
  */
 async function registerDatabaseTools(
   context: ToolInitializationContext,
   toolRegistry: ToolRegistry
 ): Promise<void> {
+  // Database tools require an agent instance - skip if no agent available (factory initialization)
+  if (!context.agent) {
+    const hasDatabaseStorage = context.config.storage?.type === 'database';
+    
+    if (hasDatabaseStorage) {
+      logger.info('[ToolInit] Skipping database tools at factory initialization (require agent instance - will be available per-agent if long-term memory is enabled)');
+    } else {
+      logger.info('[ToolInit] Long-term memory disabled (no database storage configured), skipping database tools');
+    }
+    return;
+  }
+
   const memoryConfig = context.config.agent?.memory;
 
   if (!memoryConfig?.longTermEnabled || !memoryConfig?.longTermStorage) {
-    logger.info('[ToolInit] Long-term memory disabled, skipping database tools');
+    logger.info('[ToolInit] Long-term memory disabled for this agent, skipping database tools');
     return;
   }
 

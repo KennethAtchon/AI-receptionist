@@ -318,6 +318,7 @@ export interface MemoryConfig {
   autoPersist?: {
     minImportance?: number; // Auto-save if importance >= this
     types?: Memory['type'][]; // Auto-save these types
+    persistAll?: boolean; // Auto-save all memories
   };
 }
 

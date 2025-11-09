@@ -53,6 +53,12 @@ export interface AgentInstanceConfig {
     // longTermStorage is automatically configured by factory
     // Per-agent storage override (optional, for hybrid pattern)
     longTermStorage?: any;
+    // Auto-persistence rules
+    autoPersist?: {
+      minImportance?: number; // Auto-save if importance >= this
+      types?: Array<'conversation' | 'decision' | 'error' | 'tool_execution' | 'system'>; // Auto-save these types
+      persistAll?: boolean; // Auto-save all memories
+    };
   };
 }
 
