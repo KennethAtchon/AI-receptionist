@@ -222,6 +222,65 @@ export async function createCalendarEvent(
       }
     };
   } catch (error: any) {
+    // Check if error is due to Domain-Wide Delegation requirement
+    // Service accounts cannot add attendees without Domain-Wide Delegation
+    if (error?.message?.includes('Domain-Wide Delegation') || 
+        error?.message?.includes('cannot invite attendees')) {
+      logger.warn('[GoogleCalendar] Domain-Wide Delegation not configured. Retrying without attendees...', {
+        error: error.message
+      });
+
+      try {
+        // Extract attendee emails for description
+        const attendeeEmails = eventObject.attendees?.map(a => a.email).filter(Boolean) || [];
+        const attendeeList = attendeeEmails.length > 0 
+          ? `\n\nAttendees: ${attendeeEmails.join(', ')}` 
+          : '';
+
+        // Create event without attendees (service account limitation)
+        const eventWithoutAttendees = {
+          ...eventObject,
+          attendees: undefined, // Remove attendees
+          description: `${eventObject.description || ''}${attendeeList}`
+        };
+
+        const response = await calendarClient.events.insert({
+          calendarId: calendarId,
+          requestBody: eventWithoutAttendees,
+          sendUpdates: 'none'
+        });
+
+        logger.info('[GoogleCalendar] Calendar event created successfully (without attendees due to service account limitation)', {
+          eventId: response.data.id,
+          htmlLink: response.data.htmlLink
+        });
+
+        return {
+          success: true,
+          data: {
+            eventId: response.data.id,
+            htmlLink: response.data.htmlLink,
+            iCalUID: response.data.iCalUID,
+            start: response.data.start,
+            end: response.data.end
+          },
+          response: {
+            text: `Calendar meeting created successfully. Meeting ID: ${response.data.id}. Note: Attendees were added to the description instead of as calendar invitees due to service account limitations.`,
+            htmlLink: response.data.htmlLink || ''
+          }
+        };
+      } catch (retryError: any) {
+        logger.error('[GoogleCalendar] Failed to create calendar event even without attendees:', retryError);
+        return {
+          success: false,
+          error: retryError?.message || 'Failed to create calendar meeting',
+          response: {
+            text: `Failed to create calendar meeting: ${retryError?.message || 'Unknown error'}`
+          }
+        };
+      }
+    }
+
     logger.error('[GoogleCalendar] Failed to create calendar event:', error);
     return {
       success: false,
@@ -270,6 +329,63 @@ export async function updateCalendarEvent(
       }
     };
   } catch (error: any) {
+    // Check if error is due to Domain-Wide Delegation requirement
+    if (error?.message?.includes('Domain-Wide Delegation') || 
+        error?.message?.includes('cannot invite attendees')) {
+      logger.warn('[GoogleCalendar] Domain-Wide Delegation not configured. Retrying update without attendees...', {
+        error: error.message
+      });
+
+      try {
+        // Extract attendee emails for description
+        const attendeeEmails = eventObject.attendees?.map(a => a.email).filter(Boolean) || [];
+        const attendeeList = attendeeEmails.length > 0 
+          ? `\n\nAttendees: ${attendeeEmails.join(', ')}` 
+          : '';
+
+        // Update event without attendees (service account limitation)
+        const eventWithoutAttendees = {
+          ...eventObject,
+          attendees: undefined, // Remove attendees
+          description: `${eventObject.description || ''}${attendeeList}`
+        };
+
+        const response = await calendarClient.events.update({
+          calendarId: calendarId,
+          eventId: eventId,
+          requestBody: eventWithoutAttendees,
+          sendUpdates: 'none'
+        });
+
+        logger.info('[GoogleCalendar] Calendar event updated successfully (without attendees due to service account limitation)', {
+          eventId: response.data.id
+        });
+
+        return {
+          success: true,
+          data: {
+            eventId: response.data.id,
+            htmlLink: response.data.htmlLink,
+            start: response.data.start,
+            end: response.data.end
+          },
+          response: {
+            text: `Calendar meeting updated successfully. Meeting ID: ${response.data.id}. Note: Attendees were added to the description instead of as calendar invitees due to service account limitations.`,
+            htmlLink: response.data.htmlLink || ''
+          }
+        };
+      } catch (retryError: any) {
+        logger.error('[GoogleCalendar] Failed to update calendar event even without attendees:', retryError);
+        return {
+          success: false,
+          error: retryError?.message || 'Failed to update calendar meeting',
+          response: {
+            text: `Failed to update calendar meeting: ${retryError?.message || 'Unknown error'}`
+          }
+        };
+      }
+    }
+
     logger.error('[GoogleCalendar] Failed to update calendar event:', error);
     return {
       success: false,

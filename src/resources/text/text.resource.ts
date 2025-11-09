@@ -55,30 +55,11 @@ export class TextResource {
           metadata: options.metadata
         });
         logger.info(`[TextResource] Created new conversation: ${conversationId}`);
-      } else {
-        // Add user message to existing conversation
-        logger.info('[TextResource] Storing user message to memory', {
-          conversationId,
-          contentPreview: options.prompt.substring(0, 100) + (options.prompt.length > 100 ? '...' : ''),
-          contentLength: options.prompt.length
-        });
-
-        await this.agent.getMemory().store({
-          id: `msg-${conversationId}-${Date.now()}`,
-          content: options.prompt,
-          timestamp: new Date(),
-          type: 'conversation',
-          channel: 'text',
-          role: 'user',
-          sessionMetadata: { conversationId }
-        });
-
-        logger.info('[TextResource] User message stored to memory', {
-          conversationId
-        });
       }
+      // Note: We don't store messages here - Agent.process() handles storing both user and assistant messages
 
       // Create agent request with enhanced context
+      // Agent.process() will automatically store the user message and assistant response
       const agentResponse = await this.agent.process({
         id: `text-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         input: options.prompt,
@@ -92,28 +73,6 @@ export class TextResource {
             timestamp: new Date().toISOString()
           }
         }
-      });
-
-      // Add assistant response to conversation using Agent memory
-      logger.info('[TextResource] Storing assistant response to memory', {
-        conversationId,
-        contentPreview: agentResponse.content.substring(0, 100) + (agentResponse.content.length > 100 ? '...' : ''),
-        contentLength: agentResponse.content.length,
-        hasToolCalls: !!(agentResponse.metadata?.toolsUsed && agentResponse.metadata.toolsUsed.length > 0)
-      });
-
-      await this.agent.getMemory().store({
-        id: `msg-${conversationId}-${Date.now()}`,
-        content: agentResponse.content,
-        timestamp: new Date(),
-        type: 'conversation',
-        channel: 'text',
-        role: 'assistant',
-        sessionMetadata: { conversationId }
-      });
-
-      logger.info('[TextResource] Assistant response stored to memory', {
-        conversationId
       });
 
       const response: TextResponse = {

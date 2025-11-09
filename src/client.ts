@@ -115,6 +115,7 @@ export class AIReceptionist {
         prefix: config.logger.prefix,
         enableTimestamps: config.logger.enableTimestamps,
         enableColors: true, // Keep colors enabled by default
+        ignoreTags: config.logger.ignoreTags, // Pass through ignoreTags configuration
       };
       configureLogger(loggerConfig);
     }

@@ -32,6 +32,23 @@ export interface LoggerConfig {
   enableTimestamps?: boolean;
   enableColors?: boolean;
   prefix?: string;
+  /**
+   * Tags to ignore (supports regex patterns)
+   * Tags are extracted from log messages (e.g., [MemoryManager], [TextResource])
+   * 
+   * @example
+   * // Ignore specific tags
+   * ignoreTags: ['MemoryManager', 'DatabaseStorage']
+   * 
+   * @example
+   * // Ignore tags matching regex pattern
+   * ignoreTags: [/^Memory/, /Storage$/]
+   * 
+   * @example
+   * // Mix of strings and regex
+   * ignoreTags: ['MemoryManager', /^Database/]
+   */
+  ignoreTags?: Array<string | RegExp>;
 }
 
 /**
@@ -43,6 +60,7 @@ export class Logger implements ILogger {
   private _enableTimestamps: boolean;
   private _enableColors: boolean;
   private _prefix: string;
+  private _ignoreTags: Array<string | RegExp>;
   private _logQueue: Array<() => void> = [];
   private _isProcessing: boolean = false;
 
@@ -51,6 +69,7 @@ export class Logger implements ILogger {
     this._enableTimestamps = config.enableTimestamps ?? true;
     this._enableColors = config.enableColors ?? true;
     this._prefix = config.prefix ?? '[AIReceptionist]';
+    this._ignoreTags = config.ignoreTags || [];
   }
 
   private parseLogLevel(level?: LogLevel | string): LogLevel | undefined {
@@ -115,7 +134,58 @@ export class Logger implements ILogger {
     }
   }
 
+  /**
+   * Extract tags from log message (e.g., [MemoryManager], [TextResource])
+   */
+  private extractTags(message: string): string[] {
+    const tagPattern = /\[([^\]]+)\]/g;
+    const tags: string[] = [];
+    let match;
+    while ((match = tagPattern.exec(message)) !== null) {
+      tags.push(match[1]);
+    }
+    return tags;
+  }
+
+  /**
+   * Check if any tag in the message matches any ignore pattern
+   */
+  private shouldIgnoreMessage(message: string): boolean {
+    if (this._ignoreTags.length === 0) {
+      return false;
+    }
+
+    const tags = this.extractTags(message);
+    if (tags.length === 0) {
+      return false;
+    }
+
+    // Check each tag against each ignore pattern
+    for (const tag of tags) {
+      for (const ignorePattern of this._ignoreTags) {
+        if (ignorePattern instanceof RegExp) {
+          // Regex pattern matching
+          if (ignorePattern.test(tag)) {
+            return true;
+          }
+        } else {
+          // String matching (exact match)
+          if (tag === ignorePattern) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   private log(level: string, message: string, context?: LoggerContext): void {
+    // Check if message should be ignored based on tags
+    if (this.shouldIgnoreMessage(message)) {
+      return;
+    }
+
     const timestamp = this._enableTimestamps ? new Date().toISOString() : '';
     const color = this._enableColors ? this.getColor(level) : '';
     const reset = this._enableColors ? '\x1b[0m' : '';

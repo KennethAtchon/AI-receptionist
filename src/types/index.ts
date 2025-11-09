@@ -488,6 +488,19 @@ export interface LoggerConfig {
   level?: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE';
   prefix?: string;
   enableTimestamps?: boolean;
+  /**
+   * Tags to ignore (supports regex patterns)
+   * Tags are extracted from log messages (e.g., [MemoryManager], [TextResource])
+   * 
+   * @example
+   * // Ignore specific tags
+   * ignoreTags: ['MemoryManager', 'DatabaseStorage']
+   * 
+   * @example
+   * // Ignore tags matching regex pattern
+   * ignoreTags: [/^Memory/, /Storage$/]
+   */
+  ignoreTags?: Array<string | RegExp>;
 }
 
 export interface ToolConfig {
