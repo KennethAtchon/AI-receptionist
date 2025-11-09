@@ -13,7 +13,8 @@ import { pgTable, uuid, text, timestamp, integer, jsonb, boolean, index } from '
  */
 export const memory = pgTable('ai_receptionist_memory', {
   // Core fields
-  id: uuid('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
+  externalId: text('external_id'), // User-provided text ID (e.g., "msg-lead-2-1762673752098")
   content: text('content').notNull(),
   timestamp: timestamp('timestamp').notNull(),
   type: text('type').notNull(), // 'conversation' | 'decision' | 'error' | 'tool_execution' | 'system'
@@ -64,9 +65,11 @@ export const memory = pgTable('ai_receptionist_memory', {
   index('memory_type_idx').on(table.type),
   index('memory_timestamp_idx').on(table.timestamp),
   index('memory_importance_idx').on(table.importance),
+  index('memory_external_id_idx').on(table.externalId),
 ]);
 
 /**
+ * Currently not used
  * Optional: Leads table for business logic
  * Stores customer/lead information collected by AI
  */
@@ -85,6 +88,7 @@ export const leads = pgTable('ai_receptionist_leads', {
 ]);
 
 /**
+ * Currently not used
  * Optional: Call logs table for analytics
  * Stores call outcomes and summaries
  */

@@ -9,7 +9,7 @@
  * 1. Generate migration: npx drizzle-kit generate
  * 2. Apply migration: npx drizzle-kit migrate
  *
- * However, you can enable automatic table creation by setting autoMigrate: true.
+ * However, you can enable automatic memoryTable creation by setting autoMigrate: true.
  * This will automatically create required tables if they don't exist.
  * The schema is defined in ./schema.ts.
  */
@@ -59,7 +59,7 @@ export type DatabaseStorageConfig =
 
 export class DatabaseStorage implements IStorage {
   private db: SupportedDatabase;
-  private table: typeof memory;
+  private memoryTable: typeof memory;
   private config: DatabaseStorageConfig;
   private initialized = false;
   private ownsConnection = false; // Track if we created the connection
@@ -67,7 +67,7 @@ export class DatabaseStorage implements IStorage {
 
   constructor(config: DatabaseStorageConfig) {
     this.config = config;
-    this.table = memory;
+    this.memoryTable = memory;
 
     // If db is provided directly, use it
     if ('db' in config && config.db) {
@@ -121,19 +121,19 @@ export class DatabaseStorage implements IStorage {
         throw error;
       }
     } else {
-      logger.info('[DatabaseStorage] Auto-migrate disabled, skipping table creation');
+      logger.info('[DatabaseStorage] Auto-migrate disabled, skipping memoryTable creation');
     }
 
     // Test connection with a simple query
     try {
       logger.info('[DatabaseStorage] Testing database connection...');
-      await this.db.select().from(this.table).limit(1);
+      await this.db.select().from(this.memoryTable).limit(1);
       logger.info('[DatabaseStorage] Database connection test successful');
     } catch (error) {
       logger.error('[DatabaseStorage] Database connection test failed', error instanceof Error ? error : new Error(String(error)), {
         error: error instanceof Error ? error.message : String(error)
       });
-      // Don't throw - might be okay if table doesn't exist yet
+      // Don't throw - might be okay if memoryTable doesn't exist yet
     }
 
     this.initialized = true;
@@ -238,8 +238,8 @@ export class DatabaseStorage implements IStorage {
     });
 
     try {
-      await this.db.insert(this.table).values({
-        id: memory.id,
+      await this.db.insert(this.memoryTable).values({
+        externalId: memory.id, // Store user-provided ID in externalId field
         content: memory.content,
         timestamp: memory.timestamp,
         type: memory.type,
@@ -274,9 +274,9 @@ export class DatabaseStorage implements IStorage {
   async saveBatch(memories: Memory[]): Promise<void> {
     if (memories.length === 0) return;
 
-    await this.db.insert(this.table).values(
+    await this.db.insert(this.memoryTable).values(
       memories.map(m => ({
-        id: m.id,
+        externalId: m.id, // Store user-provided ID in externalId field
         content: m.content,
         timestamp: m.timestamp,
         type: m.type,
@@ -293,13 +293,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
-   * Get a specific memory by ID
+   * Get a specific memory by ID (external ID)
    */
   async get(id: string): Promise<Memory | null> {
     const result = await this.db
       .select()
-      .from(this.table)
-      .where(eq(this.table.id, id))
+      .from(this.memoryTable)
+      .where(eq(this.memoryTable.externalId, id))
       .limit(1);
 
     return result[0] ? this.mapToMemory(result[0]) : null;
@@ -321,7 +321,7 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    let dbQuery = this.db.select().from(this.table);
+    let dbQuery = this.db.select().from(this.memoryTable);
 
     // Build WHERE clauses
     const conditions: ReturnType<typeof eq>[] = [];
@@ -333,7 +333,7 @@ export class DatabaseStorage implements IStorage {
         sqlQuery: `sessionMetadata->>'conversationId' = '${query.conversationId}'`
       });
       conditions.push(
-        sql`${this.table.sessionMetadata}->>'conversationId' = ${query.conversationId}`
+        sql`${this.memoryTable.sessionMetadata}->>'conversationId' = ${query.conversationId}`
       );
     }
 
@@ -342,7 +342,7 @@ export class DatabaseStorage implements IStorage {
       for (const [key, value] of Object.entries(query.sessionMetadata)) {
         if (value !== undefined && value !== null) {
           conditions.push(
-            sql`${this.table.sessionMetadata}->>${key} = ${String(value)}`
+            sql`${this.memoryTable.sessionMetadata}->>${key} = ${String(value)}`
           );
         }
       }
@@ -350,37 +350,37 @@ export class DatabaseStorage implements IStorage {
 
     // Filter by channel
     if (query.channel) {
-      conditions.push(eq(this.table.channel, query.channel));
+      conditions.push(eq(this.memoryTable.channel, query.channel));
     }
 
     // Filter by type
     if (query.type) {
       const types = Array.isArray(query.type) ? query.type : [query.type];
-      conditions.push(inArray(this.table.type, types));
+      conditions.push(inArray(this.memoryTable.type, types));
     }
 
     // Filter by role
     if (query.role) {
-      conditions.push(eq(this.table.role, query.role));
+      conditions.push(eq(this.memoryTable.role, query.role));
     }
 
     // Filter by date range
     if (query.startDate) {
-      conditions.push(gte(this.table.timestamp, query.startDate));
+      conditions.push(gte(this.memoryTable.timestamp, query.startDate));
     }
     if (query.endDate) {
-      conditions.push(lte(this.table.timestamp, query.endDate));
+      conditions.push(lte(this.memoryTable.timestamp, query.endDate));
     }
 
     // Filter by importance
-    if (query.minImportance !== undefined && this.table.importance) {
-      conditions.push(gte(this.table.importance, query.minImportance));
+    if (query.minImportance !== undefined && this.memoryTable.importance) {
+      conditions.push(gte(this.memoryTable.importance, query.minImportance));
     }
 
     // Keyword search (simple LIKE query)
     if (query.keywords && query.keywords.length > 0) {
       const keywordConditions = query.keywords.map(keyword =>
-        sql`${this.table.content} ILIKE ${`%${keyword}%`}`
+        sql`${this.memoryTable.content} ILIKE ${`%${keyword}%`}`
       );
       const keywordOr = or(...keywordConditions);
       if (keywordOr) {
@@ -396,7 +396,7 @@ export class DatabaseStorage implements IStorage {
     // Order by
     const orderBy = query.orderBy || 'timestamp';
     const orderDirection = query.orderDirection || 'desc';
-    const orderColumn = this.table[orderBy as keyof typeof this.table];
+    const orderColumn = this.memoryTable[orderBy as keyof typeof this.memoryTable];
 
     if (orderColumn && typeof orderColumn !== 'function') {
       dbQuery = dbQuery.orderBy(
@@ -452,10 +452,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
-   * Delete a memory
+   * Delete a memory by external ID
    */
   async delete(id: string): Promise<void> {
-    await this.db.delete(this.table).where(eq(this.table.id, id));
+    await this.db.delete(this.memoryTable).where(eq(this.memoryTable.externalId, id));
   }
 
   /**
@@ -463,7 +463,7 @@ export class DatabaseStorage implements IStorage {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      await this.db.select().from(this.table).limit(1);
+      await this.db.select().from(this.memoryTable).limit(1);
       return true;
     } catch (error) {
       console.error('Database health check failed:', error);
@@ -476,7 +476,7 @@ export class DatabaseStorage implements IStorage {
    */
   private mapToMemory(row: any): Memory {
     return {
-      id: row.id,
+      id: row.externalId || row.id, // Use externalId if available, fallback to UUID id
       content: row.content,
       timestamp: row.timestamp,
       type: row.type,
@@ -497,7 +497,7 @@ export class DatabaseStorage implements IStorage {
   async count(): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)` })
-      .from(this.table) as any;
+      .from(this.memoryTable) as any;
     return Number(result[0]?.count || 0);
   }
 
@@ -505,7 +505,7 @@ export class DatabaseStorage implements IStorage {
    * Utility: Clear all memories (for testing)
    */
   async clear(): Promise<void> {
-    await this.db.delete(this.table);
+    await this.db.delete(this.memoryTable);
   }
 
   // ============================================================================

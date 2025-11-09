@@ -73,7 +73,8 @@ export async function ensureTablesExist(db: SupportedDatabase): Promise<void> {
 async function createMemoryTable(db: SupportedDatabase): Promise<void> {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS ai_receptionist_memory (
-      id UUID PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      external_id TEXT,
       content TEXT NOT NULL,
       timestamp TIMESTAMP NOT NULL,
       type TEXT NOT NULL,
@@ -109,6 +110,10 @@ async function createMemoryTable(db: SupportedDatabase): Promise<void> {
   await db.execute(sql`
     CREATE INDEX IF NOT EXISTS memory_importance_idx 
     ON ai_receptionist_memory (importance)
+  `);
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS memory_external_id_idx 
+    ON ai_receptionist_memory (external_id)
   `);
 }
 
